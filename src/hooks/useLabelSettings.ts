@@ -37,6 +37,8 @@ export interface LabelSettings {
   showBarcode: boolean;
   showDate: boolean;
   showExpiry: boolean;
+  showStorage: boolean;
+  storageText: string;
   shelfLifeHours: number;
   logo: string;
   shopName: string;
@@ -49,6 +51,8 @@ export const defaultLabelSettings: LabelSettings = {
   showBarcode: true,
   showDate: true,
   showExpiry: true,
+  showStorage: true,
+  storageText: 'Хранить при +2…+6 °C',
   shelfLifeHours: 24,
   logo: '',
   shopName: 'Автосуши Автопицца',

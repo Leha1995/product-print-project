@@ -13,6 +13,7 @@ const toggles: { key: keyof LabelSettings; label: string }[] = [
   { key: 'showBarcode', label: 'Штрих-код' },
   { key: 'showDate', label: 'Дата изготовления' },
   { key: 'showExpiry', label: 'Употребить до' },
+  { key: 'showStorage', label: 'Температура' },
 ];
 
 const LabelSettingsPanel = ({ settings, onChange, onReset }: LabelSettingsPanelProps) => {
@@ -95,6 +96,28 @@ const LabelSettingsPanel = ({ settings, onChange, onReset }: LabelSettingsPanelP
             className="w-[70px] border-2 border-primary bg-card px-2 py-1 text-center font-head text-[15px] text-primary outline-none focus:bg-muted"
           />
         </label>
+      )}
+
+      {settings.showStorage && (
+        <div className="mt-3 grid gap-2">
+          <input
+            value={settings.storageText}
+            onChange={(e) => onChange({ storageText: e.target.value })}
+            placeholder="Условия хранения"
+            className="w-full border-2 border-primary bg-card px-3 py-2 font-body text-[14px] text-primary outline-none placeholder:text-muted-foreground focus:bg-muted"
+          />
+          <div className="flex flex-wrap gap-2">
+            {['Хранить при +2…+6 °C', 'Хранить при -18 °C', 'Хранить при +18…+25 °C'].map((t) => (
+              <button
+                key={t}
+                onClick={() => onChange({ storageText: t })}
+                className="border-2 border-dashed border-primary px-2 py-1 text-[11px] text-primary transition-colors hover:bg-muted"
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       <div className="mt-3 grid gap-2">
