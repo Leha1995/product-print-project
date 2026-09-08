@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-export type PaperId = 'roll58' | 'roll80' | 'label58x40' | 'a6';
+export type PaperId = 'label43x25' | 'roll58' | 'roll80' | 'label58x40' | 'a6';
 
 export interface PaperFormat {
   id: PaperId;
@@ -11,6 +11,13 @@ export interface PaperFormat {
 }
 
 export const paperFormats: PaperFormat[] = [
+  {
+    id: 'label43x25',
+    label: 'Лента 43×25',
+    hint: 'Мелкая этикетка на упаковку',
+    widthMm: 43,
+    heightMm: 25,
+  },
   { id: 'roll58', label: 'Лента 58 мм', hint: 'Компактный чековый принтер', widthMm: 58 },
   { id: 'roll80', label: 'Лента 80 мм', hint: 'Стандарт кассовой ленты', widthMm: 80 },
   {
@@ -46,7 +53,7 @@ export const defaultLabelSettings: LabelSettings = {
 const STORAGE_KEY = 'asap-label-settings-v1';
 
 export const getPaper = (id: PaperId) =>
-  paperFormats.find((p) => p.id === id) ?? paperFormats[1];
+  paperFormats.find((p) => p.id === id) ?? paperFormats.find((p) => p.id === 'roll80')!;
 
 export const useLabelSettings = () => {
   const [settings, setSettings] = useState<LabelSettings>(defaultLabelSettings);

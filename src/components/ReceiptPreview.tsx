@@ -23,42 +23,49 @@ const ReceiptPreview = ({
   });
 
   const paper = getPaper(settings.paper);
+  const tiny = paper.widthMm <= 45;
   const compact = paper.widthMm <= 58;
   const large = paper.widthMm >= 105;
 
   return (
     <div
-      className="print-area animate-print-out mx-auto border-2 border-primary bg-white p-4 font-body text-primary"
+      className={`print-area animate-print-out mx-auto border-2 border-primary bg-white font-body text-primary ${tiny ? 'p-2' : 'p-4'}`}
       style={{ maxWidth: `${paper.widthMm * 3.5}px` }}
     >
       {settings.logo && (
         <img
           src={settings.logo}
           alt=""
-          className="mx-auto mb-2 max-h-[52px] w-auto object-contain"
+          className={`mx-auto mb-1 w-auto object-contain ${tiny ? 'max-h-[26px]' : 'mb-2 max-h-[52px]'}`}
         />
       )}
       <div
-        className={`text-center font-head font-black uppercase tracking-[0.04em] ${large ? 'text-lg' : 'text-sm'}`}
+        className={`text-center font-head font-black uppercase tracking-[0.04em] ${large ? 'text-lg' : tiny ? 'text-[10px] leading-tight' : 'text-sm'}`}
       >
         {settings.shopName}
       </div>
-      <div className="mt-1 text-center text-[11px] uppercase tracking-[0.12em]">
-        Ценник · касса 1
-      </div>
+      {!tiny && (
+        <div className="mt-1 text-center text-[11px] uppercase tracking-[0.12em]">
+          Ценник · касса 1
+        </div>
+      )}
 
-      <div className="my-3 border-t-2 border-dashed border-primary" />
+      <div className={`border-t-2 border-dashed border-primary ${tiny ? 'my-1.5' : 'my-3'}`} />
 
       <div
-        className={`font-head font-bold uppercase leading-tight ${large ? 'text-3xl' : compact ? 'text-lg' : 'text-xl'}`}
+        className={`font-head font-bold uppercase leading-tight ${large ? 'text-3xl' : tiny ? 'text-[13px]' : compact ? 'text-lg' : 'text-xl'}`}
       >
         {product.name}
       </div>
-      {settings.showComposition && <div className="mt-1 text-[13px]">{product.composition}</div>}
+      {settings.showComposition && (
+        <div className={`mt-1 ${tiny ? 'line-clamp-2 text-[9px] leading-tight' : 'text-[13px]'}`}>
+          {product.composition}
+        </div>
+      )}
 
-      <div className="my-3 border-t-2 border-dashed border-primary" />
+      <div className={`border-t-2 border-dashed border-primary ${tiny ? 'my-1.5' : 'my-3'}`} />
 
-      <dl className="space-y-1 text-[13px]">
+      <dl className={tiny ? 'space-y-0.5 text-[9px]' : 'space-y-1 text-[13px]'}>
         <div className="flex justify-between">
           <dt>Артикул</dt>
           <dd className="font-semibold">{product.id.toUpperCase()}</dd>
@@ -69,10 +76,12 @@ const ReceiptPreview = ({
             <dd className="font-semibold">{product.weight}</dd>
           </div>
         )}
-        <div className="flex justify-between">
-          <dt>Копий</dt>
-          <dd className="font-semibold">{copies} шт.</dd>
-        </div>
+        {!tiny && (
+          <div className="flex justify-between">
+            <dt>Копий</dt>
+            <dd className="font-semibold">{copies} шт.</dd>
+          </div>
+        )}
         {settings.showDate && (
           <div className="flex justify-between">
             <dt>Дата печати</dt>
@@ -81,12 +90,14 @@ const ReceiptPreview = ({
         )}
       </dl>
 
-      <div className="my-3 border-t-2 border-dashed border-primary" />
+      <div className={`border-t-2 border-dashed border-primary ${tiny ? 'my-1.5' : 'my-3'}`} />
 
       <div className="flex items-end justify-between">
-        <span className="font-head text-xs uppercase tracking-[0.1em]">Цена</span>
+        <span className={`font-head uppercase tracking-[0.1em] ${tiny ? 'text-[9px]' : 'text-xs'}`}>
+          Цена
+        </span>
         <span
-          className={`font-head font-black leading-none ${large ? 'text-6xl' : compact ? 'text-3xl' : 'text-4xl'}`}
+          className={`font-head font-black leading-none ${large ? 'text-6xl' : tiny ? 'text-xl' : compact ? 'text-3xl' : 'text-4xl'}`}
         >
           {product.price} ₽
         </span>
@@ -94,7 +105,9 @@ const ReceiptPreview = ({
 
       {settings.showBarcode && (
         <>
-          <div className="mt-4 flex h-10 items-end gap-[2px] overflow-hidden">
+          <div
+            className={`flex items-end gap-[2px] overflow-hidden ${tiny ? 'mt-1.5 h-5' : 'mt-4 h-10'}`}
+          >
             {product.barcode
               .split('')
               .concat(product.barcode.split('').reverse())
@@ -109,7 +122,11 @@ const ReceiptPreview = ({
                 />
               ))}
           </div>
-          <div className="mt-1 text-center text-[11px] tracking-[0.3em]">{product.barcode}</div>
+          <div
+            className={`mt-1 text-center ${tiny ? 'text-[8px] tracking-[0.15em]' : 'text-[11px] tracking-[0.3em]'}`}
+          >
+            {product.barcode}
+          </div>
         </>
       )}
     </div>
