@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import AnnounceStrip from '@/components/AnnounceStrip';
 import TerminalHeader from '@/components/TerminalHeader';
 import Hero from '@/components/Hero';
@@ -39,15 +39,14 @@ const Index = () => {
       setOpen(true);
       return;
     }
-    const now = new Date();
-    setQuickStamp(now);
+    setQuickStamp(new Date());
     setQuickPrint(product);
-    window.setTimeout(() => {
-      window.print();
-      handlePrinted(product, 1);
-      setQuickPrint(null);
-    }, 120);
   };
+
+  const handleQuickDone = useCallback((product: Product) => {
+    setQuickPrint(null);
+    handlePrinted(product, 1);
+  }, []);
 
   const handlePrinted = (product: Product, copies: number) => {
     setJobs((prev) => [
@@ -112,7 +111,12 @@ const Index = () => {
         onSettingsChange={update}
         onSettingsReset={reset}
       />
-      <DirectPrintArea product={quickPrint} settings={settings} printedAt={quickStamp} />
+      <DirectPrintArea
+        product={quickPrint}
+        settings={settings}
+        printedAt={quickStamp}
+        onDone={handleQuickDone}
+      />
       <ProductFormDialog
         product={editing}
         open={formOpen}
