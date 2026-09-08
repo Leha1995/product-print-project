@@ -8,6 +8,8 @@ import ProductFormDialog from '@/components/ProductFormDialog';
 import useCatalog from '@/hooks/useCatalog';
 import AdminLoginDialog from '@/components/AdminLoginDialog';
 import useAdmin from '@/hooks/useAdmin';
+import useLabelSettings from '@/hooks/useLabelSettings';
+import DirectPrintArea from '@/components/DirectPrintArea';
 import PrintLog, { PrintJob } from '@/components/PrintLog';
 import PointsSection from '@/components/PointsSection';
 import Footer from '@/components/Footer';
@@ -23,14 +25,28 @@ const Index = () => {
   const { items, saveProduct, removeProduct, resetCatalog } = useCatalog();
   const { isAdmin, login, logout, changePin, isDefaultPin } = useAdmin();
   const [adminOpen, setAdminOpen] = useState(false);
+  const { settings, update, reset } = useLabelSettings();
+  const [quickPrint, setQuickPrint] = useState<Product | null>(null);
+  const [quickStamp, setQuickStamp] = useState(() => new Date());
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const handleSelect = (product: Product) => {
-    setSelected(product);
-    setOpen(true);
+    if (isAdmin) {
+      setSelected(product);
+      setOpen(true);
+      return;
+    }
+    const now = new Date();
+    setQuickStamp(now);
+    setQuickPrint(product);
+    window.setTimeout(() => {
+      window.print();
+      handlePrinted(product, 1);
+      setQuickPrint(null);
+    }, 120);
   };
 
   const handlePrinted = (product: Product, copies: number) => {
@@ -92,7 +108,11 @@ const Index = () => {
         open={open}
         onOpenChange={setOpen}
         onPrinted={handlePrinted}
+        settings={settings}
+        onSettingsChange={update}
+        onSettingsReset={reset}
       />
+      <DirectPrintArea product={quickPrint} settings={settings} printedAt={quickStamp} />
       <ProductFormDialog
         product={editing}
         open={formOpen}

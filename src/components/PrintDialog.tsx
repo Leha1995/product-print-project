@@ -3,7 +3,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
 import ReceiptPreview from '@/components/ReceiptPreview';
 import LabelSettingsPanel from '@/components/LabelSettingsPanel';
-import useLabelSettings, { getPaper } from '@/hooks/useLabelSettings';
+import { LabelSettings, getPaper } from '@/hooks/useLabelSettings';
 import { Product } from '@/data/products';
 
 interface PrintDialogProps {
@@ -11,13 +11,23 @@ interface PrintDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPrinted: (product: Product, copies: number) => void;
+  settings: LabelSettings;
+  onSettingsChange: (patch: Partial<LabelSettings>) => void;
+  onSettingsReset: () => void;
 }
 
-const PrintDialog = ({ product, open, onOpenChange, onPrinted }: PrintDialogProps) => {
+const PrintDialog = ({
+  product,
+  open,
+  onOpenChange,
+  onPrinted,
+  settings,
+  onSettingsChange,
+  onSettingsReset,
+}: PrintDialogProps) => {
   const [copies, setCopies] = useState(1);
   const [status, setStatus] = useState<'idle' | 'sending' | 'done'>('idle');
   const [stamp, setStamp] = useState(() => new Date());
-  const { settings, update, reset } = useLabelSettings();
 
   useEffect(() => {
     if (open) {
@@ -134,7 +144,11 @@ const PrintDialog = ({ product, open, onOpenChange, onPrinted }: PrintDialogProp
                 settings={settings}
               />
             </div>
-            <LabelSettingsPanel settings={settings} onChange={update} onReset={reset} />
+            <LabelSettingsPanel
+              settings={settings}
+              onChange={onSettingsChange}
+              onReset={onSettingsReset}
+            />
           </div>
         </div>
       </DialogContent>
