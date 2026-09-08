@@ -11,7 +11,8 @@ const toggles: { key: keyof LabelSettings; label: string }[] = [
   { key: 'showComposition', label: 'Состав' },
   { key: 'showWeight', label: 'Вес / объём' },
   { key: 'showBarcode', label: 'Штрих-код' },
-  { key: 'showDate', label: 'Дата печати' },
+  { key: 'showDate', label: 'Дата изготовления' },
+  { key: 'showExpiry', label: 'Употребить до' },
 ];
 
 const LabelSettingsPanel = ({ settings, onChange, onReset }: LabelSettingsPanelProps) => {
@@ -79,6 +80,22 @@ const LabelSettingsPanel = ({ settings, onChange, onReset }: LabelSettingsPanelP
           );
         })}
       </div>
+
+      {settings.showExpiry && (
+        <label className="mt-3 flex items-center justify-between gap-3 border-2 border-primary px-3 py-2">
+          <span className="font-head text-[0.7rem] font-medium uppercase tracking-[0.06em] text-primary">
+            Срок хранения по умолчанию, ч
+          </span>
+          <input
+            type="number"
+            min={1}
+            max={720}
+            value={settings.shelfLifeHours}
+            onChange={(e) => onChange({ shelfLifeHours: Math.max(1, Number(e.target.value) || 1) })}
+            className="w-[70px] border-2 border-primary bg-card px-2 py-1 text-center font-head text-[15px] text-primary outline-none focus:bg-muted"
+          />
+        </label>
+      )}
 
       <div className="mt-3 grid gap-2">
         <input

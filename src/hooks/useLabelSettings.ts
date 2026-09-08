@@ -36,6 +36,8 @@ export interface LabelSettings {
   showWeight: boolean;
   showBarcode: boolean;
   showDate: boolean;
+  showExpiry: boolean;
+  shelfLifeHours: number;
   logo: string;
   shopName: string;
 }
@@ -46,6 +48,8 @@ export const defaultLabelSettings: LabelSettings = {
   showWeight: true,
   showBarcode: true,
   showDate: true,
+  showExpiry: true,
+  shelfLifeHours: 24,
   logo: '',
   shopName: 'Автосуши Автопицца',
 };

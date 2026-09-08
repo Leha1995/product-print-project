@@ -14,13 +14,18 @@ const ReceiptPreview = ({
   printedAt,
   settings = defaultLabelSettings,
 }: ReceiptPreviewProps) => {
-  const stamp = printedAt.toLocaleString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const fmt = (date: Date) =>
+    date.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+  const stamp = fmt(printedAt);
+  const hours = product.shelfLifeHours ?? settings.shelfLifeHours;
+  const expiry = fmt(new Date(printedAt.getTime() + hours * 3600000));
 
   const paper = getPaper(settings.paper);
   const tiny = paper.widthMm <= 45;
@@ -66,10 +71,6 @@ const ReceiptPreview = ({
       <div className={`border-t-2 border-dashed border-primary ${tiny ? 'my-1.5' : 'my-3'}`} />
 
       <dl className={tiny ? 'space-y-0.5 text-[9px]' : 'space-y-1 text-[13px]'}>
-        <div className="flex justify-between">
-          <dt>Артикул</dt>
-          <dd className="font-semibold">{product.id.toUpperCase()}</dd>
-        </div>
         {settings.showWeight && (
           <div className="flex justify-between">
             <dt>Вес / объём</dt>
@@ -84,24 +85,33 @@ const ReceiptPreview = ({
         )}
         {settings.showDate && (
           <div className="flex justify-between">
-            <dt>Дата печати</dt>
+            <dt>Изготовлено</dt>
             <dd className="font-semibold">{stamp}</dd>
           </div>
         )}
       </dl>
 
-      <div className={`border-t-2 border-dashed border-primary ${tiny ? 'my-1.5' : 'my-3'}`} />
+      {settings.showExpiry && (
+        <>
+          <div className={`border-t-2 border-dashed border-primary ${tiny ? 'my-1.5' : 'my-3'}`} />
 
-      <div className="flex items-end justify-between">
-        <span className={`font-head uppercase tracking-[0.1em] ${tiny ? 'text-[9px]' : 'text-xs'}`}>
-          Цена
-        </span>
-        <span
-          className={`font-head font-black leading-none ${large ? 'text-6xl' : tiny ? 'text-xl' : compact ? 'text-3xl' : 'text-4xl'}`}
-        >
-          {product.price} ₽
-        </span>
-      </div>
+          <div className={tiny ? 'text-center' : 'text-center'}>
+            <div
+              className={`font-head uppercase tracking-[0.1em] ${tiny ? 'text-[9px]' : 'text-xs'}`}
+            >
+              Употребить до
+            </div>
+            <div
+              className={`font-head font-black leading-tight ${large ? 'text-3xl' : tiny ? 'text-[13px]' : compact ? 'text-lg' : 'text-xl'}`}
+            >
+              {expiry}
+            </div>
+            <div className={`mt-0.5 ${tiny ? 'text-[8px]' : 'text-[11px]'}`}>
+              Срок хранения {hours} ч
+            </div>
+          </div>
+        </>
+      )}
 
       {settings.showBarcode && (
         <>

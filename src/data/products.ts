@@ -10,6 +10,7 @@ export interface Product {
   image: string;
   barcode: string;
   hit?: boolean;
+  shelfLifeHours?: number;
 }
 
 export const categories: { id: CategoryId | 'all'; label: string; icon: string }[] = [

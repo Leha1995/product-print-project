@@ -27,6 +27,7 @@ const emptyForm = {
   composition: '',
   image: '',
   barcode: '',
+  shelfLifeHours: '',
   hit: false,
 };
 
@@ -50,6 +51,7 @@ const ProductFormDialog = ({ product, open, onOpenChange, onSave }: ProductFormD
             composition: product.composition,
             image: product.image,
             barcode: product.barcode,
+            shelfLifeHours: product.shelfLifeHours ? String(product.shelfLifeHours) : '',
             hit: Boolean(product.hit),
           }
         : emptyForm,
@@ -80,6 +82,7 @@ const ProductFormDialog = ({ product, open, onOpenChange, onSave }: ProductFormD
       composition: form.composition.trim() || 'Состав не указан',
       image: form.image.trim() || CATEGORY_IMG[form.category],
       barcode: form.barcode.trim() || String(4600000000000 + Math.floor(Math.random() * 999999)),
+      shelfLifeHours: form.shelfLifeHours ? Number(form.shelfLifeHours) : undefined,
       hit: form.hit,
     });
     onOpenChange(false);
@@ -158,6 +161,17 @@ const ProductFormDialog = ({ product, open, onOpenChange, onSave }: ProductFormD
                 />
               </label>
             </div>
+
+            <label className="grid gap-1.5">
+              <span className={labelClass}>Срок хранения, часов</span>
+              <input
+                value={form.shelfLifeHours}
+                onChange={(e) => set('shelfLifeHours', e.target.value)}
+                inputMode="numeric"
+                placeholder="Оставьте пустым — возьмём общий срок"
+                className={fieldClass}
+              />
+            </label>
 
             <label className="grid gap-1.5">
               <span className={labelClass}>Состав</span>
