@@ -1,15 +1,28 @@
 import { useMemo, useState } from 'react';
 import Icon from '@/components/ui/icon';
 import ProductCard from '@/components/ProductCard';
-import { CategoryId, Product, categories, products } from '@/data/products';
+import { CategoryId, Product, categories } from '@/data/products';
 
 interface MenuSectionProps {
+  products: Product[];
   onSelect: (product: Product) => void;
+  onAdd: () => void;
+  onEdit: (product: Product) => void;
+  onDelete: (product: Product) => void;
+  onReset: () => void;
 }
 
-const MenuSection = ({ onSelect }: MenuSectionProps) => {
+const MenuSection = ({
+  products,
+  onSelect,
+  onAdd,
+  onEdit,
+  onDelete,
+  onReset,
+}: MenuSectionProps) => {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState<CategoryId | 'all'>('all');
+  const [editMode, setEditMode] = useState(false);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -18,7 +31,7 @@ const MenuSection = ({ onSelect }: MenuSectionProps) => {
       const byQuery = !q || p.name.toLowerCase().includes(q) || p.composition.toLowerCase().includes(q);
       return byCat && byQuery;
     });
-  }, [query, active]);
+  }, [query, active, products]);
 
   return (
     <section id="menu" className="print-hide border-t-2 border-primary bg-background">
@@ -29,7 +42,15 @@ const MenuSection = ({ onSelect }: MenuSectionProps) => {
               Терминал зала
             </span>
             <h2 className="mt-3 font-head text-[34px] font-medium uppercase leading-[1.04] text-primary md:text-[52px]">
-              Выбери позицию —<br className="hidden md:block" /> ценник уйдёт в принтер
+              {editMode ? (
+                <>
+                  Редактируем каталог —<br className="hidden md:block" /> меняем цены и позиции
+                </>
+              ) : (
+                <>
+                  Выбери позицию —<br className="hidden md:block" /> ценник уйдёт в принтер
+                </>
+              )}
             </h2>
           </div>
 
@@ -49,25 +70,66 @@ const MenuSection = ({ onSelect }: MenuSectionProps) => {
           </label>
         </div>
 
-        <div className="no-scrollbar mt-8 flex gap-3 overflow-x-auto pb-1">
-          {categories.map((cat) => {
-            const isActive = active === cat.id;
-            return (
+        <div className="mt-8 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="no-scrollbar flex gap-3 overflow-x-auto pb-1">
+            {categories.map((cat) => {
+              const isActive = active === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setActive(cat.id)}
+                  className={`flex shrink-0 items-center gap-2 border-2 border-primary px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] transition-colors ${
+                    isActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-card text-primary hover:bg-accent hover:text-accent-foreground'
+                  }`}
+                >
+                  <Icon name={cat.icon} size={16} strokeWidth={2.5} />
+                  {cat.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex shrink-0 gap-3">
+            <button
+              onClick={() => setEditMode((v) => !v)}
+              className={`flex items-center gap-2 border-2 border-primary px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] transition-colors ${
+                editMode
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-card text-primary hover:bg-muted'
+              }`}
+            >
+              <Icon name={editMode ? 'Check' : 'SlidersHorizontal'} size={16} strokeWidth={2.5} />
+              {editMode ? 'Готово' : 'Редактировать'}
+            </button>
+            {editMode && (
               <button
-                key={cat.id}
-                onClick={() => setActive(cat.id)}
-                className={`flex shrink-0 items-center gap-2 border-2 border-primary px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] transition-colors ${
-                  isActive
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-card text-primary hover:bg-accent hover:text-accent-foreground'
-                }`}
+                onClick={onAdd}
+                className="flex items-center gap-2 border-2 border-primary bg-accent px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] text-accent-foreground transition-transform hover:-translate-y-0.5"
               >
-                <Icon name={cat.icon} size={16} strokeWidth={2.5} />
-                {cat.label}
+                <Icon name="Plus" size={16} strokeWidth={2.5} />
+                Добавить
               </button>
-            );
-          })}
+            )}
+          </div>
         </div>
+
+        {editMode && (
+          <div className="mt-4 flex flex-col gap-2 border-2 border-dashed border-primary p-3 text-[13px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              Нажмите на карандаш, чтобы изменить цену или название. Изменения сохраняются в этом
+              терминале.
+            </span>
+            <button
+              onClick={onReset}
+              className="flex shrink-0 items-center gap-1.5 font-head text-[0.7rem] font-medium uppercase tracking-[0.06em] text-primary underline-offset-4 hover:underline"
+            >
+              <Icon name="RotateCcw" size={14} strokeWidth={2.5} />
+              Вернуть исходный список
+            </button>
+          </div>
+        )}
 
         {visible.length === 0 ? (
           <div className="mt-12 border-2 border-dashed border-primary p-10 text-center">
@@ -77,7 +139,27 @@ const MenuSection = ({ onSelect }: MenuSectionProps) => {
         ) : (
           <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
             {visible.map((product, i) => (
-              <ProductCard key={product.id} product={product} index={i} onSelect={onSelect} />
+              <div key={product.id} className="relative">
+                <ProductCard product={product} index={i} onSelect={onSelect} />
+                {editMode && (
+                  <div className="absolute right-2 top-2 flex gap-2">
+                    <button
+                      onClick={() => onEdit(product)}
+                      aria-label="Изменить товар"
+                      className="flex h-9 w-9 items-center justify-center border-2 border-primary bg-background text-primary transition-colors hover:bg-accent"
+                    >
+                      <Icon name="Pencil" size={16} strokeWidth={2.5} />
+                    </button>
+                    <button
+                      onClick={() => onDelete(product)}
+                      aria-label="Удалить товар"
+                      className="flex h-9 w-9 items-center justify-center border-2 border-primary bg-background text-primary transition-colors hover:bg-destructive hover:text-destructive-foreground"
+                    >
+                      <Icon name="Trash2" size={16} strokeWidth={2.5} />
+                    </button>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         )}

@@ -4,6 +4,8 @@ import TerminalHeader from '@/components/TerminalHeader';
 import Hero from '@/components/Hero';
 import MenuSection from '@/components/MenuSection';
 import PrintDialog from '@/components/PrintDialog';
+import ProductFormDialog from '@/components/ProductFormDialog';
+import useCatalog from '@/hooks/useCatalog';
 import PrintLog, { PrintJob } from '@/components/PrintLog';
 import PointsSection from '@/components/PointsSection';
 import Footer from '@/components/Footer';
@@ -14,6 +16,9 @@ const Index = () => {
   const [selected, setSelected] = useState<Product | null>(null);
   const [open, setOpen] = useState(false);
   const [jobs, setJobs] = useState<PrintJob[]>([]);
+  const [editing, setEditing] = useState<Product | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const { items, saveProduct, removeProduct, resetCatalog } = useCatalog();
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -47,7 +52,26 @@ const Index = () => {
       <TerminalHeader printedCount={jobs.length} onNavigate={scrollTo} />
       <main>
         <Hero onOpenMenu={() => scrollTo('menu')} />
-        <MenuSection onSelect={handleSelect} />
+        <MenuSection
+          products={items}
+          onSelect={handleSelect}
+          onAdd={() => {
+            setEditing(null);
+            setFormOpen(true);
+          }}
+          onEdit={(product) => {
+            setEditing(product);
+            setFormOpen(true);
+          }}
+          onDelete={(product) => {
+            removeProduct(product.id);
+            toast({ title: 'Товар удалён', description: product.name });
+          }}
+          onReset={() => {
+            resetCatalog();
+            toast({ title: 'Каталог возвращён к исходному списку' });
+          }}
+        />
         <PrintLog jobs={jobs} onClear={() => setJobs([])} />
         <PointsSection />
       </main>
@@ -57,6 +81,18 @@ const Index = () => {
         open={open}
         onOpenChange={setOpen}
         onPrinted={handlePrinted}
+      />
+      <ProductFormDialog
+        product={editing}
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        onSave={(product) => {
+          saveProduct(product);
+          toast({
+            title: editing ? 'Товар обновлён' : 'Товар добавлен',
+            description: `${product.name} · ${product.price} ₽`,
+          });
+        }}
       />
     </div>
   );
