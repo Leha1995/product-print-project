@@ -14,6 +14,7 @@ const toggles: { key: keyof LabelSettings; label: string }[] = [
   { key: 'showDate', label: 'Дата изготовления' },
   { key: 'showExpiry', label: 'Употребить до' },
   { key: 'showStorage', label: 'Температура' },
+  { key: 'showStaff', label: 'Кто изготовил / продал' },
 ];
 
 const LabelSettingsPanel = ({ settings, onChange, onReset }: LabelSettingsPanelProps) => {
@@ -96,6 +97,23 @@ const LabelSettingsPanel = ({ settings, onChange, onReset }: LabelSettingsPanelP
             className="w-[70px] border-2 border-primary bg-card px-2 py-1 text-center font-head text-[15px] text-primary outline-none focus:bg-muted"
           />
         </label>
+      )}
+
+      {settings.showStaff && (
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <input
+            value={settings.makerName}
+            onChange={(e) => onChange({ makerName: e.target.value })}
+            placeholder="Изготовил — фамилия"
+            className="w-full border-2 border-primary bg-card px-3 py-2 font-body text-[14px] text-primary outline-none placeholder:text-muted-foreground focus:bg-muted"
+          />
+          <input
+            value={settings.sellerName}
+            onChange={(e) => onChange({ sellerName: e.target.value })}
+            placeholder="Продал — фамилия"
+            className="w-full border-2 border-primary bg-card px-3 py-2 font-body text-[14px] text-primary outline-none placeholder:text-muted-foreground focus:bg-muted"
+          />
+        </div>
       )}
 
       {settings.showStorage && (

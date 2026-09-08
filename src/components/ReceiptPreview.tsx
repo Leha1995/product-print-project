@@ -90,6 +90,18 @@ const ReceiptPreview = ({
             <dd className="font-semibold">{stamp}</dd>
           </div>
         )}
+        {settings.showStaff && (
+          <>
+            <div className="flex justify-between gap-2">
+              <dt className="shrink-0">Изготовил</dt>
+              <dd className="truncate font-semibold">{settings.makerName || '—'}</dd>
+            </div>
+            <div className="flex justify-between gap-2">
+              <dt className="shrink-0">Продал</dt>
+              <dd className="truncate font-semibold">{settings.sellerName || '—'}</dd>
+            </div>
+          </>
+        )}
       </dl>
 
       {settings.showExpiry && (
