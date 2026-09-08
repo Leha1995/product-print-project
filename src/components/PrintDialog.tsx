@@ -4,6 +4,7 @@ import Icon from '@/components/ui/icon';
 import ReceiptPreview from '@/components/ReceiptPreview';
 import LabelSettingsPanel from '@/components/LabelSettingsPanel';
 import { LabelSettings, getPaper } from '@/hooks/useLabelSettings';
+import { printNodeHtml } from '@/components/DirectPrintArea';
 import { Product } from '@/data/products';
 
 interface PrintDialogProps {
@@ -45,7 +46,15 @@ const PrintDialog = ({
     window.setTimeout(() => {
       setStatus('done');
       onPrinted(product, copies);
-      window.print();
+      const node = document.querySelector('.print-area');
+      const paper = getPaper(settings.paper);
+      if (node) {
+        printNodeHtml(
+          Array.from({ length: copies }, () => node.outerHTML).join(''),
+          paper.widthMm,
+          paper.heightMm,
+        );
+      }
     }, 700);
   };
 
