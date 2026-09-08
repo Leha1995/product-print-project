@@ -161,6 +161,9 @@
 }
 
 @media print {
+  @page {
+    margin: 0;
+  }
   body * {
     visibility: hidden !important;
   }
@@ -171,7 +174,9 @@
   .print-area {
     position: fixed !important;
     inset: 0 auto auto 0 !important;
-    width: 80mm !important;
+    width: var(--label-width, 80mm) !important;
+    height: var(--label-height, auto) !important;
+    overflow: hidden !important;
     margin: 0 !important;
     padding: 4mm !important;
     border: none !important;

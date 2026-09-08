@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
 import ReceiptPreview from '@/components/ReceiptPreview';
+import LabelSettingsPanel from '@/components/LabelSettingsPanel';
+import useLabelSettings, { getPaper } from '@/hooks/useLabelSettings';
 import { Product } from '@/data/products';
 
 interface PrintDialogProps {
@@ -15,6 +17,7 @@ const PrintDialog = ({ product, open, onOpenChange, onPrinted }: PrintDialogProp
   const [copies, setCopies] = useState(1);
   const [status, setStatus] = useState<'idle' | 'sending' | 'done'>('idle');
   const [stamp, setStamp] = useState(() => new Date());
+  const { settings, update, reset } = useLabelSettings();
 
   useEffect(() => {
     if (open) {
@@ -113,17 +116,25 @@ const PrintDialog = ({ product, open, onOpenChange, onPrinted }: PrintDialogProp
               </button>
 
               <p className="mt-3 text-center text-[12px] uppercase tracking-[0.06em] text-muted-foreground">
-                Принтер «Касса 1» · чековая лента 80 мм
+                Принтер «Касса 1» · {getPaper(settings.paper).label}
               </p>
             </div>
           </div>
 
-          <div className="bg-muted p-5">
-            <div className="print-hide mb-3 flex items-center gap-2 font-head text-[0.7rem] font-medium uppercase tracking-[0.1em] text-primary">
-              <Icon name="ScrollText" size={14} strokeWidth={2.5} />
-              Превью ценника
+          <div className="bg-muted">
+            <div className="p-5">
+              <div className="print-hide mb-3 flex items-center gap-2 font-head text-[0.7rem] font-medium uppercase tracking-[0.1em] text-primary">
+                <Icon name="ScrollText" size={14} strokeWidth={2.5} />
+                Превью ценника
+              </div>
+              <ReceiptPreview
+                product={product}
+                copies={copies}
+                printedAt={stamp}
+                settings={settings}
+              />
             </div>
-            <ReceiptPreview product={product} copies={copies} printedAt={stamp} />
+            <LabelSettingsPanel settings={settings} onChange={update} onReset={reset} />
           </div>
         </div>
       </DialogContent>
