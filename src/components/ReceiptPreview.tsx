@@ -97,8 +97,8 @@ const ReceiptPreview = ({
               <dd className="truncate font-semibold">{settings.makerName || '—'}</dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="shrink-0">Продал</dt>
-              <dd className="truncate font-semibold">{settings.sellerName || '—'}</dd>
+              <dt className="shrink-0">Проверил</dt>
+              <dd className="truncate font-semibold">{settings.checkerName || '—'}</dd>
             </div>
           </>
         )}

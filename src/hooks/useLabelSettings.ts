@@ -41,7 +41,8 @@ export interface LabelSettings {
   storageText: string;
   showStaff: boolean;
   makerName: string;
-  sellerName: string;
+  checkerName: string;
+  staffList: string[];
   shelfLifeHours: number;
   logo: string;
   shopName: string;
@@ -58,7 +59,8 @@ export const defaultLabelSettings: LabelSettings = {
   storageText: 'Хранить при +2…+6 °C',
   showStaff: true,
   makerName: '',
-  sellerName: '',
+  checkerName: '',
+  staffList: ['Иванова А.', 'Петров С.', 'Смирнова О.', 'Кузнецов Д.'],
   shelfLifeHours: 24,
   logo: '',
   shopName: 'Автосуши Автопицца',

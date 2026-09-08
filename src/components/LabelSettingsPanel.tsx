@@ -1,5 +1,9 @@
+import { useState } from 'react';
 import Icon from '@/components/ui/icon';
 import { LabelSettings, paperFormats } from '@/hooks/useLabelSettings';
+
+const staffFieldClass =
+  'w-full border-2 border-primary bg-card px-3 py-2 font-body text-[14px] text-primary outline-none placeholder:text-muted-foreground focus:bg-muted';
 
 interface LabelSettingsPanelProps {
   settings: LabelSettings;
@@ -14,10 +18,27 @@ const toggles: { key: keyof LabelSettings; label: string }[] = [
   { key: 'showDate', label: 'Дата изготовления' },
   { key: 'showExpiry', label: 'Употребить до' },
   { key: 'showStorage', label: 'Температура' },
-  { key: 'showStaff', label: 'Кто изготовил / продал' },
+  { key: 'showStaff', label: 'Изготовил / проверил' },
 ];
 
 const LabelSettingsPanel = ({ settings, onChange, onReset }: LabelSettingsPanelProps) => {
+  const [newStaff, setNewStaff] = useState('');
+
+  const addStaff = () => {
+    const name = newStaff.trim();
+    if (!name || settings.staffList.includes(name)) return;
+    onChange({ staffList: [...settings.staffList, name] });
+    setNewStaff('');
+  };
+
+  const removeStaff = (name: string) => {
+    onChange({
+      staffList: settings.staffList.filter((n) => n !== name),
+      makerName: settings.makerName === name ? '' : settings.makerName,
+      checkerName: settings.checkerName === name ? '' : settings.checkerName,
+    });
+  };
+
   const handleLogo = (file?: File) => {
     if (!file) return;
     const reader = new FileReader();
@@ -100,19 +121,80 @@ const LabelSettingsPanel = ({ settings, onChange, onReset }: LabelSettingsPanelP
       )}
 
       {settings.showStaff && (
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <input
-            value={settings.makerName}
-            onChange={(e) => onChange({ makerName: e.target.value })}
-            placeholder="Изготовил — фамилия"
-            className="w-full border-2 border-primary bg-card px-3 py-2 font-body text-[14px] text-primary outline-none placeholder:text-muted-foreground focus:bg-muted"
-          />
-          <input
-            value={settings.sellerName}
-            onChange={(e) => onChange({ sellerName: e.target.value })}
-            placeholder="Продал — фамилия"
-            className="w-full border-2 border-primary bg-card px-3 py-2 font-body text-[14px] text-primary outline-none placeholder:text-muted-foreground focus:bg-muted"
-          />
+        <div className="mt-3 grid gap-2">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="grid gap-1">
+              <span className="font-head text-[0.65rem] font-medium uppercase tracking-[0.06em] text-primary">
+                Изготовил
+              </span>
+              <select
+                value={settings.makerName}
+                onChange={(e) => onChange({ makerName: e.target.value })}
+                className={staffFieldClass}
+              >
+                <option value="">Не выбрано</option>
+                {settings.staffList.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1">
+              <span className="font-head text-[0.65rem] font-medium uppercase tracking-[0.06em] text-primary">
+                Проверил
+              </span>
+              <select
+                value={settings.checkerName}
+                onChange={(e) => onChange({ checkerName: e.target.value })}
+                className={staffFieldClass}
+              >
+                <option value="">Не выбрано</option>
+                {settings.staffList.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              value={newStaff}
+              onChange={(e) => setNewStaff(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addStaff()}
+              placeholder="Добавить фамилию в список"
+              className={staffFieldClass}
+            />
+            <button
+              onClick={addStaff}
+              aria-label="Добавить сотрудника"
+              className="flex w-[42px] shrink-0 items-center justify-center border-2 border-primary bg-accent text-accent-foreground transition-transform hover:-translate-y-0.5"
+            >
+              <Icon name="Plus" size={16} strokeWidth={3} />
+            </button>
+          </div>
+
+          {settings.staffList.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {settings.staffList.map((n) => (
+                <span
+                  key={n}
+                  className="flex items-center gap-1 border-2 border-dashed border-primary px-2 py-1 text-[11px] text-primary"
+                >
+                  {n}
+                  <button
+                    onClick={() => removeStaff(n)}
+                    aria-label={`Убрать ${n}`}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <Icon name="X" size={12} strokeWidth={3} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
