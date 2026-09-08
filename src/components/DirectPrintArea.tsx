@@ -10,7 +10,12 @@ interface DirectPrintAreaProps {
   onDone: (product: Product) => void;
 }
 
-export const printNodeHtml = (html: string, widthMm: number, heightMm?: number) => {
+export const printNodeHtml = (
+  html: string,
+  widthMm: number,
+  heightMm?: number,
+  rotate90 = false,
+) => {
   const styles = Array.from(
     document.querySelectorAll('style, link[rel="stylesheet"]'),
   )
@@ -49,10 +54,10 @@ export const printNodeHtml = (html: string, widthMm: number, heightMm?: number) 
     position: absolute;
     top: 0;
     left: 0;
-    width: ${pageH}mm;
-    height: ${widthMm}mm;
+    width: ${rotate90 ? pageH : widthMm}mm;
+    height: ${rotate90 ? widthMm : pageH}mm;
     transform-origin: top left;
-    transform: translateX(${widthMm}mm) rotate(90deg);
+    ${rotate90 ? `transform: translateX(${widthMm}mm) rotate(90deg);` : ''}
   }
   .rot .print-area {
     position: static !important;
@@ -127,7 +132,7 @@ const DirectPrintArea = ({ product, settings, printedAt, onDone }: DirectPrintAr
 
     const paper = getPaper(settings.paper);
     const id = window.setTimeout(() => {
-      printNodeHtml(node.outerHTML, paper.widthMm, paper.heightMm);
+      printNodeHtml(node.outerHTML, paper.widthMm, paper.heightMm, settings.rotate90);
       onDone(product);
     }, 60);
 

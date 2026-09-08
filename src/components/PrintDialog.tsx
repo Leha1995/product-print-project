@@ -53,6 +53,7 @@ const PrintDialog = ({
           Array.from({ length: copies }, () => node.outerHTML).join(''),
           paper.widthMm,
           paper.heightMm,
+          settings.rotate90,
         );
       }
     }, 700);

@@ -84,6 +84,41 @@ const LabelSettingsPanel = ({ settings, onChange, onReset }: LabelSettingsPanelP
         })}
       </div>
 
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {[
+          { value: false, label: 'Обычная 0°', hint: 'Печать вдоль листа' },
+          { value: true, label: 'Поворот 90°', hint: 'Печать поперёк ленты' },
+        ].map((mode) => {
+          const active = settings.rotate90 === mode.value;
+          return (
+            <button
+              key={mode.label}
+              onClick={() => onChange({ rotate90: mode.value })}
+              className={`flex items-center gap-2 border-2 border-primary px-3 py-2 text-left transition-colors ${
+                active ? 'bg-primary text-primary-foreground' : 'bg-card text-primary hover:bg-muted'
+              }`}
+            >
+              <Icon
+                name={mode.value ? 'RotateCw' : 'AlignVerticalJustifyCenter'}
+                size={16}
+                strokeWidth={2.5}
+                className="shrink-0"
+              />
+              <span>
+                <span className="block font-head text-[0.75rem] font-medium uppercase tracking-[0.04em]">
+                  {mode.label}
+                </span>
+                <span
+                  className={`block text-[11px] ${active ? 'opacity-80' : 'text-muted-foreground'}`}
+                >
+                  {mode.hint}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="mt-3 flex flex-wrap gap-2">
         {toggles.map((t) => {
           const active = Boolean(settings[t.key]);

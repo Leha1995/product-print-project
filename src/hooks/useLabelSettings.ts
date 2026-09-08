@@ -32,6 +32,7 @@ export const paperFormats: PaperFormat[] = [
 
 export interface LabelSettings {
   paper: PaperId;
+  rotate90: boolean;
   showComposition: boolean;
   showWeight: boolean;
   showBarcode: boolean;
@@ -50,6 +51,7 @@ export interface LabelSettings {
 
 export const defaultLabelSettings: LabelSettings = {
   paper: 'roll80',
+  rotate90: false,
   showComposition: true,
   showWeight: true,
   showBarcode: true,
