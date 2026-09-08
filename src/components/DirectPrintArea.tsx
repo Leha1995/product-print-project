@@ -35,6 +35,8 @@ export const printNodeHtml = (html: string, widthMm: number, heightMm?: number) 
   @page { size: ${widthMm}mm ${heightMm ? `${heightMm}mm` : 'auto'}; margin: 0; }
   html, body { margin: 0; padding: 0; background: #fff; }
   .label-root { width: ${widthMm}mm; ${heightMm ? `height: ${heightMm}mm;` : ''} overflow: hidden; }
+  .label-fit { width: ${widthMm}mm; transform-origin: top left; }
+  .label-root .print-area + .print-area { break-before: page; page-break-before: always; }
   .label-root .print-area {
     position: static !important;
     width: 100% !important;
@@ -47,10 +49,18 @@ export const printNodeHtml = (html: string, widthMm: number, heightMm?: number) 
     color: #000 !important;
     padding: 2mm !important;
   }
-</style></head><body><div class="label-root">${html}</div></body></html>`);
+</style></head><body><div class="label-root"><div class="label-fit">${html}</div></div></body></html>`);
   doc.close();
 
   const fire = () => {
+    if (heightMm) {
+      const root = doc.querySelector('.label-root') as HTMLElement | null;
+      const fit = doc.querySelector('.label-fit') as HTMLElement | null;
+      if (root && fit) {
+        const scale = Math.min(1, root.clientHeight / (fit.scrollHeight || 1));
+        if (scale < 1) fit.style.transform = `scale(${scale})`;
+      }
+    }
     iframe.contentWindow?.focus();
     iframe.contentWindow?.print();
     window.setTimeout(() => iframe.remove(), 1000);
