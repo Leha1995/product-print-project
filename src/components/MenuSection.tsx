@@ -10,6 +10,8 @@ interface MenuSectionProps {
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
   onReset: () => void;
+  isAdmin: boolean;
+  onRequestAdmin: () => void;
 }
 
 const MenuSection = ({
@@ -19,10 +21,13 @@ const MenuSection = ({
   onEdit,
   onDelete,
   onReset,
+  isAdmin,
+  onRequestAdmin,
 }: MenuSectionProps) => {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState<CategoryId | 'all'>('all');
-  const [editMode, setEditMode] = useState(false);
+  const [rawEditMode, setEditMode] = useState(false);
+  const editMode = isAdmin && rawEditMode;
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -93,14 +98,24 @@ const MenuSection = ({
 
           <div className="flex shrink-0 gap-3">
             <button
-              onClick={() => setEditMode((v) => !v)}
+              onClick={() => {
+                if (!isAdmin) {
+                  onRequestAdmin();
+                  return;
+                }
+                setEditMode((v) => !v);
+              }}
               className={`flex items-center gap-2 border-2 border-primary px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] transition-colors ${
                 editMode
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-card text-primary hover:bg-muted'
               }`}
             >
-              <Icon name={editMode ? 'Check' : 'SlidersHorizontal'} size={16} strokeWidth={2.5} />
+              <Icon
+                name={editMode ? 'Check' : isAdmin ? 'SlidersHorizontal' : 'Lock'}
+                size={16}
+                strokeWidth={2.5}
+              />
               {editMode ? 'Готово' : 'Редактировать'}
             </button>
             {editMode && (

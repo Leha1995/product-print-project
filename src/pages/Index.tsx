@@ -6,6 +6,8 @@ import MenuSection from '@/components/MenuSection';
 import PrintDialog from '@/components/PrintDialog';
 import ProductFormDialog from '@/components/ProductFormDialog';
 import useCatalog from '@/hooks/useCatalog';
+import AdminLoginDialog from '@/components/AdminLoginDialog';
+import useAdmin from '@/hooks/useAdmin';
 import PrintLog, { PrintJob } from '@/components/PrintLog';
 import PointsSection from '@/components/PointsSection';
 import Footer from '@/components/Footer';
@@ -19,6 +21,8 @@ const Index = () => {
   const [editing, setEditing] = useState<Product | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const { items, saveProduct, removeProduct, resetCatalog } = useCatalog();
+  const { isAdmin, login, logout, changePin, isDefaultPin } = useAdmin();
+  const [adminOpen, setAdminOpen] = useState(false);
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -49,7 +53,12 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       <AnnounceStrip />
-      <TerminalHeader printedCount={jobs.length} onNavigate={scrollTo} />
+      <TerminalHeader
+        printedCount={jobs.length}
+        onNavigate={scrollTo}
+        isAdmin={isAdmin}
+        onAdminClick={() => setAdminOpen(true)}
+      />
       <main>
         <Hero onOpenMenu={() => scrollTo('menu')} />
         <MenuSection
@@ -71,6 +80,8 @@ const Index = () => {
             resetCatalog();
             toast({ title: 'Каталог возвращён к исходному списку' });
           }}
+          isAdmin={isAdmin}
+          onRequestAdmin={() => setAdminOpen(true)}
         />
         <PrintLog jobs={jobs} onClear={() => setJobs([])} />
         <PointsSection />
@@ -92,6 +103,22 @@ const Index = () => {
             title: editing ? 'Товар обновлён' : 'Товар добавлен',
             description: `${product.name} · ${product.price} ₽`,
           });
+        }}
+      />
+      <AdminLoginDialog
+        open={adminOpen}
+        onOpenChange={setAdminOpen}
+        isAdmin={isAdmin}
+        isDefaultPin={isDefaultPin}
+        onLogin={(pin) => {
+          const ok = login(pin);
+          if (ok) toast({ title: 'Вход выполнен', description: 'Редактирование каталога доступно' });
+          return ok;
+        }}
+        onChangePin={changePin}
+        onLogout={() => {
+          logout();
+          toast({ title: 'Вы вышли из режима администратора' });
         }}
       />
     </div>
