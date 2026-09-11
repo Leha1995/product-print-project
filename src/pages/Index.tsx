@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
 import AnnounceStrip from '@/components/AnnounceStrip';
 import TerminalHeader from '@/components/TerminalHeader';
-import Hero from '@/components/Hero';
 import MenuSection from '@/components/MenuSection';
 import PrintDialog from '@/components/PrintDialog';
 import ProductFormDialog from '@/components/ProductFormDialog';
@@ -77,7 +76,6 @@ const Index = () => {
         onAdminClick={() => setAdminOpen(true)}
       />
       <main>
-        <Hero onOpenMenu={() => scrollTo('menu')} />
         <MenuSection
           products={items}
           categories={categories}
