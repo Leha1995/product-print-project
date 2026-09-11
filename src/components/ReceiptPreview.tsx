@@ -30,15 +30,16 @@ const ReceiptPreview = ({
 
   const paper = getPaper(settings.paper);
   const tiny = paper.widthMm <= 45;
+  const micro = tiny && (paper.heightMm ?? 99) <= 30;
   const compact = paper.widthMm <= 58;
   const large = paper.widthMm >= 105;
 
   return (
     <div
-      className={`print-area animate-print-out mx-auto border-2 border-primary bg-white font-body text-primary ${tiny ? 'p-2' : 'p-4'}`}
+      className={`print-area animate-print-out mx-auto border-2 border-primary bg-white font-body text-primary ${micro ? 'p-1.5' : tiny ? 'p-2' : 'p-4'}`}
       style={{ maxWidth: `${paper.widthMm * 3.5}px` }}
     >
-      {settings.logo && (
+      {settings.logo && !micro && (
         <img
           src={settings.logo}
           alt=""
@@ -46,7 +47,7 @@ const ReceiptPreview = ({
         />
       )}
       <div
-        className={`text-center font-head font-black uppercase tracking-[0.04em] ${large ? 'text-lg' : tiny ? 'text-[10px] leading-tight' : 'text-sm'}`}
+        className={`text-center font-head font-black uppercase tracking-[0.04em] ${large ? 'text-lg' : micro ? 'text-[8px] leading-none' : tiny ? 'text-[10px] leading-tight' : 'text-sm'}`}
       >
         {settings.shopName}
       </div>
@@ -56,22 +57,32 @@ const ReceiptPreview = ({
         </div>
       )}
 
-      <div className={`border-t-2 border-dashed border-primary ${tiny ? 'my-1.5' : 'my-3'}`} />
+      <div
+        className={`border-t-2 border-dashed border-primary ${micro ? 'my-1' : tiny ? 'my-1.5' : 'my-3'}`}
+      />
 
       <div
-        className={`font-head font-bold uppercase leading-tight ${large ? 'text-3xl' : tiny ? 'text-[13px]' : compact ? 'text-lg' : 'text-xl'}`}
+        className={`font-head font-bold uppercase leading-tight ${large ? 'text-3xl' : micro ? 'line-clamp-2 text-[11px]' : tiny ? 'text-[13px]' : compact ? 'text-lg' : 'text-xl'}`}
       >
         {product.name}
       </div>
       {settings.showComposition && (
-        <div className={`mt-1 ${tiny ? 'line-clamp-2 text-[9px] leading-tight' : 'text-[13px]'}`}>
+        <div
+          className={`mt-1 ${micro ? 'line-clamp-2 text-[7px] leading-[1.15]' : tiny ? 'line-clamp-2 text-[9px] leading-tight' : 'text-[13px]'}`}
+        >
           {product.composition}
         </div>
       )}
 
-      <div className={`border-t-2 border-dashed border-primary ${tiny ? 'my-1.5' : 'my-3'}`} />
+      <div
+        className={`border-t-2 border-dashed border-primary ${micro ? 'my-1' : tiny ? 'my-1.5' : 'my-3'}`}
+      />
 
-      <dl className={tiny ? 'space-y-0.5 text-[9px]' : 'space-y-1 text-[13px]'}>
+      <dl
+        className={
+          micro ? 'space-y-0 text-[7px] leading-[1.25]' : tiny ? 'space-y-0.5 text-[9px]' : 'space-y-1 text-[13px]'
+        }
+      >
         {settings.showWeight && (
           <div className="flex justify-between">
             <dt>Вес / объём</dt>
@@ -90,49 +101,70 @@ const ReceiptPreview = ({
             <dd className="font-semibold">{stamp}</dd>
           </div>
         )}
-        {settings.showStaff && (
-          <>
-            <div className="flex justify-between gap-2">
-              <dt className="shrink-0">Изготовил</dt>
-              <dd className="truncate font-semibold">{settings.makerName || '—'}</dd>
+        {settings.showStaff &&
+          (micro ? (
+            <div className="flex justify-between gap-1">
+              <dt className="shrink-0">Изг. / пров.</dt>
+              <dd className="truncate font-semibold">
+                {settings.makerName || '—'} / {settings.checkerName || '—'}
+              </dd>
             </div>
-            <div className="flex justify-between gap-2">
-              <dt className="shrink-0">Проверил</dt>
-              <dd className="truncate font-semibold">{settings.checkerName || '—'}</dd>
-            </div>
-          </>
-        )}
+          ) : (
+            <>
+              <div className="flex justify-between gap-2">
+                <dt className="shrink-0">Изготовил</dt>
+                <dd className="truncate font-semibold">{settings.makerName || '—'}</dd>
+              </div>
+              <div className="flex justify-between gap-2">
+                <dt className="shrink-0">Проверил</dt>
+                <dd className="truncate font-semibold">{settings.checkerName || '—'}</dd>
+              </div>
+            </>
+          ))}
       </dl>
 
       {settings.showExpiry && (
         <>
-          <div className={`border-t-2 border-dashed border-primary ${tiny ? 'my-1.5' : 'my-3'}`} />
+          <div
+            className={`border-t-2 border-dashed border-primary ${micro ? 'my-1' : tiny ? 'my-1.5' : 'my-3'}`}
+          />
 
-          <div className={tiny ? 'text-center' : 'text-center'}>
+          <div className="text-center">
             <div
-              className={`font-head uppercase tracking-[0.1em] ${tiny ? 'text-[9px]' : 'text-xs'}`}
+              className={`font-head uppercase tracking-[0.1em] ${micro ? 'text-[7px] leading-none' : tiny ? 'text-[9px]' : 'text-xs'}`}
             >
               Употребить до
             </div>
             <div
-              className={`font-head font-black leading-tight ${large ? 'text-3xl' : tiny ? 'text-[13px]' : compact ? 'text-lg' : 'text-xl'}`}
+              className={`font-head font-black leading-tight ${large ? 'text-3xl' : micro ? 'text-[10px]' : tiny ? 'text-[13px]' : compact ? 'text-lg' : 'text-xl'}`}
             >
               {expiry}
             </div>
-            <div className={`mt-0.5 ${tiny ? 'text-[8px]' : 'text-[11px]'}`}>
-              Срок хранения {hours} ч
-            </div>
+            {!micro && (
+              <div className={`mt-0.5 ${tiny ? 'text-[8px]' : 'text-[11px]'}`}>
+                Срок хранения {hours} ч
+              </div>
+            )}
           </div>
         </>
       )}
 
       {settings.showStorage && (
         <div
-          className={`flex items-center justify-center gap-1.5 border-2 border-primary font-head font-bold uppercase leading-tight ${
-            tiny ? 'mt-1.5 px-1 py-0.5 text-[8px]' : 'mt-3 px-2 py-1 text-[11px] tracking-[0.04em]'
+          className={`flex items-center justify-center gap-1 border border-primary font-head font-bold uppercase leading-tight ${
+            micro
+              ? 'mt-1 px-1 py-px text-[7px]'
+              : tiny
+                ? 'mt-1.5 border-2 px-1 py-0.5 text-[8px]'
+                : 'mt-3 border-2 px-2 py-1 text-[11px] tracking-[0.04em]'
           }`}
         >
-          <Icon name="Thermometer" size={tiny ? 10 : 14} strokeWidth={2.5} className="shrink-0" />
+          <Icon
+            name="Thermometer"
+            size={micro ? 8 : tiny ? 10 : 14}
+            strokeWidth={2.5}
+            className="shrink-0"
+          />
           <span>{settings.storageText}</span>
         </div>
       )}
@@ -140,7 +172,7 @@ const ReceiptPreview = ({
       {settings.showBarcode && (
         <>
           <div
-            className={`flex items-end gap-[2px] overflow-hidden ${tiny ? 'mt-1.5 h-5' : 'mt-4 h-10'}`}
+            className={`flex items-end gap-[2px] overflow-hidden ${micro ? 'mt-1 h-3.5' : tiny ? 'mt-1.5 h-5' : 'mt-4 h-10'}`}
           >
             {product.barcode
               .split('')
@@ -157,7 +189,7 @@ const ReceiptPreview = ({
               ))}
           </div>
           <div
-            className={`mt-1 text-center ${tiny ? 'text-[8px] tracking-[0.15em]' : 'text-[11px] tracking-[0.3em]'}`}
+            className={`mt-0.5 text-center ${micro ? 'text-[7px] tracking-[0.08em]' : tiny ? 'text-[8px] tracking-[0.15em]' : 'text-[11px] tracking-[0.3em]'}`}
           >
             {product.barcode}
           </div>

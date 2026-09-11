@@ -74,7 +74,7 @@ export const printNodeHtml = (
     animation: none !important;
     background: #fff !important;
     color: #000 !important;
-    padding: 1.5mm 2mm !important;
+    padding: ${widthMm <= 45 ? '0.8mm 1mm' : '1.5mm 2mm'} !important;
   }
   .rot .print-area > * { flex: 0 0 auto; }
 </style></head><body></body></html>`);
@@ -101,14 +101,21 @@ export const printNodeHtml = (
       const rot = node as HTMLElement;
       const area = rot.firstElementChild as HTMLElement | null;
       if (!area) return;
-      const avail = rot.clientHeight;
-      const needed = area.scrollHeight;
-      if (needed > avail && avail > 0) {
-        const scale = avail / needed;
-        area.style.height = `${100 / scale}%`;
+      const availH = rot.clientHeight;
+      const availW = rot.clientWidth;
+      if (!availH || !availW) return;
+
+      area.style.height = 'auto';
+      area.style.width = `${availW}px`;
+      const neededH = area.scrollHeight;
+      const neededW = area.scrollWidth;
+
+      const scale = Math.min(1, availH / neededH, availW / neededW);
+      area.style.height = `${availH / scale}px`;
+      area.style.width = `${availW / scale}px`;
+      if (scale < 1) {
         area.style.transformOrigin = 'top left';
         area.style.transform = `scale(${scale})`;
-        area.style.width = `${100 / scale}%`;
       }
     });
     iframe.contentWindow?.focus();
