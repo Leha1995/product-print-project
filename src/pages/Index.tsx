@@ -33,11 +33,11 @@ const Index = () => {
   };
 
   const handleSelect = (product: Product) => {
-    if (isAdmin) {
-      setSelected(product);
-      setOpen(true);
-      return;
-    }
+    setSelected(product);
+    setOpen(true);
+  };
+
+  const handleQuickPrint = (product: Product) => {
     setQuickStamp(new Date());
     setQuickPrint(product);
   };
@@ -78,6 +78,7 @@ const Index = () => {
         <MenuSection
           products={items}
           onSelect={handleSelect}
+          onPrint={handleQuickPrint}
           onAdd={() => {
             setEditing(null);
             setFormOpen(true);

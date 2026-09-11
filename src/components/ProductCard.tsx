@@ -1,20 +1,23 @@
-import Icon from '@/components/ui/icon';
 import { Product } from '@/data/products';
 
 interface ProductCardProps {
   product: Product;
   index: number;
   onSelect: (product: Product) => void;
+  onPrint: (product: Product) => void;
 }
 
-const ProductCard = ({ product, index, onSelect }: ProductCardProps) => {
+const ProductCard = ({ product, index, onSelect, onPrint }: ProductCardProps) => {
   return (
-    <button
-      onClick={() => onSelect(product)}
+    <div
       style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
-      className="group flex animate-fade-in flex-col border-2 border-primary bg-card text-left transition-transform duration-150 hover:-translate-y-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary"
+      className="group flex animate-fade-in flex-col border-2 border-primary bg-card text-left transition-transform duration-150 hover:-translate-y-1"
     >
-      <div className="relative aspect-square w-full overflow-hidden bg-secondary">
+      <button
+        onClick={() => onPrint(product)}
+        aria-label={`Печатать ценник: ${product.name}`}
+        className="relative aspect-square w-full overflow-hidden bg-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary active:opacity-80"
+      >
         <img
           src={product.image}
           alt={product.name}
@@ -26,20 +29,17 @@ const ProductCard = ({ product, index, onSelect }: ProductCardProps) => {
             Хит
           </span>
         )}
-      </div>
+      </button>
 
-      <div className="flex flex-1 flex-col items-center gap-1 border-t-2 border-primary p-1.5">
-        <h3 className="line-clamp-2 text-center font-head text-[0.65rem] font-bold uppercase leading-tight text-primary">
+      <button
+        onClick={() => onSelect(product)}
+        className="flex flex-1 items-center justify-center border-t-2 border-primary p-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary"
+      >
+        <h3 className="line-clamp-2 text-center font-head text-[0.7rem] font-bold uppercase leading-tight text-primary">
           {product.name}
         </h3>
-        <Icon
-          name="Printer"
-          size={60}
-          strokeWidth={2}
-          className="mt-auto shrink-0 text-primary transition-transform duration-150 group-hover:scale-110"
-        />
-      </div>
-    </button>
+      </button>
+    </div>
   );
 };
 

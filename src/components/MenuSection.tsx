@@ -6,6 +6,7 @@ import { CategoryId, Product, categories } from '@/data/products';
 interface MenuSectionProps {
   products: Product[];
   onSelect: (product: Product) => void;
+  onPrint: (product: Product) => void;
   onAdd: () => void;
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
@@ -17,6 +18,7 @@ interface MenuSectionProps {
 const MenuSection = ({
   products,
   onSelect,
+  onPrint,
   onAdd,
   onEdit,
   onDelete,
@@ -155,7 +157,12 @@ const MenuSection = ({
           <div className="mt-8 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8">
             {visible.map((product, i) => (
               <div key={product.id} className="relative">
-                <ProductCard product={product} index={i} onSelect={onSelect} />
+                <ProductCard
+                  product={product}
+                  index={i}
+                  onSelect={onSelect}
+                  onPrint={onPrint}
+                />
                 {editMode && (
                   <div className="absolute right-1 top-1 flex gap-1">
                     <button
