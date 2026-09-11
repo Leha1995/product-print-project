@@ -5,6 +5,7 @@ import ReceiptPreview from '@/components/ReceiptPreview';
 import LabelSettingsPanel from '@/components/LabelSettingsPanel';
 import { LabelSettings, getPaper } from '@/hooks/useLabelSettings';
 import { printNodeHtml } from '@/components/DirectPrintArea';
+import { downloadBartenderJob } from '@/lib/bartender';
 import { Product } from '@/data/products';
 
 interface PrintDialogProps {
@@ -41,11 +42,16 @@ const PrintDialog = ({
   if (!product) return null;
 
   const handlePrint = () => {
+    const now = new Date();
     setStatus('sending');
-    setStamp(new Date());
+    setStamp(now);
     window.setTimeout(() => {
       setStatus('done');
       onPrinted(product, copies);
+      if (settings.printMode === 'bartender') {
+        downloadBartenderJob(product, copies, now, settings);
+        return;
+      }
       const node = document.querySelector('.print-area');
       const paper = getPaper(settings.paper);
       if (node) {

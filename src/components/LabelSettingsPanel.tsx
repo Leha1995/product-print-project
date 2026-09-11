@@ -86,6 +86,72 @@ const LabelSettingsPanel = ({ settings, onChange, onReset }: LabelSettingsPanelP
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         {[
+          { value: 'browser' as const, label: 'Печать браузером', hint: 'Обычный принтер' },
+          { value: 'bartender' as const, label: 'BarTender', hint: 'Файл задания в папку' },
+        ].map((mode) => {
+          const active = settings.printMode === mode.value;
+          return (
+            <button
+              key={mode.value}
+              onClick={() => onChange({ printMode: mode.value })}
+              className={`flex items-center gap-2 border-2 border-primary px-3 py-2 text-left transition-colors ${
+                active ? 'bg-primary text-primary-foreground' : 'bg-card text-primary hover:bg-muted'
+              }`}
+            >
+              <Icon
+                name={mode.value === 'bartender' ? 'FileDown' : 'Printer'}
+                size={16}
+                strokeWidth={2.5}
+                className="shrink-0"
+              />
+              <span>
+                <span className="block font-head text-[0.75rem] font-medium uppercase tracking-[0.04em]">
+                  {mode.label}
+                </span>
+                <span
+                  className={`block text-[11px] ${active ? 'opacity-80' : 'text-muted-foreground'}`}
+                >
+                  {mode.hint}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {settings.printMode === 'bartender' && (
+        <div className="mt-3 grid gap-2 border-2 border-dashed border-primary p-3">
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Сайт сохраняет файл задания. Укажите папку загрузок как отслеживаемую в BarTender
+            Commander — программа сама подхватит файл и напечатает этикетку.
+          </p>
+          <label className="grid gap-1">
+            <span className="font-head text-[0.65rem] font-medium uppercase tracking-[0.06em] text-primary">
+              Шаблон BarTender (.btw)
+            </span>
+            <input
+              value={settings.bartenderTemplate}
+              onChange={(e) => onChange({ bartenderTemplate: e.target.value })}
+              placeholder="cennik.btw"
+              className={staffFieldClass}
+            />
+          </label>
+          <label className="grid gap-1">
+            <span className="font-head text-[0.65rem] font-medium uppercase tracking-[0.06em] text-primary">
+              Имя принтера в Windows
+            </span>
+            <input
+              value={settings.bartenderPrinter}
+              onChange={(e) => onChange({ bartenderPrinter: e.target.value })}
+              placeholder="Например, TSC TE200"
+              className={staffFieldClass}
+            />
+          </label>
+        </div>
+      )}
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {[
           { value: false, label: 'Обычная 0°', hint: 'Печать вдоль листа' },
           { value: true, label: 'Поворот 90°', hint: 'Печать поперёк ленты' },
         ].map((mode) => {

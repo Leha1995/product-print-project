@@ -47,6 +47,9 @@ export interface LabelSettings {
   shelfLifeHours: number;
   logo: string;
   shopName: string;
+  printMode: 'browser' | 'bartender';
+  bartenderTemplate: string;
+  bartenderPrinter: string;
 }
 
 export const defaultLabelSettings: LabelSettings = {
@@ -66,6 +69,9 @@ export const defaultLabelSettings: LabelSettings = {
   shelfLifeHours: 24,
   logo: '',
   shopName: 'Автосуши Автопицца',
+  printMode: 'browser',
+  bartenderTemplate: 'cennik.btw',
+  bartenderPrinter: '',
 };
 
 const STORAGE_KEY = 'asap-label-settings-v1';

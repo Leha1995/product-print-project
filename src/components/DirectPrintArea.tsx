@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import ReceiptPreview from '@/components/ReceiptPreview';
 import { LabelSettings, getPaper } from '@/hooks/useLabelSettings';
+import { downloadBartenderJob } from '@/lib/bartender';
 import { Product } from '@/data/products';
 
 interface DirectPrintAreaProps {
@@ -127,6 +128,15 @@ const DirectPrintArea = ({ product, settings, printedAt, onDone }: DirectPrintAr
 
   useEffect(() => {
     if (!product) return;
+
+    if (settings.printMode === 'bartender') {
+      const id = window.setTimeout(() => {
+        downloadBartenderJob(product, 1, printedAt, settings);
+        onDone(product);
+      }, 60);
+      return () => window.clearTimeout(id);
+    }
+
     const node = ref.current?.firstElementChild as HTMLElement | undefined;
     if (!node) return;
 
@@ -137,7 +147,7 @@ const DirectPrintArea = ({ product, settings, printedAt, onDone }: DirectPrintAr
     }, 60);
 
     return () => window.clearTimeout(id);
-  }, [product, settings, onDone]);
+  }, [product, settings, printedAt, onDone]);
 
   if (!product) return null;
 
