@@ -20,9 +20,15 @@ const Index = () => {
   const [jobs, setJobs] = useState<PrintJob[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  const { items, saveProduct, removeProduct, resetCatalog } = useCatalog();
-  const { categories, addCategory, renameCategory, removeCategory, resetCategories } =
-    useCategories();
+  const { items, saveProduct, removeProduct, resetCatalog, replaceCatalog } = useCatalog();
+  const {
+    categories,
+    addCategory,
+    renameCategory,
+    removeCategory,
+    resetCategories,
+    replaceCategories,
+  } = useCategories();
   const { isAdmin, login, logout, changePin, isDefaultPin } = useAdmin();
   const [adminOpen, setAdminOpen] = useState(false);
   const { settings, update, reset } = useLabelSettings();
@@ -36,6 +42,53 @@ const Index = () => {
   const handleSelect = (product: Product) => {
     setSelected(product);
     setOpen(true);
+  };
+
+  const handleExport = () => {
+    const payload = {
+      type: 'asap-catalog',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      categories,
+      products: items,
+      settings,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `katalog-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast({ title: 'Каталог выгружен', description: `${items.length} позиций в файле` });
+  };
+
+  const handleImport = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(String(reader.result));
+        const nextProducts = Array.isArray(data) ? data : data.products;
+        if (!Array.isArray(nextProducts) || !nextProducts.length) {
+          throw new Error('empty');
+        }
+        replaceCatalog(nextProducts as Product[]);
+        if (Array.isArray(data.categories) && data.categories.length) {
+          replaceCategories(data.categories);
+        }
+        if (data.settings) update(data.settings);
+        toast({
+          title: 'Каталог загружен',
+          description: `${nextProducts.length} позиций перенесено`,
+        });
+      } catch {
+        toast({
+          title: 'Не удалось прочитать файл',
+          description: 'Нужен файл, выгруженный кнопкой «Выгрузить»',
+        });
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleQuickPrint = (product: Product) => {
@@ -95,6 +148,8 @@ const Index = () => {
             toast({ title: 'Категория удалена', description: category.label });
           }}
           onResetCategories={resetCategories}
+          onExport={handleExport}
+          onImport={handleImport}
           onSelect={handleSelect}
           onPrint={handleQuickPrint}
           onAdd={() => {

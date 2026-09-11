@@ -17,6 +17,8 @@ interface MenuSectionProps {
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
   onReset: () => void;
+  onExport: () => void;
+  onImport: (file: File) => void;
   isAdmin: boolean;
   onRequestAdmin: () => void;
 }
@@ -34,6 +36,8 @@ const MenuSection = ({
   onEdit,
   onDelete,
   onReset,
+  onExport,
+  onImport,
   isAdmin,
   onRequestAdmin,
 }: MenuSectionProps) => {
@@ -133,6 +137,31 @@ const MenuSection = ({
                 <Icon name="Plus" size={16} strokeWidth={2.5} />
                 Добавить
               </button>
+            )}
+            {editMode && (
+              <>
+                <button
+                  onClick={onExport}
+                  className="flex items-center gap-2 border-2 border-primary bg-card px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] text-primary transition-colors hover:bg-muted"
+                >
+                  <Icon name="Download" size={16} strokeWidth={2.5} />
+                  Выгрузить
+                </button>
+                <label className="flex cursor-pointer items-center gap-2 border-2 border-primary bg-card px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] text-primary transition-colors hover:bg-muted">
+                  <Icon name="Upload" size={16} strokeWidth={2.5} />
+                  Загрузить
+                  <input
+                    type="file"
+                    accept="application/json,.json"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) onImport(file);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+              </>
             )}
           </div>
         </div>

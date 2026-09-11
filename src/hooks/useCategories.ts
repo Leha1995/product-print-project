@@ -72,7 +72,19 @@ export const useCategories = () => {
     save(seedCategories);
   }, []);
 
-  return { categories: list, addCategory, renameCategory, removeCategory, resetCategories };
+  const replaceCategories = useCallback((next: Category[]) => {
+    setList(next);
+    save(next);
+  }, []);
+
+  return {
+    categories: list,
+    addCategory,
+    renameCategory,
+    removeCategory,
+    resetCategories,
+    replaceCategories,
+  };
 };
 
 export default useCategories;

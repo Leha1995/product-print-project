@@ -62,7 +62,9 @@ export const useCatalog = () => {
 
   const resetCatalog = useCallback(() => persist(seedProducts), [persist]);
 
-  return { items, saveProduct, removeProduct, resetCatalog };
+  const replaceCatalog = useCallback((next: Product[]) => persist(next), [persist]);
+
+  return { items, saveProduct, removeProduct, resetCatalog, replaceCatalog };
 };
 
 export default useCatalog;
