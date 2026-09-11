@@ -57,7 +57,7 @@ const ReceiptPreview = ({
       />
 
       <div
-        className={`font-head font-bold uppercase leading-tight ${large ? 'text-3xl' : micro ? 'line-clamp-2 text-[11px]' : tiny ? 'text-[13px]' : compact ? 'text-lg' : 'text-xl'}`}
+        className={`font-head font-bold uppercase leading-tight ${large ? 'text-2xl' : micro ? 'line-clamp-2 text-[9px]' : tiny ? 'text-[11px]' : compact ? 'text-base' : 'text-lg'}`}
       >
         {product.name}
       </div>
