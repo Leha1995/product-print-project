@@ -15,7 +15,7 @@ const ProductCard = ({ product, index, onSelect, onPrint }: ProductCardProps) =>
     >
       <button
         onClick={() => onPrint(product)}
-        aria-label={`Печатать ценник: ${product.name}`}
+        aria-label={`Печатать маркировку: ${product.name}`}
         className="relative aspect-square w-full overflow-hidden bg-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary active:opacity-80"
       >
         <img

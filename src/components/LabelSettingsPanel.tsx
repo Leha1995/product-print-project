@@ -51,7 +51,7 @@ const LabelSettingsPanel = ({ settings, onChange, onReset }: LabelSettingsPanelP
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-2 font-head text-[0.7rem] font-medium uppercase tracking-[0.1em] text-primary">
           <Icon name="Settings2" size={14} strokeWidth={2.5} />
-          Настройки ценника
+          Настройки маркировки
         </span>
         <button
           onClick={onReset}
@@ -325,7 +325,7 @@ const LabelSettingsPanel = ({ settings, onChange, onReset }: LabelSettingsPanelP
         <input
           value={settings.shopName}
           onChange={(e) => onChange({ shopName: e.target.value })}
-          placeholder="Название магазина в шапке ценника"
+          placeholder="Название магазина в шапке маркировки"
           className="w-full border-2 border-primary bg-card px-3 py-2 font-body text-[14px] text-primary outline-none placeholder:text-muted-foreground focus:bg-muted"
         />
         <div className="flex items-center gap-2">

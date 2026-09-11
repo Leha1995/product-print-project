@@ -107,7 +107,7 @@ const ProductFormDialog = ({
             {product ? 'Изменить товар' : 'Новый товар'}
           </h3>
           <p className="mt-1 text-[14px] text-muted-foreground">
-            Название, цена и состав попадут в ценник при печати
+            Название, цена и состав попадут в маркировку при печати
           </p>
 
           <div className="mt-5 grid gap-4">

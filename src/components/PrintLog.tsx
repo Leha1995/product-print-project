@@ -34,7 +34,7 @@ const PrintLog = ({ jobs, onClear }: PrintLogProps) => {
 
         {jobs.length === 0 ? (
           <p className="mt-6 border-2 border-dashed border-primary p-6 font-head text-sm uppercase tracking-[0.06em] text-white">
-            Пока пусто. Нажми на любое блюдо — ценник появится здесь.
+            Пока пусто. Нажми на любое блюдо — маркировка появится здесь.
           </p>
         ) : (
           <ul className="mt-6 divide-y-2 divide-primary border-2 border-primary bg-background">

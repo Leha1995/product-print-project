@@ -100,7 +100,7 @@ const PrintDialog = ({
 
               <div className="mt-5 flex items-center justify-between border-2 border-primary p-3">
                 <span className="font-head text-[0.75rem] font-medium uppercase tracking-[0.08em] text-primary">
-                  Копий ценника
+                  Копий маркировки
                 </span>
                 <div className="flex items-center gap-3">
                   <button
@@ -138,7 +138,7 @@ const PrintDialog = ({
                   ? 'Отправляем в принтер'
                   : status === 'done'
                     ? 'Отправлено — печатать снова'
-                    : 'Печатать ценник'}
+                    : 'Печатать маркировку'}
               </button>
 
               <p className="mt-3 text-center text-[12px] uppercase tracking-[0.06em] text-muted-foreground">
@@ -151,7 +151,7 @@ const PrintDialog = ({
             <div className="p-5">
               <div className="print-hide mb-3 flex items-center gap-2 font-head text-[0.7rem] font-medium uppercase tracking-[0.1em] text-primary">
                 <Icon name="ScrollText" size={14} strokeWidth={2.5} />
-                Превью ценника
+                Превью маркировки
               </div>
               <ReceiptPreview
                 product={product}

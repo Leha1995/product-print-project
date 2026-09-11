@@ -27,7 +27,7 @@ export const paperFormats: PaperFormat[] = [
     widthMm: 58,
     heightMm: 40,
   },
-  { id: 'a6', label: 'A6 (105×148)', hint: 'Крупный ценник на витрину', widthMm: 105, heightMm: 148 },
+  { id: 'a6', label: 'A6 (105×148)', hint: 'Крупная маркировка на витрину', widthMm: 105, heightMm: 148 },
 ];
 
 export interface LabelSettings {

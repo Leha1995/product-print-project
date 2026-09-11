@@ -113,7 +113,7 @@ const Index = () => {
       ...prev,
     ]);
     toast({
-      title: 'Ценник отправлен на принтер',
+      title: 'Маркировка отправлена на принтер',
       description: `${product.name} · ${copies} шт.`,
     });
   };
