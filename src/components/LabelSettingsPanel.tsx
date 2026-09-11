@@ -16,7 +16,7 @@ const toggles: { key: keyof LabelSettings; label: string }[] = [
   { key: 'showWeight', label: 'Вес / объём' },
   { key: 'showBarcode', label: 'Штрих-код' },
   { key: 'showDate', label: 'Дата изготовления' },
-  { key: 'showExpiry', label: 'Употребить до' },
+  { key: 'showExpiry', label: 'Годен до' },
   { key: 'showStorage', label: 'Температура' },
   { key: 'showStaff', label: 'Изготовил / проверил' },
 ];

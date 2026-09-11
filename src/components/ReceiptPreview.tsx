@@ -128,7 +128,7 @@ const ReceiptPreview = ({
             <div
               className={`font-head uppercase tracking-[0.1em] ${micro ? 'text-[7px] leading-none' : tiny ? 'text-[9px]' : 'text-xs'}`}
             >
-              Употребить до
+              Годен до
             </div>
             <div
               className={`font-head font-black leading-tight ${large ? 'text-3xl' : micro ? 'text-[10px]' : tiny ? 'text-[13px]' : compact ? 'text-lg' : 'text-xl'}`}
