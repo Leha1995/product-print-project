@@ -37,9 +37,6 @@ const TerminalHeader = ({
       </div>
 
       <div className="flex items-center justify-end gap-4">
-        <span className="hidden font-head text-[0.7rem] font-medium uppercase tracking-[0.06em] text-muted-foreground sm:inline">
-          Касса 1
-        </span>
         <button
           onClick={onAdminClick}
           aria-label={isAdmin ? 'Режим администратора' : 'Вход администратора'}
