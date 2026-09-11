@@ -11,7 +11,6 @@ import useAdmin from '@/hooks/useAdmin';
 import useLabelSettings from '@/hooks/useLabelSettings';
 import DirectPrintArea from '@/components/DirectPrintArea';
 import PrintLog, { PrintJob } from '@/components/PrintLog';
-import PointsSection from '@/components/PointsSection';
 import Footer from '@/components/Footer';
 import { Product } from '@/data/products';
 import { toast } from '@/hooks/use-toast';
@@ -99,7 +98,6 @@ const Index = () => {
           onRequestAdmin={() => setAdminOpen(true)}
         />
         <PrintLog jobs={jobs} onClear={() => setJobs([])} />
-        <PointsSection />
       </main>
       <Footer />
       <PrintDialog

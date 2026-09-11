@@ -9,7 +9,6 @@ interface TerminalHeaderProps {
 
 const links = [
   { label: 'Меню', target: 'menu' },
-  { label: 'Точки', target: 'points' },
 ];
 
 const TerminalHeader = ({
