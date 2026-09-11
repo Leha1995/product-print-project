@@ -51,11 +51,6 @@ const ReceiptPreview = ({
       >
         {settings.shopName}
       </div>
-      {!tiny && (
-        <div className="mt-1 text-center text-[11px] uppercase tracking-[0.12em]">
-          Ценник · касса 1
-        </div>
-      )}
 
       <div
         className={`border-t-2 border-dashed border-primary ${micro ? 'my-1' : tiny ? 'my-1.5' : 'my-3'}`}
