@@ -15,11 +15,15 @@ const ReceiptPreview = ({
   printedAt,
   settings = defaultLabelSettings,
 }: ReceiptPreviewProps) => {
+  const paper = getPaper(settings.paper);
+  const tiny = paper.widthMm <= 45;
+  const micro = tiny && (paper.heightMm ?? 99) <= 30;
+
   const fmt = (date: Date) =>
     date.toLocaleString('ru-RU', {
       day: '2-digit',
       month: '2-digit',
-      year: 'numeric',
+      year: micro ? '2-digit' : 'numeric',
       hour: '2-digit',
       minute: '2-digit',
     });
@@ -27,10 +31,6 @@ const ReceiptPreview = ({
   const stamp = fmt(printedAt);
   const hours = product.shelfLifeHours ?? settings.shelfLifeHours;
   const expiry = fmt(new Date(printedAt.getTime() + hours * 3600000));
-
-  const paper = getPaper(settings.paper);
-  const tiny = paper.widthMm <= 45;
-  const micro = tiny && (paper.heightMm ?? 99) <= 30;
   const compact = paper.widthMm <= 58;
   const large = paper.widthMm >= 105;
 
@@ -53,7 +53,7 @@ const ReceiptPreview = ({
       </div>
 
       <div
-        className={`border-t-2 border-dashed border-primary ${micro ? 'my-1' : tiny ? 'my-1.5' : 'my-3'}`}
+        className={`border-dashed border-primary ${micro ? 'my-0.5 border-t' : tiny ? 'my-1.5 border-t-2' : 'my-3 border-t-2'}`}
       />
 
       <div
@@ -70,7 +70,7 @@ const ReceiptPreview = ({
       )}
 
       <div
-        className={`border-t-2 border-dashed border-primary ${micro ? 'my-1' : tiny ? 'my-1.5' : 'my-3'}`}
+        className={`border-dashed border-primary ${micro ? 'my-0.5 border-t' : tiny ? 'my-1.5 border-t-2' : 'my-3 border-t-2'}`}
       />
 
       <dl
@@ -80,7 +80,7 @@ const ReceiptPreview = ({
       >
         {settings.showWeight && (
           <div className="flex justify-between">
-            <dt>Вес / объём</dt>
+            <dt>{micro ? 'Вес' : 'Вес / объём'}</dt>
             <dd className="font-semibold">{product.weight}</dd>
           </div>
         )}
@@ -92,7 +92,7 @@ const ReceiptPreview = ({
         )}
         {settings.showDate && (
           <div className="flex justify-between">
-            <dt>Изготовлено</dt>
+            <dt className="shrink-0">{micro ? 'Изгот.' : 'Изготовлено'}</dt>
             <dd className="font-semibold">{stamp}</dd>
           </div>
         )}
@@ -121,7 +121,7 @@ const ReceiptPreview = ({
       {settings.showExpiry && (
         <>
           <div
-            className={`border-t-2 border-dashed border-primary ${micro ? 'my-1' : tiny ? 'my-1.5' : 'my-3'}`}
+            className={`border-dashed border-primary ${micro ? 'my-0.5 border-t' : tiny ? 'my-1.5 border-t-2' : 'my-3 border-t-2'}`}
           />
 
           <div className="text-center">

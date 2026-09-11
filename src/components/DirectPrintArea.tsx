@@ -64,7 +64,7 @@ export const printNodeHtml = (
     position: static !important;
     display: flex !important;
     flex-direction: column !important;
-    justify-content: space-between !important;
+    justify-content: ${widthMm <= 45 ? 'flex-start' : 'space-between'} !important;
     box-sizing: border-box !important;
     width: 100% !important;
     height: 100% !important;
@@ -77,6 +77,10 @@ export const printNodeHtml = (
     padding: ${widthMm <= 45 ? '0.8mm 1mm' : '1.5mm 2mm'} !important;
   }
   .rot .print-area > * { flex: 0 0 auto; }
+  .rot .print-area * {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
 </style></head><body></body></html>`);
   doc.close();
 
@@ -105,14 +109,15 @@ export const printNodeHtml = (
       const availW = rot.clientWidth;
       if (!availH || !availW) return;
 
-      area.style.height = 'auto';
-      area.style.width = `${availW}px`;
+      area.style.setProperty('height', 'auto', 'important');
+      area.style.setProperty('width', `${availW}px`, 'important');
       const neededH = area.scrollHeight;
       const neededW = area.scrollWidth;
+      if (!neededH) return;
 
       const scale = Math.min(1, availH / neededH, availW / neededW);
-      area.style.height = `${availH / scale}px`;
-      area.style.width = `${availW / scale}px`;
+      area.style.setProperty('height', `${availH / scale}px`, 'important');
+      area.style.setProperty('width', `${availW / scale}px`, 'important');
       if (scale < 1) {
         area.style.transformOrigin = 'top left';
         area.style.transform = `scale(${scale})`;
