@@ -1,5 +1,4 @@
 import { useCallback, useState } from 'react';
-import AnnounceStrip from '@/components/AnnounceStrip';
 import TerminalHeader from '@/components/TerminalHeader';
 import MenuSection from '@/components/MenuSection';
 import PrintDialog from '@/components/PrintDialog';
@@ -68,7 +67,6 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <AnnounceStrip />
       <TerminalHeader
         printedCount={jobs.length}
         onNavigate={scrollTo}
