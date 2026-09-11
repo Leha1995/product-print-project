@@ -6,7 +6,7 @@ const Footer = () => {
           Автосуши&nbsp;Автопицца
         </span>
         <span className="font-head text-[0.7rem] uppercase tracking-[0.1em]">
-          Терминал печати ценников · версия 1.0
+          Терминал печати маркировки · версия 1.0
         </span>
       </div>
     </footer>
