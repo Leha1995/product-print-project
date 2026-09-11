@@ -26,26 +26,18 @@ const ProductCard = ({ product, index, onSelect }: ProductCardProps) => {
             Хит
           </span>
         )}
-        <span className="absolute bottom-0 right-0 border-l-2 border-t-2 border-primary bg-background px-1 py-0.5 font-head text-[0.7rem] font-black text-primary">
-          {product.price} ₽
-        </span>
       </div>
 
-      <div className="flex flex-1 flex-col gap-0.5 border-t-2 border-primary p-1.5">
-        <h3 className="line-clamp-2 font-head text-[0.65rem] font-bold uppercase leading-tight text-primary">
+      <div className="flex flex-1 flex-col items-center gap-1 border-t-2 border-primary p-1.5">
+        <h3 className="line-clamp-2 text-center font-head text-[0.65rem] font-bold uppercase leading-tight text-primary">
           {product.name}
         </h3>
-        <div className="mt-auto flex items-center justify-between gap-1 pt-1">
-          <span className="truncate text-[0.55rem] uppercase tracking-[0.04em] text-muted-foreground">
-            {product.weight}
-          </span>
-          <Icon
-            name="Printer"
-            size={12}
-            strokeWidth={2.5}
-            className="shrink-0 text-muted-foreground"
-          />
-        </div>
+        <Icon
+          name="Printer"
+          size={60}
+          strokeWidth={2}
+          className="mt-auto shrink-0 text-primary transition-transform duration-150 group-hover:scale-110"
+        />
       </div>
     </button>
   );
