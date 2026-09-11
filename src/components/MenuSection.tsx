@@ -1,10 +1,16 @@
 import { useMemo, useState } from 'react';
 import Icon from '@/components/ui/icon';
 import ProductCard from '@/components/ProductCard';
-import { CategoryId, Product, categories } from '@/data/products';
+import CategoryEditor from '@/components/CategoryEditor';
+import { Category, CategoryId, Product } from '@/data/products';
 
 interface MenuSectionProps {
   products: Product[];
+  categories: Category[];
+  onAddCategory: (label: string, icon: string) => void;
+  onRenameCategory: (id: string, label: string) => void;
+  onRemoveCategory: (category: Category) => void;
+  onResetCategories: () => void;
   onSelect: (product: Product) => void;
   onPrint: (product: Product) => void;
   onAdd: () => void;
@@ -17,6 +23,11 @@ interface MenuSectionProps {
 
 const MenuSection = ({
   products,
+  categories,
+  onAddCategory,
+  onRenameCategory,
+  onRemoveCategory,
+  onResetCategories,
   onSelect,
   onPrint,
   onAdd,
@@ -79,7 +90,7 @@ const MenuSection = ({
 
         <div className="mt-8 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="no-scrollbar flex gap-3 overflow-x-auto pb-1">
-            {categories.map((cat) => {
+            {[{ id: 'all', label: 'Всё меню', icon: 'LayoutGrid' }, ...categories].map((cat) => {
               const isActive = active === cat.id;
               return (
                 <button
@@ -146,6 +157,16 @@ const MenuSection = ({
               Вернуть исходный список
             </button>
           </div>
+        )}
+
+        {editMode && (
+          <CategoryEditor
+            categories={categories}
+            onAdd={onAddCategory}
+            onRename={onRenameCategory}
+            onRemove={onRemoveCategory}
+            onReset={onResetCategories}
+          />
         )}
 
         {visible.length === 0 ? (

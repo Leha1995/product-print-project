@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
-import { CategoryId, Product, categories } from '@/data/products';
+import { Category, CategoryId, Product } from '@/data/products';
 
 interface ProductFormDialogProps {
   product: Product | null;
+  categories: Category[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (product: Product) => void;
 }
 
-const CATEGORY_IMG: Record<CategoryId, string> = {
+const DEFAULT_IMG =
+  'https://cdn.poehali.dev/projects/3ae3beb2-6f64-4c04-99be-0b8f386617e0/files/cbab4a1a-834a-470d-91c8-8ebdd00c9168.jpg';
+
+const CATEGORY_IMG: Record<string, string> = {
   sushi:
     'https://cdn.poehali.dev/projects/3ae3beb2-6f64-4c04-99be-0b8f386617e0/files/cbab4a1a-834a-470d-91c8-8ebdd00c9168.jpg',
   pizza:
@@ -36,8 +40,15 @@ const fieldClass =
 const labelClass =
   'font-head text-[0.7rem] font-medium uppercase tracking-[0.08em] text-primary';
 
-const ProductFormDialog = ({ product, open, onOpenChange, onSave }: ProductFormDialogProps) => {
+const ProductFormDialog = ({
+  product,
+  categories,
+  open,
+  onOpenChange,
+  onSave,
+}: ProductFormDialogProps) => {
   const [form, setForm] = useState(emptyForm);
+  const fallbackImg = (cat: CategoryId) => CATEGORY_IMG[cat] ?? DEFAULT_IMG;
 
   useEffect(() => {
     if (!open) return;
@@ -54,9 +65,9 @@ const ProductFormDialog = ({ product, open, onOpenChange, onSave }: ProductFormD
             shelfLifeHours: product.shelfLifeHours ? String(product.shelfLifeHours) : '',
             hit: Boolean(product.hit),
           }
-        : emptyForm,
+        : { ...emptyForm, category: categories[0]?.id ?? 'sushi' },
     );
-  }, [open, product]);
+  }, [open, product, categories]);
 
   const set = <K extends keyof typeof emptyForm>(key: K, value: (typeof emptyForm)[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -80,7 +91,7 @@ const ProductFormDialog = ({ product, open, onOpenChange, onSave }: ProductFormD
       price: Math.round(price),
       weight: form.weight.trim() || '—',
       composition: form.composition.trim() || 'Состав не указан',
-      image: form.image.trim() || CATEGORY_IMG[form.category],
+      image: form.image.trim() || fallbackImg(form.category),
       barcode: form.barcode.trim() || String(4600000000000 + Math.floor(Math.random() * 999999)),
       shelfLifeHours: form.shelfLifeHours ? Number(form.shelfLifeHours) : undefined,
       hit: form.hit,
@@ -130,13 +141,11 @@ const ProductFormDialog = ({ product, open, onOpenChange, onSave }: ProductFormD
                   onChange={(e) => set('category', e.target.value as CategoryId)}
                   className={fieldClass}
                 >
-                  {categories
-                    .filter((c) => c.id !== 'all')
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.label}
-                      </option>
-                    ))}
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.label}
+                    </option>
+                  ))}
                 </select>
               </label>
             </div>
@@ -189,7 +198,7 @@ const ProductFormDialog = ({ product, open, onOpenChange, onSave }: ProductFormD
               <div className="flex items-center gap-3">
                 <div className="h-[64px] w-[64px] shrink-0 overflow-hidden border-2 border-primary bg-muted">
                   <img
-                    src={form.image || CATEGORY_IMG[form.category]}
+                    src={form.image || fallbackImg(form.category)}
                     alt=""
                     className="h-full w-full object-cover"
                   />

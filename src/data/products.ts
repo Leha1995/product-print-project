@@ -1,4 +1,10 @@
-export type CategoryId = 'sushi' | 'pizza' | 'drinks';
+export type CategoryId = string;
+
+export interface Category {
+  id: string;
+  label: string;
+  icon: string;
+}
 
 export interface Product {
   id: string;
@@ -13,8 +19,7 @@ export interface Product {
   shelfLifeHours?: number;
 }
 
-export const categories: { id: CategoryId | 'all'; label: string; icon: string }[] = [
-  { id: 'all', label: 'Всё меню', icon: 'LayoutGrid' },
+export const categories: Category[] = [
   { id: 'sushi', label: 'Суши бар', icon: 'Fish' },
   { id: 'pizza', label: 'Пицца', icon: 'Pizza' },
   { id: 'drinks', label: 'Напитки', icon: 'CupSoda' },

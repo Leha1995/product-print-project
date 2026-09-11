@@ -6,6 +6,7 @@ import MenuSection from '@/components/MenuSection';
 import PrintDialog from '@/components/PrintDialog';
 import ProductFormDialog from '@/components/ProductFormDialog';
 import useCatalog from '@/hooks/useCatalog';
+import useCategories from '@/hooks/useCategories';
 import AdminLoginDialog from '@/components/AdminLoginDialog';
 import useAdmin from '@/hooks/useAdmin';
 import useLabelSettings from '@/hooks/useLabelSettings';
@@ -22,6 +23,8 @@ const Index = () => {
   const [editing, setEditing] = useState<Product | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const { items, saveProduct, removeProduct, resetCatalog } = useCatalog();
+  const { categories, addCategory, renameCategory, removeCategory, resetCategories } =
+    useCategories();
   const { isAdmin, login, logout, changePin, isDefaultPin } = useAdmin();
   const [adminOpen, setAdminOpen] = useState(false);
   const { settings, update, reset } = useLabelSettings();
@@ -77,6 +80,25 @@ const Index = () => {
         <Hero onOpenMenu={() => scrollTo('menu')} />
         <MenuSection
           products={items}
+          categories={categories}
+          onAddCategory={(label, icon) => {
+            addCategory(label, icon);
+            toast({ title: 'Категория добавлена', description: label });
+          }}
+          onRenameCategory={renameCategory}
+          onRemoveCategory={(category) => {
+            const used = items.filter((p) => p.category === category.id).length;
+            if (used) {
+              toast({
+                title: 'Категория не пустая',
+                description: `Сначала удалите или перенесите товары (${used} шт.)`,
+              });
+              return;
+            }
+            removeCategory(category.id);
+            toast({ title: 'Категория удалена', description: category.label });
+          }}
+          onResetCategories={resetCategories}
           onSelect={handleSelect}
           onPrint={handleQuickPrint}
           onAdd={() => {
@@ -118,6 +140,7 @@ const Index = () => {
       />
       <ProductFormDialog
         product={editing}
+        categories={categories}
         open={formOpen}
         onOpenChange={setFormOpen}
         onSave={(product) => {
