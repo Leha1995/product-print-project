@@ -59,17 +59,11 @@ const MenuSection = ({
             <span className="inline-block border-2 border-primary bg-primary px-2 py-1 font-head text-[0.7rem] font-medium uppercase tracking-[0.1em] text-primary-foreground">
               Терминал зала
             </span>
-            <h2 className="mt-3 font-head text-[34px] font-medium uppercase leading-[1.04] text-primary md:text-[52px]">
-              {editMode ? (
-                <>
-                  Редактируем каталог —<br className="hidden md:block" /> меняем цены и позиции
-                </>
-              ) : (
-                <>
-                  Выбери позицию —<br className="hidden md:block" /> ценник уйдёт в принтер
-                </>
-              )}
-            </h2>
+            {editMode && (
+              <h2 className="mt-3 font-head text-[34px] font-medium uppercase leading-[1.04] text-primary md:text-[52px]">
+                Редактируем каталог —<br className="hidden md:block" /> меняем цены и позиции
+              </h2>
+            )}
           </div>
 
           <label className="flex w-full items-center gap-3 border-2 border-primary bg-card px-3 py-3 md:w-[340px]">
