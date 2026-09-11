@@ -15,7 +15,7 @@ export interface Product {
 
 export const categories: { id: CategoryId | 'all'; label: string; icon: string }[] = [
   { id: 'all', label: 'Всё меню', icon: 'LayoutGrid' },
-  { id: 'sushi', label: 'Суши', icon: 'Fish' },
+  { id: 'sushi', label: 'Суши бар', icon: 'Fish' },
   { id: 'pizza', label: 'Пицца', icon: 'Pizza' },
   { id: 'drinks', label: 'Напитки', icon: 'CupSoda' },
 ];
