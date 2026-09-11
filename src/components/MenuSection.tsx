@@ -152,25 +152,25 @@ const MenuSection = ({
             <p className="mt-2 text-muted-foreground">Попробуйте другое название или категорию</p>
           </div>
         ) : (
-          <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
+          <div className="mt-8 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8">
             {visible.map((product, i) => (
               <div key={product.id} className="relative">
                 <ProductCard product={product} index={i} onSelect={onSelect} />
                 {editMode && (
-                  <div className="absolute right-2 top-2 flex gap-2">
+                  <div className="absolute right-1 top-1 flex gap-1">
                     <button
                       onClick={() => onEdit(product)}
                       aria-label="Изменить товар"
-                      className="flex h-9 w-9 items-center justify-center border-2 border-primary bg-background text-primary transition-colors hover:bg-accent"
+                      className="flex h-6 w-6 items-center justify-center border-2 border-primary bg-background text-primary transition-colors hover:bg-accent"
                     >
-                      <Icon name="Pencil" size={16} strokeWidth={2.5} />
+                      <Icon name="Pencil" size={11} strokeWidth={2.5} />
                     </button>
                     <button
                       onClick={() => onDelete(product)}
                       aria-label="Удалить товар"
-                      className="flex h-9 w-9 items-center justify-center border-2 border-primary bg-background text-primary transition-colors hover:bg-destructive hover:text-destructive-foreground"
+                      className="flex h-6 w-6 items-center justify-center border-2 border-primary bg-background text-primary transition-colors hover:bg-destructive hover:text-destructive-foreground"
                     >
-                      <Icon name="Trash2" size={16} strokeWidth={2.5} />
+                      <Icon name="Trash2" size={11} strokeWidth={2.5} />
                     </button>
                   </div>
                 )}
