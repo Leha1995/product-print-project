@@ -10,19 +10,19 @@ interface CategoryEditorProps {
   onReset: () => void;
 }
 
-const iconChoices = [
-  'Utensils',
-  'Fish',
-  'Pizza',
-  'CupSoda',
-  'Salad',
-  'Soup',
-  'Cake',
-  'Coffee',
-  'Beef',
-  'Sandwich',
-  'IceCream',
-  'Croissant',
+const iconChoices: { name: string; title: string }[] = [
+  { name: 'Utensils', title: 'Блюда' },
+  { name: 'Fish', title: 'Рыба' },
+  { name: 'Pizza', title: 'Пицца' },
+  { name: 'CupSoda', title: 'Напитки' },
+  { name: 'Salad', title: 'Салаты' },
+  { name: 'Soup', title: 'Супы' },
+  { name: 'Cake', title: 'Торты' },
+  { name: 'Coffee', title: 'Кофе' },
+  { name: 'Beef', title: 'Мясо' },
+  { name: 'Sandwich', title: 'Бутерброды' },
+  { name: 'IceCream', title: 'Мороженое' },
+  { name: 'Croissant', title: 'Выпечка' },
 ];
 
 const fieldClass =
@@ -122,9 +122,9 @@ const CategoryEditor = ({
           onChange={(e) => setIcon(e.target.value)}
           className={`${fieldClass} sm:w-[180px]`}
         >
-          {iconChoices.map((name) => (
-            <option key={name} value={name}>
-              {name}
+          {iconChoices.map((choice) => (
+            <option key={choice.name} value={choice.name}>
+              {choice.title}
             </option>
           ))}
         </select>
