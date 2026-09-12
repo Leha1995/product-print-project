@@ -80,20 +80,44 @@ const MenuSection = ({
             )}
           </div>
 
-          <label className="flex w-full items-center gap-3 border-2 border-primary bg-card px-3 py-3 md:w-[340px]">
-            <Icon name="Search" size={20} className="text-primary" strokeWidth={2.5} />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Поиск по названию"
-              className="w-full bg-transparent font-body text-[15px] text-primary outline-none placeholder:text-muted-foreground"
-            />
-            {query && (
-              <button onClick={() => setQuery('')} aria-label="Очистить поиск">
-                <Icon name="X" size={18} className="text-muted-foreground" />
-              </button>
-            )}
-          </label>
+          <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
+            <label className="flex w-full items-center gap-3 border-2 border-primary bg-card px-3 py-3 md:w-[340px]">
+              <Icon name="Search" size={20} className="text-primary" strokeWidth={2.5} />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Поиск по названию"
+                className="w-full bg-transparent font-body text-[15px] text-primary outline-none placeholder:text-muted-foreground"
+              />
+              {query && (
+                <button onClick={() => setQuery('')} aria-label="Очистить поиск">
+                  <Icon name="X" size={18} className="text-muted-foreground" />
+                </button>
+              )}
+            </label>
+
+            <button
+              onClick={() => {
+                if (!isAdmin) {
+                  onRequestAdmin();
+                  return;
+                }
+                setEditMode((v) => !v);
+              }}
+              className={`flex shrink-0 items-center justify-center gap-2 border-2 border-primary px-4 py-3 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] transition-colors ${
+                editMode
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-card text-primary hover:bg-muted'
+              }`}
+            >
+              <Icon
+                name={editMode ? 'Check' : isAdmin ? 'SlidersHorizontal' : 'Lock'}
+                size={16}
+                strokeWidth={2.5}
+              />
+              {editMode ? 'Готово' : 'Редактировать'}
+            </button>
+          </div>
         </div>
 
         <div className="mt-8 flex justify-center">
@@ -151,27 +175,6 @@ const MenuSection = ({
           </div>
 
           <div className="flex shrink-0 flex-wrap gap-3">
-            <button
-              onClick={() => {
-                if (!isAdmin) {
-                  onRequestAdmin();
-                  return;
-                }
-                setEditMode((v) => !v);
-              }}
-              className={`flex items-center gap-2 border-2 border-primary px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] transition-colors ${
-                editMode
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-card text-primary hover:bg-muted'
-              }`}
-            >
-              <Icon
-                name={editMode ? 'Check' : isAdmin ? 'SlidersHorizontal' : 'Lock'}
-                size={16}
-                strokeWidth={2.5}
-              />
-              {editMode ? 'Готово' : 'Редактировать'}
-            </button>
             {editMode && (
               <button
                 onClick={onAdd}
