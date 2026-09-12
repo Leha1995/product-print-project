@@ -24,6 +24,13 @@ const ProductCard = ({ product, index, onSelect, onPrint }: ProductCardProps) =>
           loading="lazy"
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
+        {product.shelfLifeHours !== undefined && (
+          <span className="absolute right-0 top-1 border-2 border-r-0 border-primary bg-card px-1 py-px font-head text-[0.5rem] font-bold uppercase tracking-[0.06em] text-primary">
+            {product.shelfLifeHours < 24
+              ? `${product.shelfLifeHours} ч`
+              : `${Math.round(product.shelfLifeHours / 24)} сут`}
+          </span>
+        )}
         {product.hit && (
           <span className="absolute left-0 top-1 border-2 border-l-0 border-primary bg-accent px-1 py-px font-head text-[0.5rem] font-bold uppercase tracking-[0.06em] text-accent-foreground">
             Хит

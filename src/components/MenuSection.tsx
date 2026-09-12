@@ -50,11 +50,18 @@ const MenuSection = ({
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return products.filter((p) => {
-      const byCat = active === 'all' || productCategories(p).includes(active);
-      const byQuery = !q || p.name.toLowerCase().includes(q) || p.composition.toLowerCase().includes(q);
-      return byCat && byQuery;
-    });
+    return products
+      .filter((p) => {
+        const byCat = active === 'all' || productCategories(p).includes(active);
+        const byQuery = !q || p.name.toLowerCase().includes(q) || p.composition.toLowerCase().includes(q);
+        return byCat && byQuery;
+      })
+      .sort((a, b) => {
+        const sa = a.shelfLifeHours ?? Number.POSITIVE_INFINITY;
+        const sb = b.shelfLifeHours ?? Number.POSITIVE_INFINITY;
+        if (sa !== sb) return sa - sb;
+        return a.name.localeCompare(b.name, 'ru');
+      });
   }, [query, active, products]);
 
   const tabsRef = useRef<HTMLDivElement>(null);
