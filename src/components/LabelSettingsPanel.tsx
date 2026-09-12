@@ -160,6 +160,38 @@ const LabelSettingsPanel = ({
         </div>
       )}
 
+      {settings.printMode === 'browser' && (
+        <div className="mt-3 grid gap-1.5 border-2 border-dashed border-primary p-3">
+          <span className="flex items-center gap-2 font-head text-[0.65rem] font-medium uppercase tracking-[0.06em] text-primary">
+            <Icon name="Zap" size={13} strokeWidth={2.5} />
+            Печать без окна подтверждения
+          </span>
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Окно печати рисует сам браузер, сайт его закрыть не может. Отключается один раз в
+            Windows:
+          </p>
+          <ol className="grid gap-1 pl-4 text-[11px] leading-snug text-muted-foreground">
+            <li className="list-decimal">Закройте все окна Chrome или Edge.</li>
+            <li className="list-decimal">
+              Правой кнопкой по ярлыку браузера на рабочем столе → «Свойства».
+            </li>
+            <li className="list-decimal">
+              В поле «Объект» в самый конец, после кавычек, через пробел добавьте{' '}
+              <code className="border border-primary bg-card px-1 text-primary">
+                --kiosk-printing
+              </code>
+            </li>
+            <li className="list-decimal">
+              Сохраните и запускайте сайт только с этого ярлыка. Печать пойдёт сразу на принтер по
+              умолчанию.
+            </li>
+          </ol>
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Заранее сделайте нужный принтер принтером по умолчанию в «Устройства и принтеры».
+          </p>
+        </div>
+      )}
+
       <div className="mt-3 grid grid-cols-2 gap-2">
         {[
           { value: false, label: 'Обычная 0°', hint: 'Печать вдоль листа' },
