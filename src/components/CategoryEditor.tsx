@@ -110,31 +110,49 @@ const CategoryEditor = ({
         ))}
       </div>
 
-      <form onSubmit={submit} className="mt-3 flex flex-col gap-2 sm:flex-row">
-        <input
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          placeholder="Название категории, например «Салаты»"
-          className={fieldClass}
-        />
-        <select
-          value={icon}
-          onChange={(e) => setIcon(e.target.value)}
-          className={`${fieldClass} sm:w-[180px]`}
-        >
-          {iconChoices.map((choice) => (
-            <option key={choice.name} value={choice.name}>
-              {choice.title}
-            </option>
-          ))}
-        </select>
-        <button
-          type="submit"
-          className="flex shrink-0 items-center justify-center gap-2 border-2 border-primary bg-accent px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] text-accent-foreground transition-transform hover:-translate-y-0.5"
-        >
-          <Icon name="Plus" size={16} strokeWidth={2.5} />
-          Добавить
-        </button>
+      <form onSubmit={submit} className="mt-3 flex flex-col gap-3">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="Название категории, например «Салаты»"
+            className={fieldClass}
+          />
+          <button
+            type="submit"
+            className="flex shrink-0 items-center justify-center gap-2 border-2 border-primary bg-accent px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] text-accent-foreground transition-transform hover:-translate-y-0.5"
+          >
+            <Icon name="Plus" size={16} strokeWidth={2.5} />
+            Добавить
+          </button>
+        </div>
+
+        <div>
+          <span className="font-head text-[0.7rem] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+            Значок категории
+          </span>
+          <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+            {iconChoices.map((choice) => {
+              const active = icon === choice.name;
+              return (
+                <button
+                  key={choice.name}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setIcon(choice.name)}
+                  className={`flex flex-col items-center gap-1 border-2 border-primary px-2 py-2 transition-transform hover:-translate-y-0.5 ${
+                    active ? 'bg-accent text-accent-foreground' : 'bg-card text-primary'
+                  }`}
+                >
+                  <Icon name={choice.name} size={20} strokeWidth={2.5} />
+                  <span className="font-head text-[0.65rem] font-medium uppercase tracking-[0.04em]">
+                    {choice.title}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </form>
     </div>
   );
