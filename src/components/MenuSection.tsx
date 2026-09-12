@@ -13,6 +13,7 @@ interface MenuSectionProps {
   onResetCategories: () => void;
   onSelect: (product: Product) => void;
   onPrint: (product: Product) => void;
+  onPrintBatch: (products: Product[], label: string) => void;
   onAdd: () => void;
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
@@ -32,6 +33,7 @@ const MenuSection = ({
   onResetCategories,
   onSelect,
   onPrint,
+  onPrintBatch,
   onAdd,
   onEdit,
   onDelete,
@@ -54,6 +56,9 @@ const MenuSection = ({
       return byCat && byQuery;
     });
   }, [query, active, products]);
+
+  const activeLabel =
+    active === 'all' ? 'Всё меню' : (categories.find((c) => c.id === active)?.label ?? 'Категория');
 
   return (
     <section id="menu" className="print-hide border-t-2 border-primary bg-background">
@@ -107,7 +112,16 @@ const MenuSection = ({
             })}
           </div>
 
-          <div className="flex shrink-0 gap-3">
+          <div className="flex shrink-0 flex-wrap gap-3">
+            <button
+              onClick={() => onPrintBatch(visible, activeLabel)}
+              disabled={!visible.length}
+              className="flex items-center gap-2 border-2 border-primary bg-accent px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] text-accent-foreground transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50"
+            >
+              <Icon name="Printer" size={16} strokeWidth={2.5} />
+              Печатать всю категорию
+              <span className="border-l-2 border-accent-foreground/40 pl-2">{visible.length}</span>
+            </button>
             <button
               onClick={() => {
                 if (!isAdmin) {

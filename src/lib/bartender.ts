@@ -33,7 +33,7 @@ const fmt = (date: Date) =>
     minute: '2-digit',
   });
 
-export const buildBartenderCsv = (
+const buildRow = (
   product: Product,
   copies: number,
   printedAt: Date,
@@ -42,7 +42,7 @@ export const buildBartenderCsv = (
   const hours = product.shelfLifeHours ?? settings.shelfLifeHours;
   const expiry = new Date(printedAt.getTime() + hours * 3600000);
 
-  const row = [
+  return [
     settings.bartenderTemplate,
     copies,
     settings.bartenderPrinter,
@@ -59,8 +59,49 @@ export const buildBartenderCsv = (
     settings.showStaff ? settings.makerName : '',
     settings.showStaff ? settings.checkerName : '',
   ];
+};
 
-  return `${columns.join(',')}\n${row.map(esc).join(',')}\n`;
+export const buildBartenderCsv = (
+  product: Product,
+  copies: number,
+  printedAt: Date,
+  settings: LabelSettings,
+) =>
+  `${columns.join(',')}\n${buildRow(product, copies, printedAt, settings).map(esc).join(',')}\n`;
+
+export const buildBartenderBatchCsv = (
+  products: Product[],
+  copies: number,
+  printedAt: Date,
+  settings: LabelSettings,
+) =>
+  `${columns.join(',')}\n${products
+    .map((p) => buildRow(p, copies, printedAt, settings).map(esc).join(','))
+    .join('\n')}\n`;
+
+const saveCsv = (csv: string, fileName: string) => {
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+};
+
+export const downloadBartenderBatch = (
+  products: Product[],
+  copies: number,
+  printedAt: Date,
+  settings: LabelSettings,
+) => {
+  const stamp = printedAt.toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  saveCsv(
+    buildBartenderBatchCsv(products, copies, printedAt, settings),
+    `labels_batch_${stamp}.csv`,
+  );
 };
 
 export const downloadBartenderJob = (
@@ -74,15 +115,7 @@ export const downloadBartenderJob = (
     .toISOString()
     .replace(/[:.]/g, '-')
     .slice(0, 19);
-  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `label_${product.id}_${stamp}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+  saveCsv(csv, `label_${product.id}_${stamp}.csv`);
 };
 
 export default downloadBartenderJob;

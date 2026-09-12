@@ -9,6 +9,7 @@ import AdminLoginDialog from '@/components/AdminLoginDialog';
 import useAdmin from '@/hooks/useAdmin';
 import useLabelSettings from '@/hooks/useLabelSettings';
 import DirectPrintArea from '@/components/DirectPrintArea';
+import BatchPrintArea from '@/components/BatchPrintArea';
 import PrintLog, { PrintJob } from '@/components/PrintLog';
 import Footer from '@/components/Footer';
 import { Product, productCategories } from '@/data/products';
@@ -34,6 +35,9 @@ const Index = () => {
   const { settings, update, reset } = useLabelSettings();
   const [quickPrint, setQuickPrint] = useState<Product | null>(null);
   const [quickStamp, setQuickStamp] = useState(() => new Date());
+  const [batchPrint, setBatchPrint] = useState<Product[] | null>(null);
+  const [batchStamp, setBatchStamp] = useState(() => new Date());
+  const [batchLabel, setBatchLabel] = useState('');
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -101,6 +105,35 @@ const Index = () => {
     handlePrinted(product, 1);
   }, []);
 
+  const handlePrintBatch = (list: Product[], label: string) => {
+    if (!list.length) {
+      toast({ title: 'В категории нет товаров' });
+      return;
+    }
+    setBatchLabel(label);
+    setBatchStamp(new Date());
+    setBatchPrint(list);
+  };
+
+  const handleBatchDone = useCallback((list: Product[]) => {
+    setBatchPrint(null);
+    const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    setJobs((prev) => [
+      ...list.map((p) => ({
+        id: `${p.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name: p.name,
+        price: p.price,
+        copies: 1,
+        time,
+      })),
+      ...prev,
+    ]);
+    toast({
+      title: 'Партия отправлена на принтер',
+      description: `${batchLabel} · ${list.length} этикеток`,
+    });
+  }, [batchLabel]);
+
   const handlePrinted = (product: Product, copies: number) => {
     setJobs((prev) => [
       {
@@ -154,6 +187,7 @@ const Index = () => {
           onImport={handleImport}
           onSelect={handleSelect}
           onPrint={handleQuickPrint}
+          onPrintBatch={handlePrintBatch}
           onAdd={() => {
             setEditing(null);
             setFormOpen(true);
@@ -191,6 +225,12 @@ const Index = () => {
         settings={settings}
         printedAt={quickStamp}
         onDone={handleQuickDone}
+      />
+      <BatchPrintArea
+        products={batchPrint}
+        settings={settings}
+        printedAt={batchStamp}
+        onDone={handleBatchDone}
       />
       <ProductFormDialog
         product={editing}
