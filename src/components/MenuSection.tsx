@@ -91,6 +91,18 @@ const MenuSection = ({
           </label>
         </div>
 
+        <div className="mt-8 flex justify-center">
+          <button
+            onClick={() => onPrintBatch(visible, activeLabel)}
+            disabled={!visible.length}
+            className="flex items-center justify-center gap-3 border-2 border-primary bg-accent px-6 py-4 font-head text-[0.95rem] font-medium uppercase tracking-[0.06em] text-accent-foreground transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50 md:text-[1.05rem]"
+          >
+            <Icon name="Printer" size={20} strokeWidth={2.5} />
+            Печатать всю категорию
+            <span className="border-l-2 border-accent-foreground/40 pl-3">{visible.length}</span>
+          </button>
+        </div>
+
         <div className="mt-8 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="no-scrollbar flex gap-3 overflow-x-auto pb-1">
             {[{ id: 'all', label: 'Всё меню', icon: 'LayoutGrid' }, ...categories].map((cat) => {
@@ -113,15 +125,6 @@ const MenuSection = ({
           </div>
 
           <div className="flex shrink-0 flex-wrap gap-3">
-            <button
-              onClick={() => onPrintBatch(visible, activeLabel)}
-              disabled={!visible.length}
-              className="flex items-center gap-2 border-2 border-primary bg-accent px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] text-accent-foreground transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50"
-            >
-              <Icon name="Printer" size={16} strokeWidth={2.5} />
-              Печатать всю категорию
-              <span className="border-l-2 border-accent-foreground/40 pl-2">{visible.length}</span>
-            </button>
             <button
               onClick={() => {
                 if (!isAdmin) {
