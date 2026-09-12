@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
-import { Category, CategoryId, Product } from '@/data/products';
+import { Category, CategoryId, Product, productCategories } from '@/data/products';
 
 interface ProductFormDialogProps {
   product: Product | null;
@@ -26,6 +26,7 @@ const CATEGORY_IMG: Record<string, string> = {
 const emptyForm = {
   name: '',
   category: 'sushi' as CategoryId,
+  categories: [] as CategoryId[],
   price: '',
   weight: '',
   composition: '',
@@ -57,6 +58,7 @@ const ProductFormDialog = ({
         ? {
             name: product.name,
             category: product.category,
+            categories: productCategories(product),
             price: String(product.price),
             weight: product.weight,
             composition: product.composition,
@@ -65,12 +67,24 @@ const ProductFormDialog = ({
             shelfLifeHours: product.shelfLifeHours ? String(product.shelfLifeHours) : '',
             hit: Boolean(product.hit),
           }
-        : { ...emptyForm, category: categories[0]?.id ?? 'sushi' },
+        : {
+            ...emptyForm,
+            category: categories[0]?.id ?? 'sushi',
+            categories: [categories[0]?.id ?? 'sushi'],
+          },
     );
   }, [open, product, categories]);
 
   const set = <K extends keyof typeof emptyForm>(key: K, value: (typeof emptyForm)[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  const toggleCategory = (id: CategoryId) =>
+    setForm((prev) => ({
+      ...prev,
+      categories: prev.categories.includes(id)
+        ? prev.categories.filter((c) => c !== id)
+        : [...prev.categories, id],
+    }));
 
   const handleFile = (file?: File) => {
     if (!file) return;
@@ -84,14 +98,17 @@ const ProductFormDialog = ({
     const price = Number(form.price.replace(',', '.'));
     if (!form.name.trim() || Number.isNaN(price)) return;
 
+    const picked = form.categories.length ? form.categories : [form.category];
+
     onSave({
       id: product?.id ?? `usr-${Date.now().toString(36)}`,
       name: form.name.trim(),
-      category: form.category,
+      category: picked[0],
+      categories: picked,
       price: Math.round(price),
       weight: form.weight.trim() || '—',
       composition: form.composition.trim() || 'Состав не указан',
-      image: form.image.trim() || fallbackImg(form.category),
+      image: form.image.trim() || fallbackImg(picked[0]),
       barcode: form.barcode.trim() || String(4600000000000 + Math.floor(Math.random() * 999999)),
       shelfLifeHours: form.shelfLifeHours ? Number(form.shelfLifeHours) : undefined,
       hit: form.hit,
@@ -122,32 +139,45 @@ const ProductFormDialog = ({
               />
             </label>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="grid gap-1.5">
-                <span className={labelClass}>Цена, ₽</span>
-                <input
-                  value={form.price}
-                  onChange={(e) => set('price', e.target.value)}
-                  inputMode="decimal"
-                  placeholder="489"
-                  required
-                  className={fieldClass}
-                />
-              </label>
-              <label className="grid gap-1.5">
-                <span className={labelClass}>Категория</span>
-                <select
-                  value={form.category}
-                  onChange={(e) => set('category', e.target.value as CategoryId)}
-                  className={fieldClass}
-                >
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
+            <label className="grid gap-1.5">
+              <span className={labelClass}>Цена, ₽</span>
+              <input
+                value={form.price}
+                onChange={(e) => set('price', e.target.value)}
+                inputMode="decimal"
+                placeholder="489"
+                required
+                className={fieldClass}
+              />
+            </label>
+
+            <div className="grid gap-1.5">
+              <span className={labelClass}>Категории — можно выбрать несколько</span>
+              <div className="flex flex-wrap gap-2">
+                {categories.map((c) => {
+                  const on = form.categories.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => toggleCategory(c.id)}
+                      className={`flex items-center gap-1.5 border-2 border-primary px-3 py-1.5 font-head text-[0.7rem] font-medium uppercase tracking-[0.06em] transition-colors ${
+                        on
+                          ? 'bg-accent text-accent-foreground'
+                          : 'bg-card text-muted-foreground hover:bg-muted'
+                      }`}
+                    >
+                      <Icon name={on ? 'Check' : 'Plus'} size={14} strokeWidth={3} />
                       {c.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                    </button>
+                  );
+                })}
+              </div>
+              {!form.categories.length && (
+                <span className="text-[12px] text-muted-foreground">
+                  Выберите хотя бы одну категорию
+                </span>
+              )}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -198,7 +228,7 @@ const ProductFormDialog = ({
               <div className="flex items-center gap-3">
                 <div className="h-[64px] w-[64px] shrink-0 overflow-hidden border-2 border-primary bg-muted">
                   <img
-                    src={form.image || fallbackImg(form.category)}
+                    src={form.image || fallbackImg(form.categories[0] ?? form.category)}
                     alt=""
                     className="h-full w-full object-cover"
                   />

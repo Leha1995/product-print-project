@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import Icon from '@/components/ui/icon';
 import ProductCard from '@/components/ProductCard';
 import CategoryEditor from '@/components/CategoryEditor';
-import { Category, CategoryId, Product } from '@/data/products';
+import { Category, CategoryId, Product, productCategories } from '@/data/products';
 
 interface MenuSectionProps {
   products: Product[];
@@ -49,7 +49,7 @@ const MenuSection = ({
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return products.filter((p) => {
-      const byCat = active === 'all' || p.category === active;
+      const byCat = active === 'all' || productCategories(p).includes(active);
       const byQuery = !q || p.name.toLowerCase().includes(q) || p.composition.toLowerCase().includes(q);
       return byCat && byQuery;
     });

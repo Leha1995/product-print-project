@@ -11,7 +11,7 @@ import useLabelSettings from '@/hooks/useLabelSettings';
 import DirectPrintArea from '@/components/DirectPrintArea';
 import PrintLog, { PrintJob } from '@/components/PrintLog';
 import Footer from '@/components/Footer';
-import { Product } from '@/data/products';
+import { Product, productCategories } from '@/data/products';
 import { toast } from '@/hooks/use-toast';
 
 const Index = () => {
@@ -136,7 +136,9 @@ const Index = () => {
           }}
           onRenameCategory={renameCategory}
           onRemoveCategory={(category) => {
-            const used = items.filter((p) => p.category === category.id).length;
+            const used = items.filter((p) =>
+              productCategories(p).includes(category.id),
+            ).length;
             if (used) {
               toast({
                 title: 'Категория не пустая',

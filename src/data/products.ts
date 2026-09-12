@@ -10,6 +10,7 @@ export interface Product {
   id: string;
   name: string;
   category: CategoryId;
+  categories?: CategoryId[];
   price: number;
   weight: string;
   composition: string;
@@ -161,3 +162,7 @@ export const products: Product[] = [
     barcode: '4600003000047',
   },
 ];
+export const productCategories = (product: Product): CategoryId[] => {
+  const list = product.categories?.length ? product.categories : [product.category];
+  return list.filter(Boolean);
+};
