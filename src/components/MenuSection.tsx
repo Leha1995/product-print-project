@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Icon from '@/components/ui/icon';
 import ProductCard from '@/components/ProductCard';
 import CategoryEditor from '@/components/CategoryEditor';
@@ -57,6 +57,11 @@ const MenuSection = ({
     });
   }, [query, active, products]);
 
+  const tabsRef = useRef<HTMLDivElement>(null);
+
+  const scrollTabs = (dir: 1 | -1) =>
+    tabsRef.current?.scrollBy({ left: dir * 280, behavior: 'smooth' });
+
   const activeLabel =
     active === 'all' ? 'Всё меню' : (categories.find((c) => c.id === active)?.label ?? 'Категория');
 
@@ -104,24 +109,45 @@ const MenuSection = ({
         </div>
 
         <div className="mt-8 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="no-scrollbar flex gap-3 overflow-x-auto pb-1">
-            {[{ id: 'all', label: 'Всё меню', icon: 'LayoutGrid' }, ...categories].map((cat) => {
-              const isActive = active === cat.id;
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => setActive(cat.id)}
-                  className={`flex shrink-0 items-center gap-2 border-2 border-primary px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] transition-colors ${
-                    isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-card text-primary hover:bg-accent hover:text-accent-foreground'
-                  }`}
-                >
-                  <Icon name={cat.icon} size={16} strokeWidth={2.5} />
-                  {cat.label}
-                </button>
-              );
-            })}
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <button
+              onClick={() => scrollTabs(-1)}
+              aria-label="Прокрутить категории влево"
+              className="hidden h-[42px] w-[34px] shrink-0 items-center justify-center border-2 border-primary bg-card text-primary transition-colors hover:bg-accent hover:text-accent-foreground md:flex"
+            >
+              <Icon name="ChevronLeft" size={18} strokeWidth={2.5} />
+            </button>
+
+            <div
+              ref={tabsRef}
+              className="cat-scroll flex min-w-0 flex-1 gap-3 overflow-x-auto pb-2"
+            >
+              {[{ id: 'all', label: 'Всё меню', icon: 'LayoutGrid' }, ...categories].map((cat) => {
+                const isActive = active === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setActive(cat.id)}
+                    className={`flex shrink-0 items-center gap-2 border-2 border-primary px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] transition-colors ${
+                      isActive
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-card text-primary hover:bg-accent hover:text-accent-foreground'
+                    }`}
+                  >
+                    <Icon name={cat.icon} size={16} strokeWidth={2.5} />
+                    {cat.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => scrollTabs(1)}
+              aria-label="Прокрутить категории вправо"
+              className="hidden h-[42px] w-[34px] shrink-0 items-center justify-center border-2 border-primary bg-card text-primary transition-colors hover:bg-accent hover:text-accent-foreground md:flex"
+            >
+              <Icon name="ChevronRight" size={18} strokeWidth={2.5} />
+            </button>
           </div>
 
           <div className="flex shrink-0 flex-wrap gap-3">

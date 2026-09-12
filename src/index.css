@@ -158,6 +158,25 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  .cat-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary)) hsl(var(--muted));
+  }
+  .cat-scroll::-webkit-scrollbar {
+    height: 10px;
+  }
+  .cat-scroll::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border: 2px solid hsl(var(--primary));
+  }
+  .cat-scroll::-webkit-scrollbar-thumb {
+    background: hsl(var(--primary));
+    border: 2px solid hsl(var(--muted));
+  }
+  .cat-scroll::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--accent));
+  }
 }
 
 @media print {
