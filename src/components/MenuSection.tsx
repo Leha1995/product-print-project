@@ -65,7 +65,7 @@ const MenuSection = ({
             </span>
             {editMode && (
               <h2 className="mt-3 font-head text-[34px] font-medium uppercase leading-[1.04] text-primary md:text-[52px]">
-                Редактируем каталог —<br className="hidden md:block" /> меняем цены и позиции
+                Редактирование и добавление позиций
               </h2>
             )}
           </div>
