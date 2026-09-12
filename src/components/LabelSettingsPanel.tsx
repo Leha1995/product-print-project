@@ -9,6 +9,7 @@ interface LabelSettingsPanelProps {
   settings: LabelSettings;
   onChange: (patch: Partial<LabelSettings>) => void;
   onReset: () => void;
+  staffOnly?: boolean;
 }
 
 const toggles: { key: keyof LabelSettings; label: string }[] = [
@@ -21,7 +22,12 @@ const toggles: { key: keyof LabelSettings; label: string }[] = [
   { key: 'showStaff', label: 'Изготовил / проверил' },
 ];
 
-const LabelSettingsPanel = ({ settings, onChange, onReset }: LabelSettingsPanelProps) => {
+const LabelSettingsPanel = ({
+  settings,
+  onChange,
+  onReset,
+  staffOnly = false,
+}: LabelSettingsPanelProps) => {
   const [newStaff, setNewStaff] = useState('');
 
   const addStaff = () => {
@@ -50,18 +56,22 @@ const LabelSettingsPanel = ({ settings, onChange, onReset }: LabelSettingsPanelP
     <div className="print-hide border-t-2 border-primary p-5">
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-2 font-head text-[0.7rem] font-medium uppercase tracking-[0.1em] text-primary">
-          <Icon name="Settings2" size={14} strokeWidth={2.5} />
-          Настройки маркировки
+          <Icon name={staffOnly ? 'Users' : 'Settings2'} size={14} strokeWidth={2.5} />
+          {staffOnly ? 'Кто изготовил и проверил' : 'Настройки маркировки'}
         </span>
-        <button
-          onClick={onReset}
-          className="flex items-center gap-1.5 font-head text-[0.65rem] font-medium uppercase tracking-[0.06em] text-muted-foreground underline-offset-4 hover:underline"
-        >
-          <Icon name="RotateCcw" size={13} strokeWidth={2.5} />
-          Сбросить
-        </button>
+        {!staffOnly && (
+          <button
+            onClick={onReset}
+            className="flex items-center gap-1.5 font-head text-[0.65rem] font-medium uppercase tracking-[0.06em] text-muted-foreground underline-offset-4 hover:underline"
+          >
+            <Icon name="RotateCcw" size={13} strokeWidth={2.5} />
+            Сбросить
+          </button>
+        )}
       </div>
 
+      {!staffOnly && (
+        <>
       <div className="mt-3 grid grid-cols-2 gap-2">
         {paperFormats.map((paper) => {
           const active = settings.paper === paper.id;
@@ -220,8 +230,10 @@ const LabelSettingsPanel = ({ settings, onChange, onReset }: LabelSettingsPanelP
           />
         </label>
       )}
+        </>
+      )}
 
-      {settings.showStaff && (
+      {(staffOnly || settings.showStaff) && (
         <div className="mt-3 grid gap-2">
           <div className="grid gap-2 sm:grid-cols-2">
             <label className="grid gap-1">
@@ -299,7 +311,7 @@ const LabelSettingsPanel = ({ settings, onChange, onReset }: LabelSettingsPanelP
         </div>
       )}
 
-      {settings.showStorage && (
+      {!staffOnly && settings.showStorage && (
         <div className="mt-3 grid gap-2">
           <input
             value={settings.storageText}
@@ -321,6 +333,7 @@ const LabelSettingsPanel = ({ settings, onChange, onReset }: LabelSettingsPanelP
         </div>
       )}
 
+      {!staffOnly && (
       <div className="mt-3 grid gap-2">
         <input
           value={settings.shopName}
@@ -355,6 +368,7 @@ const LabelSettingsPanel = ({ settings, onChange, onReset }: LabelSettingsPanelP
           )}
         </div>
       </div>
+      )}
     </div>
   );
 };

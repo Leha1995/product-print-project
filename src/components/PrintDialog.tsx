@@ -16,6 +16,7 @@ interface PrintDialogProps {
   settings: LabelSettings;
   onSettingsChange: (patch: Partial<LabelSettings>) => void;
   onSettingsReset: () => void;
+  isAdmin?: boolean;
 }
 
 const PrintDialog = ({
@@ -26,6 +27,7 @@ const PrintDialog = ({
   settings,
   onSettingsChange,
   onSettingsReset,
+  isAdmin = false,
 }: PrintDialogProps) => {
   const [copies, setCopies] = useState(1);
   const [status, setStatus] = useState<'idle' | 'sending' | 'done'>('idle');
@@ -164,6 +166,7 @@ const PrintDialog = ({
               settings={settings}
               onChange={onSettingsChange}
               onReset={onSettingsReset}
+              staffOnly={!isAdmin}
             />
           </div>
         </div>

@@ -182,6 +182,7 @@ const Index = () => {
         settings={settings}
         onSettingsChange={update}
         onSettingsReset={reset}
+        isAdmin={isAdmin}
       />
       <DirectPrintArea
         product={quickPrint}
