@@ -58,7 +58,7 @@ export const printNodeHtml = (
     width: ${rotate90 ? pageH : widthMm}mm;
     height: ${rotate90 ? widthMm : pageH}mm;
     transform-origin: top left;
-    ${rotate90 ? `transform: translateX(${widthMm}mm) rotate(90deg);` : ''}
+    ${rotate90 ? `transform: translateX(${widthMm}mm) rotate(90deg) translateY(2mm);` : 'transform: translateX(2mm);'}
   }
   .rot .print-area {
     position: static !important;
