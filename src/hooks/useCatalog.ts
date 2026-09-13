@@ -1,66 +1,128 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Product, products as seedProducts } from '@/data/products';
+import {
+  IMG_PREFIX,
+  compressImage,
+  getAllImages,
+  putImage,
+  removeImage,
+} from '@/lib/imageStore';
+import { toast } from '@/hooks/use-toast';
 
 const STORAGE_KEY = 'asap-catalog-v1';
 
-const load = (): Product[] => {
+const loadRaw = (): Product[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return seedProducts;
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length ? (parsed as Product[]) : seedProducts;
+    if (!Array.isArray(parsed) || !parsed.length) return seedProducts;
+    const clean = (parsed as Product[]).filter((p) => p && p.id && p.name);
+    return Array.from(new Map(clean.map((p) => [p.id, p])).values());
   } catch {
     return seedProducts;
   }
 };
 
+const write = (list: Product[]) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  } catch {
+    toast({
+      title: 'Не удалось сохранить каталог',
+      description: 'Память браузера переполнена — выгрузите каталог в файл',
+    });
+  }
+};
+
 export const useCatalog = () => {
   const [items, setItems] = useState<Product[]>(seedProducts);
+  const imagesRef = useRef<Record<string, string>>({});
 
-  useEffect(() => {
-    setItems(load());
-  }, []);
-
-  const persist = useCallback((next: Product[]) => {
-    setItems(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      /* storage unavailable */
-    }
-  }, []);
-
-  const saveProduct = useCallback(
-    (product: Product) => {
-      setItems((prev) => {
-        const exists = prev.some((p) => p.id === product.id);
-        const next = exists
-          ? prev.map((p) => (p.id === product.id ? product : p))
-          : [product, ...prev];
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-        } catch {
-          /* storage unavailable */
-        }
-        return next;
-      });
-    },
+  const resolve = useCallback(
+    (list: Product[]) =>
+      list.map((p) =>
+        p.image?.startsWith(IMG_PREFIX)
+          ? { ...p, image: imagesRef.current[p.image.slice(IMG_PREFIX.length)] ?? '' }
+          : p,
+      ),
     [],
   );
 
-  const removeProduct = useCallback((id: string) => {
-    setItems((prev) => {
-      const next = prev.filter((p) => p.id !== id);
+  useEffect(() => {
+    let alive = true;
+    const boot = async () => {
+      const stored = loadRaw();
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        imagesRef.current = await getAllImages();
       } catch {
-        /* storage unavailable */
+        imagesRef.current = {};
       }
-      return next;
-    });
+      if (!alive) return;
+      setItems(
+        stored.map((p) =>
+          p.image?.startsWith(IMG_PREFIX)
+            ? { ...p, image: imagesRef.current[p.image.slice(IMG_PREFIX.length)] ?? '' }
+            : p,
+        ),
+      );
+    };
+    boot();
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  const resetCatalog = useCallback(() => persist(seedProducts), [persist]);
+  const toStored = useCallback(async (product: Product): Promise<Product> => {
+    if (!product.image?.startsWith('data:')) return product;
+    const key = `img-${product.id}`;
+    const small = await compressImage(product.image);
+    imagesRef.current[key] = small;
+    try {
+      await putImage(key, small);
+      return { ...product, image: `${IMG_PREFIX}${key}` };
+    } catch {
+      return { ...product, image: small };
+    }
+  }, []);
+
+  const persist = useCallback(
+    async (next: Product[]) => {
+      const stored = await Promise.all(next.map(toStored));
+      write(stored);
+      setItems(resolve(stored));
+    },
+    [resolve, toStored],
+  );
+
+  const saveProduct = useCallback(
+    async (product: Product) => {
+      const stored = await toStored(product);
+      const prev = loadRaw();
+      const exists = prev.some((p) => p.id === stored.id);
+      const next = exists
+        ? prev.map((p) => (p.id === stored.id ? stored : p))
+        : [stored, ...prev];
+      write(next);
+      setItems(resolve(next));
+    },
+    [resolve, toStored],
+  );
+
+  const removeProduct = useCallback(
+    (id: string) => {
+      const next = loadRaw().filter((p) => p.id !== id);
+      write(next);
+      setItems(resolve(next));
+      removeImage(`img-${id}`).catch(() => undefined);
+    },
+    [resolve],
+  );
+
+  const resetCatalog = useCallback(() => {
+    write(seedProducts);
+    setItems(seedProducts);
+  }, []);
 
   const replaceCatalog = useCallback((next: Product[]) => persist(next), [persist]);
 
