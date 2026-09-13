@@ -1,4 +1,4 @@
-import { CATEGORY_IMAGE, FALLBACK_IMG, Product, productImage } from '@/data/products';
+import { Product } from '@/data/products';
 
 interface ProductCardProps {
   product: Product;
@@ -19,14 +19,9 @@ const ProductCard = ({ product, index, onSelect, onPrint }: ProductCardProps) =>
         className="relative aspect-square w-full overflow-hidden bg-secondary focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary active:opacity-80"
       >
         <img
-          src={productImage(product)}
+          src={product.image}
           alt={product.name}
           loading="lazy"
-          onError={(e) => {
-            const img = e.currentTarget;
-            const fallback = CATEGORY_IMAGE[product.category] ?? FALLBACK_IMG;
-            if (img.src !== fallback) img.src = fallback;
-          }}
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
         {product.shelfLifeHours !== undefined && (
