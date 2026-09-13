@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Product, products as seedProducts } from '@/data/products';
+import { toast } from '@/hooks/use-toast';
 
 const STORAGE_KEY = 'asap-catalog-v1';
 
@@ -8,26 +9,52 @@ const load = (): Product[] => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return seedProducts;
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length ? (parsed as Product[]) : seedProducts;
+    if (!Array.isArray(parsed)) return seedProducts;
+    const clean = (parsed as Product[]).filter((p) => p && p.id && p.name);
+    const unique = Array.from(new Map(clean.map((p) => [p.id, p])).values());
+    return unique;
   } catch {
     return seedProducts;
   }
 };
 
+const write = (next: Product[]): boolean => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    return true;
+  } catch {
+    try {
+      const light = next.map((p) =>
+        p.image?.startsWith('data:') ? { ...p, image: '' } : p,
+      );
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(light));
+      toast({
+        title: 'Памяти браузера не хватило',
+        description: 'Позиции сохранены, но часть загруженных фото пришлось убрать',
+      });
+      return true;
+    } catch {
+      toast({
+        title: 'Не удалось сохранить каталог',
+        description: 'Память браузера переполнена. Выгрузите каталог в файл и очистите список',
+      });
+      return false;
+    }
+  }
+};
+
 export const useCatalog = () => {
   const [items, setItems] = useState<Product[]>(seedProducts);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     setItems(load());
+    setReady(true);
   }, []);
 
   const persist = useCallback((next: Product[]) => {
     setItems(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      /* storage unavailable */
-    }
+    write(next);
   }, []);
 
   const saveProduct = useCallback(
@@ -37,11 +64,7 @@ export const useCatalog = () => {
         const next = exists
           ? prev.map((p) => (p.id === product.id ? product : p))
           : [product, ...prev];
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-        } catch {
-          /* storage unavailable */
-        }
+        write(next);
         return next;
       });
     },
@@ -51,11 +74,7 @@ export const useCatalog = () => {
   const removeProduct = useCallback((id: string) => {
     setItems((prev) => {
       const next = prev.filter((p) => p.id !== id);
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        /* storage unavailable */
-      }
+      write(next);
       return next;
     });
   }, []);
@@ -64,7 +83,7 @@ export const useCatalog = () => {
 
   const replaceCatalog = useCallback((next: Product[]) => persist(next), [persist]);
 
-  return { items, saveProduct, removeProduct, resetCatalog, replaceCatalog };
+  return { items, ready, saveProduct, removeProduct, resetCatalog, replaceCatalog };
 };
 
 export default useCatalog;
