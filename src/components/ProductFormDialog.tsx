@@ -89,25 +89,7 @@ const ProductFormDialog = ({
   const handleFile = (file?: File) => {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        const max = 420;
-        const scale = Math.min(1, max / Math.max(img.width, img.height));
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          set('image', String(reader.result));
-          return;
-        }
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        set('image', canvas.toDataURL('image/jpeg', 0.72));
-      };
-      img.onerror = () => set('image', String(reader.result));
-      img.src = String(reader.result);
-    };
+    reader.onload = () => set('image', String(reader.result));
     reader.readAsDataURL(file);
   };
 
@@ -119,9 +101,7 @@ const ProductFormDialog = ({
     const picked = form.categories.length ? form.categories : [form.category];
 
     onSave({
-      id:
-        product?.id ??
-        `usr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+      id: product?.id ?? `usr-${Date.now().toString(36)}`,
       name: form.name.trim(),
       category: picked[0],
       categories: picked,
