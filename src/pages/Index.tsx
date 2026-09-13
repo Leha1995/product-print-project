@@ -10,6 +10,7 @@ import useAdmin from '@/hooks/useAdmin';
 import useLabelSettings from '@/hooks/useLabelSettings';
 import DirectPrintArea from '@/components/DirectPrintArea';
 import BatchPrintArea from '@/components/BatchPrintArea';
+import BatchPrintDialog from '@/components/BatchPrintDialog';
 import PrintLog, { PrintJob } from '@/components/PrintLog';
 import Footer from '@/components/Footer';
 import { Product, productCategories } from '@/data/products';
@@ -38,6 +39,8 @@ const Index = () => {
   const [batchPrint, setBatchPrint] = useState<Product[] | null>(null);
   const [batchStamp, setBatchStamp] = useState(() => new Date());
   const [batchLabel, setBatchLabel] = useState('');
+  const [batchPick, setBatchPick] = useState<Product[]>([]);
+  const [batchOpen, setBatchOpen] = useState(false);
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -111,6 +114,11 @@ const Index = () => {
       return;
     }
     setBatchLabel(label);
+    setBatchPick(list);
+    setBatchOpen(true);
+  };
+
+  const handleBatchConfirm = (list: Product[]) => {
     setBatchStamp(new Date());
     setBatchPrint(list);
   };
@@ -118,12 +126,18 @@ const Index = () => {
   const handleBatchDone = useCallback((list: Product[]) => {
     setBatchPrint(null);
     const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    const grouped = new Map<string, { product: Product; copies: number }>();
+    list.forEach((p) => {
+      const row = grouped.get(p.id);
+      if (row) row.copies += 1;
+      else grouped.set(p.id, { product: p, copies: 1 });
+    });
     setJobs((prev) => [
-      ...list.map((p) => ({
-        id: `${p.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        name: p.name,
-        price: p.price,
-        copies: 1,
+      ...Array.from(grouped.values()).map(({ product, copies }) => ({
+        id: `${product.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name: product.name,
+        price: product.price,
+        copies,
         time,
       })),
       ...prev,
@@ -225,6 +239,13 @@ const Index = () => {
         settings={settings}
         printedAt={quickStamp}
         onDone={handleQuickDone}
+      />
+      <BatchPrintDialog
+        products={batchPick}
+        label={batchLabel}
+        open={batchOpen}
+        onOpenChange={setBatchOpen}
+        onConfirm={handleBatchConfirm}
       />
       <BatchPrintArea
         products={batchPrint}

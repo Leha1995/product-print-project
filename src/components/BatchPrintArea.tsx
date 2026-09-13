@@ -51,9 +51,9 @@ const BatchPrintArea = ({ products, settings, printedAt, onDone }: BatchPrintAre
       aria-hidden
       className="print-hide pointer-events-none fixed left-[-10000px] top-0 w-[320px]"
     >
-      {products.map((product) => (
+      {products.map((product, i) => (
         <ReceiptPreview
-          key={product.id}
+          key={`${product.id}-${i}`}
           product={product}
           copies={1}
           printedAt={printedAt}
