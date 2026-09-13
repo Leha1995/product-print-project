@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Product, products as seedProducts } from '@/data/products';
+import {
+  CATEGORY_IMAGE,
+  FALLBACK_IMG,
+  Product,
+  products as seedProducts,
+} from '@/data/products';
 import { toast } from '@/hooks/use-toast';
 
 const STORAGE_KEY = 'asap-catalog-v1';
@@ -12,7 +17,16 @@ const load = (): Product[] => {
     if (!Array.isArray(parsed)) return seedProducts;
     const clean = (parsed as Product[]).filter((p) => p && p.id && p.name);
     const unique = Array.from(new Map(clean.map((p) => [p.id, p])).values());
-    return unique;
+    const seedById = new Map(seedProducts.map((p) => [p.id, p]));
+    return unique.map((p) =>
+      p.image?.trim()
+        ? p
+        : {
+            ...p,
+            image:
+              seedById.get(p.id)?.image ?? CATEGORY_IMAGE[p.category] ?? FALLBACK_IMG,
+          },
+    );
   } catch {
     return seedProducts;
   }
@@ -25,7 +39,9 @@ const write = (next: Product[]): boolean => {
   } catch {
     try {
       const light = next.map((p) =>
-        p.image?.startsWith('data:') ? { ...p, image: '' } : p,
+        p.image?.startsWith('data:')
+          ? { ...p, image: CATEGORY_IMAGE[p.category] ?? FALLBACK_IMG }
+          : p,
       );
       localStorage.setItem(STORAGE_KEY, JSON.stringify(light));
       toast({

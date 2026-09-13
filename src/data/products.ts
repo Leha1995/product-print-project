@@ -162,6 +162,17 @@ export const products: Product[] = [
     barcode: '4600003000047',
   },
 ];
+export const FALLBACK_IMG = SUSHI_IMG;
+
+export const CATEGORY_IMAGE: Record<string, string> = {
+  sushi: SUSHI_IMG,
+  pizza: PIZZA_IMG,
+  drinks: DRINK_IMG,
+};
+
+export const productImage = (product: Product): string =>
+  product.image?.trim() || CATEGORY_IMAGE[product.category] || FALLBACK_IMG;
+
 export const productCategories = (product: Product): CategoryId[] => {
   const list = product.categories?.length ? product.categories : [product.category];
   return list.filter(Boolean);
