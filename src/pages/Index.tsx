@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import TerminalHeader from '@/components/TerminalHeader';
 import MenuSection from '@/components/MenuSection';
 import PrintDialog from '@/components/PrintDialog';
@@ -7,6 +7,7 @@ import useCatalog from '@/hooks/useCatalog';
 import useCategories from '@/hooks/useCategories';
 import AdminLoginDialog from '@/components/AdminLoginDialog';
 import useAdmin from '@/hooks/useAdmin';
+import usePrintHistory from '@/hooks/usePrintHistory';
 import useLabelSettings from '@/hooks/useLabelSettings';
 import DirectPrintArea from '@/components/DirectPrintArea';
 import BatchPrintArea from '@/components/BatchPrintArea';
@@ -37,6 +38,7 @@ const Index = () => {
       description: '10 минут без действий — вход сброшен для безопасности',
     }),
   );
+  const { markPrinted, getExpiry, now } = usePrintHistory();
   const [adminOpen, setAdminOpen] = useState(false);
   const { settings, update, reset } = useLabelSettings();
   const [quickPrint, setQuickPrint] = useState<Product | null>(null);
@@ -46,6 +48,14 @@ const Index = () => {
   const [batchLabel, setBatchLabel] = useState('');
   const [batchPick, setBatchPick] = useState<Product[]>([]);
   const [batchOpen, setBatchOpen] = useState(false);
+
+  const expiredIds = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((p) => {
+      if (getExpiry(p).expired) set.add(p.id);
+    });
+    return set;
+  }, [items, getExpiry, now]);
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -110,8 +120,9 @@ const Index = () => {
 
   const handleQuickDone = useCallback((product: Product) => {
     setQuickPrint(null);
+    markPrinted([product.id]);
     handlePrinted(product, 1);
-  }, []);
+  }, [markPrinted]);
 
   const handlePrintBatch = (list: Product[], label: string) => {
     if (!list.length) {
@@ -130,6 +141,7 @@ const Index = () => {
 
   const handleBatchDone = useCallback((list: Product[]) => {
     setBatchPrint(null);
+    markPrinted(list.map((p) => p.id));
     const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
     const grouped = new Map<string, { product: Product; copies: number }>();
     list.forEach((p) => {
@@ -151,7 +163,7 @@ const Index = () => {
       title: 'Партия отправлена на принтер',
       description: `${batchLabel} · ${list.length} этикеток`,
     });
-  }, [batchLabel]);
+  }, [batchLabel, markPrinted]);
 
   const handlePrinted = (product: Product, copies: number) => {
     setJobs((prev) => [
@@ -225,6 +237,7 @@ const Index = () => {
           }}
           isAdmin={isAdmin}
           onRequestAdmin={() => setAdminOpen(true)}
+          expiredIds={expiredIds}
         />
         <PrintLog jobs={jobs} onClear={() => setJobs([])} />
       </main>
@@ -233,7 +246,10 @@ const Index = () => {
         product={selected}
         open={open}
         onOpenChange={setOpen}
-        onPrinted={handlePrinted}
+        onPrinted={(product, copies) => {
+          markPrinted([product.id]);
+          handlePrinted(product, copies);
+        }}
         settings={settings}
         onSettingsChange={update}
         onSettingsReset={reset}

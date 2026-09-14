@@ -5,13 +5,18 @@ interface ProductCardProps {
   index: number;
   onSelect: (product: Product) => void;
   onPrint: (product: Product) => void;
+  expired?: boolean;
 }
 
-const ProductCard = ({ product, index, onSelect, onPrint }: ProductCardProps) => {
+const ProductCard = ({ product, index, onSelect, onPrint, expired }: ProductCardProps) => {
   return (
     <div
       style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
-      className="group flex animate-fade-in flex-col border-2 border-primary bg-card text-left transition-transform duration-150 hover:-translate-y-1"
+      className={`group flex animate-fade-in flex-col border-2 text-left transition-transform duration-150 hover:-translate-y-1 ${
+        expired
+          ? 'border-destructive bg-destructive/10 shadow-[0_0_0_2px_hsl(var(--destructive))]'
+          : 'border-primary bg-card'
+      }`}
     >
       <button
         onClick={() => onPrint(product)}
@@ -31,7 +36,12 @@ const ProductCard = ({ product, index, onSelect, onPrint }: ProductCardProps) =>
               : `${Math.round(product.shelfLifeHours / 24)} сут`}
           </span>
         )}
-        {product.hit && (
+        {expired && (
+          <span className="absolute inset-x-0 bottom-0 border-t-2 border-destructive bg-destructive px-1 py-0.5 text-center font-head text-[0.5rem] font-bold uppercase tracking-[0.06em] text-destructive-foreground">
+            Срок вышел
+          </span>
+        )}
+        {product.hit && !expired && (
           <span className="absolute left-0 top-1 border-2 border-l-0 border-primary bg-accent px-1 py-px font-head text-[0.5rem] font-bold uppercase tracking-[0.06em] text-accent-foreground">
             Хит
           </span>
@@ -40,9 +50,15 @@ const ProductCard = ({ product, index, onSelect, onPrint }: ProductCardProps) =>
 
       <button
         onClick={() => onSelect(product)}
-        className="flex flex-1 items-center justify-center border-t-2 border-primary p-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary"
+        className={`flex flex-1 items-center justify-center border-t-2 p-1.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-secondary ${
+          expired ? 'border-destructive' : 'border-primary'
+        }`}
       >
-        <h3 className="line-clamp-2 text-center font-head text-[0.7rem] font-bold uppercase leading-tight text-primary">
+        <h3
+          className={`line-clamp-2 text-center font-head text-[0.7rem] font-bold uppercase leading-tight ${
+            expired ? 'text-destructive' : 'text-primary'
+          }`}
+        >
           {product.name}
         </h3>
       </button>

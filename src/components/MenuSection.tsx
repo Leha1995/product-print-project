@@ -23,6 +23,7 @@ interface MenuSectionProps {
   onImport: (file: File) => void;
   isAdmin: boolean;
   onRequestAdmin: () => void;
+  expiredIds?: Set<string>;
 }
 
 const MenuSection = ({
@@ -43,6 +44,7 @@ const MenuSection = ({
   onImport,
   isAdmin,
   onRequestAdmin,
+  expiredIds,
 }: MenuSectionProps) => {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState<CategoryId | 'all'>('all');
@@ -305,6 +307,7 @@ const MenuSection = ({
                   index={i}
                   onSelect={handleSelect}
                   onPrint={handlePrint}
+                  expired={expiredIds?.has(product.id)}
                 />
                 {editMode && (
                   <div className="absolute right-1 top-1 flex gap-1">
