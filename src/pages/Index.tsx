@@ -104,7 +104,7 @@ const Index = () => {
     const fresh = Array.from(expiredIds).filter((id) => !deadRef.current.has(id));
     if (!fresh.length) return;
     fresh.forEach((id) => deadRef.current.add(id));
-    playFuneralTune(10);
+    playFuneralTune(17);
     const names = fresh
       .map((id) => items.find((p) => p.id === id)?.name)
       .filter(Boolean)

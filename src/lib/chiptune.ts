@@ -144,6 +144,6 @@ const playTune = (kind: 'alert' | 'funeral', seconds: number, force = false) => 
 
 export const playAlertTune = (seconds = 10) => playTune('alert', seconds);
 
-export const playFuneralTune = (seconds = 10) => playTune('funeral', seconds, true);
+export const playFuneralTune = (seconds = 17) => playTune('funeral', seconds, true);
 
 export default playAlertTune;
