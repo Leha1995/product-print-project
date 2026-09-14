@@ -25,6 +25,26 @@ const save = (history: PrintHistory) => {
   }
 };
 
+export const SOON_MS = 3600000;
+
+export interface ExpiryStatus {
+  expired: boolean;
+  soon: boolean;
+  label: string | null;
+}
+
+export const formatLeft = (ms: number) => {
+  if (ms <= 0) return '0 мин';
+  const totalMin = Math.ceil(ms / 60000);
+  if (totalMin < 60) return `${totalMin} мин`;
+  const hours = Math.floor(totalMin / 60);
+  const mins = totalMin % 60;
+  if (hours < 24) return mins ? `${hours} ч ${mins} мин` : `${hours} ч`;
+  const days = Math.floor(hours / 24);
+  const restHours = hours % 24;
+  return restHours ? `${days} сут ${restHours} ч` : `${days} сут`;
+};
+
 export const usePrintHistory = () => {
   const [history, setHistory] = useState<PrintHistory>({});
   const [now, setNow] = useState(() => Date.now());
@@ -74,7 +94,17 @@ export const usePrintHistory = () => {
     [history, now],
   );
 
-  return { history, markPrinted, clearHistory, getExpiry, now };
+  const getStatus = useCallback(
+    (product: Product): ExpiryStatus => {
+      const { expiresAt, leftMs } = getExpiry(product);
+      if (!expiresAt || leftMs === null) return { expired: false, soon: false, label: null };
+      if (leftMs <= 0) return { expired: true, soon: false, label: 'Срок вышел' };
+      return { expired: false, soon: leftMs <= SOON_MS, label: formatLeft(leftMs) };
+    },
+    [getExpiry],
+  );
+
+  return { history, markPrinted, clearHistory, getExpiry, getStatus, now };
 };
 
 export default usePrintHistory;

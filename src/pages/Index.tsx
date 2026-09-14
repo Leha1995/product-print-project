@@ -38,7 +38,7 @@ const Index = () => {
       description: '10 минут без действий — вход сброшен для безопасности',
     }),
   );
-  const { markPrinted, getExpiry, now } = usePrintHistory();
+  const { markPrinted, getExpiry, getStatus, now } = usePrintHistory();
   const [adminOpen, setAdminOpen] = useState(false);
   const { settings, update, reset } = useLabelSettings();
   const [quickPrint, setQuickPrint] = useState<Product | null>(null);
@@ -238,6 +238,7 @@ const Index = () => {
           isAdmin={isAdmin}
           onRequestAdmin={() => setAdminOpen(true)}
           expiredIds={expiredIds}
+          getStatus={getStatus}
         />
         <PrintLog jobs={jobs} onClear={() => setJobs([])} />
       </main>

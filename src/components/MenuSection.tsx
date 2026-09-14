@@ -4,6 +4,7 @@ import ProductCard from '@/components/ProductCard';
 import CategoryEditor from '@/components/CategoryEditor';
 import VirtualKeyboard from '@/components/VirtualKeyboard';
 import { Category, CategoryId, Product, productCategories } from '@/data/products';
+import { ExpiryStatus } from '@/hooks/usePrintHistory';
 
 interface MenuSectionProps {
   products: Product[];
@@ -24,6 +25,7 @@ interface MenuSectionProps {
   isAdmin: boolean;
   onRequestAdmin: () => void;
   expiredIds?: Set<string>;
+  getStatus?: (product: Product) => ExpiryStatus;
 }
 
 const MenuSection = ({
@@ -45,6 +47,7 @@ const MenuSection = ({
   isAdmin,
   onRequestAdmin,
   expiredIds,
+  getStatus,
 }: MenuSectionProps) => {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState<CategoryId | 'all'>('all');
@@ -341,7 +344,7 @@ const MenuSection = ({
                   index={i}
                   onSelect={handleSelect}
                   onPrint={handlePrint}
-                  expired={expiredIds?.has(product.id)}
+                  status={getStatus?.(product)}
                 />
                 {editMode && (
                   <div className="absolute right-1 top-1 flex gap-1">
