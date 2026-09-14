@@ -16,7 +16,7 @@ import PrintLog, { PrintJob } from '@/components/PrintLog';
 import Footer from '@/components/Footer';
 import { Product, productCategories } from '@/data/products';
 import { toast } from '@/hooks/use-toast';
-import { playAlertTune, unlockAudio } from '@/lib/chiptune';
+import { playAlertTune, playFuneralTune, unlockAudio } from '@/lib/chiptune';
 
 const Index = () => {
   const [selected, setSelected] = useState<Product | null>(null);
@@ -67,6 +67,7 @@ const Index = () => {
   }, [items, getStatus, now]);
 
   const alertedRef = useRef<Set<string>>(new Set());
+  const deadRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const unlock = () => unlockAudio();
@@ -95,6 +96,24 @@ const Index = () => {
       description: names || `${fresh.length} позиций пора перепечатать`,
     });
   }, [soonIds, expiredIds, items]);
+
+  useEffect(() => {
+    deadRef.current.forEach((id) => {
+      if (!expiredIds.has(id)) deadRef.current.delete(id);
+    });
+    const fresh = Array.from(expiredIds).filter((id) => !deadRef.current.has(id));
+    if (!fresh.length) return;
+    fresh.forEach((id) => deadRef.current.add(id));
+    playFuneralTune(10);
+    const names = fresh
+      .map((id) => items.find((p) => p.id === id)?.name)
+      .filter(Boolean)
+      .join(', ');
+    toast({
+      title: 'Срок годности вышел',
+      description: names || `${fresh.length} позиций нужно снять и перепечатать`,
+    });
+  }, [expiredIds, items]);
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
