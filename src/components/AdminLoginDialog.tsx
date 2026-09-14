@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
+import NumericKeypad from '@/components/NumericKeypad';
 
 interface AdminLoginDialogProps {
   open: boolean;
@@ -11,7 +12,7 @@ interface AdminLoginDialogProps {
 }
 
 const fieldClass =
-  'w-full border-2 border-primary bg-card px-3 py-3 text-center font-head text-2xl tracking-[0.4em] text-primary outline-none placeholder:tracking-[0.3em] placeholder:text-muted-foreground focus:bg-muted';
+  'w-full select-none border-2 border-primary bg-card px-3 py-3 text-center font-head text-2xl leading-8 tracking-[0.4em] text-primary';
 
 const AdminLoginDialog = ({
   open,
@@ -30,8 +31,8 @@ const AdminLoginDialog = ({
     }
   }, [open]);
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (onLogin(value)) {
       onOpenChange(false);
     } else {
@@ -62,26 +63,18 @@ const AdminLoginDialog = ({
 
           {!isAdmin ? (
             <form onSubmit={submit} className="mt-5 grid gap-3">
-              <input
+              <div className={fieldClass}>
+                {value ? '•'.repeat(value.length) : <span className="opacity-40">••••••••</span>}
+              </div>
+              {error && <p className="text-[13px] text-destructive">{error}</p>}
+              <NumericKeypad
                 value={value}
-                onChange={(e) => {
-                  setValue(e.target.value);
+                onChange={(v) => {
+                  setValue(v);
                   setError('');
                 }}
-                type="password"
-                inputMode="numeric"
-                autoFocus
-                placeholder="••••••••"
-                className={fieldClass}
+                onSubmit={() => submit()}
               />
-              {error && <p className="text-[13px] text-destructive">{error}</p>}
-              <button
-                type="submit"
-                className="flex items-center justify-center gap-2 border-2 border-primary bg-accent px-4 py-3 font-head text-[0.9rem] font-medium uppercase tracking-[0.04em] text-accent-foreground transition-transform hover:-translate-y-0.5"
-              >
-                <Icon name="LogIn" size={18} strokeWidth={2.5} />
-                Войти
-              </button>
             </form>
           ) : (
             <div className="mt-5 grid gap-3">
