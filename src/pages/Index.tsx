@@ -31,7 +31,7 @@ const Index = () => {
     resetCategories,
     replaceCategories,
   } = useCategories();
-  const { isAdmin, login, logout, changePin, isDefaultPin } = useAdmin();
+  const { isAdmin, login, logout } = useAdmin();
   const [adminOpen, setAdminOpen] = useState(false);
   const { settings, update, reset } = useLabelSettings();
   const [quickPrint, setQuickPrint] = useState<Product | null>(null);
@@ -270,13 +270,11 @@ const Index = () => {
         open={adminOpen}
         onOpenChange={setAdminOpen}
         isAdmin={isAdmin}
-        isDefaultPin={isDefaultPin}
         onLogin={(pin) => {
           const ok = login(pin);
           if (ok) toast({ title: 'Вход выполнен', description: 'Редактирование каталога доступно' });
           return ok;
         }}
-        onChangePin={changePin}
         onLogout={() => {
           logout();
           toast({ title: 'Вы вышли из режима администратора' });

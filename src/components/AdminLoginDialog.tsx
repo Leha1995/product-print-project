@@ -6,35 +6,27 @@ interface AdminLoginDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onLogin: (pin: string) => boolean;
-  onChangePin: (pin: string) => boolean;
   isAdmin: boolean;
-  isDefaultPin: boolean;
   onLogout: () => void;
 }
 
 const fieldClass =
-  'w-full border-2 border-primary bg-card px-3 py-3 text-center font-head text-2xl tracking-[0.5em] text-primary outline-none placeholder:tracking-[0.3em] placeholder:text-muted-foreground focus:bg-muted';
+  'w-full border-2 border-primary bg-card px-3 py-3 text-center font-head text-2xl tracking-[0.4em] text-primary outline-none placeholder:tracking-[0.3em] placeholder:text-muted-foreground focus:bg-muted';
 
 const AdminLoginDialog = ({
   open,
   onOpenChange,
   onLogin,
-  onChangePin,
   isAdmin,
-  isDefaultPin,
   onLogout,
 }: AdminLoginDialogProps) => {
   const [value, setValue] = useState('');
-  const [newPin, setNewPin] = useState('');
   const [error, setError] = useState('');
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (open) {
       setValue('');
-      setNewPin('');
       setError('');
-      setSaved(false);
     }
   }, [open]);
 
@@ -43,17 +35,8 @@ const AdminLoginDialog = ({
     if (onLogin(value)) {
       onOpenChange(false);
     } else {
-      setError('Неверный код. Попробуйте ещё раз');
+      setError('Неверный пароль. Попробуйте ещё раз');
       setValue('');
-    }
-  };
-
-  const savePin = () => {
-    if (onChangePin(newPin)) {
-      setSaved(true);
-      setNewPin('');
-    } else {
-      setError('Код должен быть не короче 4 символов');
     }
   };
 
@@ -72,7 +55,7 @@ const AdminLoginDialog = ({
               <p className="text-[13px] text-muted-foreground">
                 {isAdmin
                   ? 'Можно менять фото, названия, состав и цены'
-                  : 'Введите код доступа, чтобы редактировать каталог'}
+                  : 'Введите пароль, чтобы редактировать каталог'}
               </p>
             </div>
           </div>
@@ -88,15 +71,10 @@ const AdminLoginDialog = ({
                 type="password"
                 inputMode="numeric"
                 autoFocus
-                placeholder="••••"
+                placeholder="••••••••"
                 className={fieldClass}
               />
               {error && <p className="text-[13px] text-destructive">{error}</p>}
-              {isDefaultPin && (
-                <p className="border-2 border-dashed border-primary p-2 text-[12px] text-muted-foreground">
-                  Код по умолчанию — 1234. После входа смените его на свой.
-                </p>
-              )}
               <button
                 type="submit"
                 className="flex items-center justify-center gap-2 border-2 border-primary bg-accent px-4 py-3 font-head text-[0.9rem] font-medium uppercase tracking-[0.04em] text-accent-foreground transition-transform hover:-translate-y-0.5"
@@ -107,30 +85,6 @@ const AdminLoginDialog = ({
             </form>
           ) : (
             <div className="mt-5 grid gap-3">
-              <span className="font-head text-[0.7rem] font-medium uppercase tracking-[0.08em] text-primary">
-                Сменить код доступа
-              </span>
-              <input
-                value={newPin}
-                onChange={(e) => {
-                  setNewPin(e.target.value);
-                  setError('');
-                  setSaved(false);
-                }}
-                type="password"
-                inputMode="numeric"
-                placeholder="Новый код"
-                className={fieldClass}
-              />
-              {error && <p className="text-[13px] text-destructive">{error}</p>}
-              {saved && <p className="text-[13px] text-primary">Код обновлён</p>}
-              <button
-                onClick={savePin}
-                className="flex items-center justify-center gap-2 border-2 border-primary bg-card px-4 py-3 font-head text-[0.85rem] font-medium uppercase tracking-[0.04em] text-primary transition-colors hover:bg-muted"
-              >
-                <Icon name="KeyRound" size={18} strokeWidth={2.5} />
-                Сохранить код
-              </button>
               <button
                 onClick={() => {
                   onLogout();

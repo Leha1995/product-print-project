@@ -1,35 +1,30 @@
 import { useCallback, useEffect, useState } from 'react';
 
-const PIN_KEY = 'asap-admin-pin';
 const SESSION_KEY = 'asap-admin-session';
-const DEFAULT_PIN = '1234';
+const ADMIN_PIN = '15271527';
 
 export const useAdmin = () => {
   const [isAdmin, setIsAdmin] = useState(false);
-  const [pin, setPin] = useState(DEFAULT_PIN);
 
   useEffect(() => {
     try {
-      setPin(localStorage.getItem(PIN_KEY) || DEFAULT_PIN);
+      localStorage.removeItem('asap-admin-pin');
       setIsAdmin(sessionStorage.getItem(SESSION_KEY) === '1');
     } catch {
       /* storage unavailable */
     }
   }, []);
 
-  const login = useCallback(
-    (value: string) => {
-      if (value.trim() !== pin) return false;
-      setIsAdmin(true);
-      try {
-        sessionStorage.setItem(SESSION_KEY, '1');
-      } catch {
-        /* storage unavailable */
-      }
-      return true;
-    },
-    [pin],
-  );
+  const login = useCallback((value: string) => {
+    if (value.trim() !== ADMIN_PIN) return false;
+    setIsAdmin(true);
+    try {
+      sessionStorage.setItem(SESSION_KEY, '1');
+    } catch {
+      /* storage unavailable */
+    }
+    return true;
+  }, []);
 
   const logout = useCallback(() => {
     setIsAdmin(false);
@@ -40,19 +35,7 @@ export const useAdmin = () => {
     }
   }, []);
 
-  const changePin = useCallback((next: string) => {
-    const value = next.trim();
-    if (value.length < 4) return false;
-    setPin(value);
-    try {
-      localStorage.setItem(PIN_KEY, value);
-    } catch {
-      /* storage unavailable */
-    }
-    return true;
-  }, []);
-
-  return { isAdmin, login, logout, changePin, isDefaultPin: pin === DEFAULT_PIN };
+  return { isAdmin, login, logout };
 };
 
 export default useAdmin;
