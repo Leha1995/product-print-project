@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import Icon from '@/components/ui/icon';
 import ProductCard from '@/components/ProductCard';
 import CategoryEditor from '@/components/CategoryEditor';
+import VirtualKeyboard from '@/components/VirtualKeyboard';
 import { Category, CategoryId, Product, productCategories } from '@/data/products';
 
 interface MenuSectionProps {
@@ -45,6 +46,7 @@ const MenuSection = ({
 }: MenuSectionProps) => {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState<CategoryId | 'all'>('all');
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [rawEditMode, setEditMode] = useState(false);
   const editMode = isAdmin && rawEditMode;
 
@@ -93,11 +95,19 @@ const MenuSection = ({
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
+                onFocus={() => setKeyboardOpen(true)}
+                onClick={() => setKeyboardOpen(true)}
                 placeholder="Поиск по названию"
                 className="w-full bg-transparent font-body text-[15px] text-primary outline-none placeholder:text-muted-foreground"
               />
               {query && (
-                <button onClick={() => setQuery('')} aria-label="Очистить поиск">
+                <button
+                  onClick={() => {
+                    setQuery('');
+                    setKeyboardOpen(false);
+                  }}
+                  aria-label="Очистить поиск"
+                >
                   <Icon name="X" size={18} className="text-muted-foreground" />
                 </button>
               )}
@@ -283,6 +293,14 @@ const MenuSection = ({
           </div>
         )}
       </div>
+
+      <VirtualKeyboard
+        open={keyboardOpen}
+        value={query}
+        onChange={setQuery}
+        onClose={() => setKeyboardOpen(false)}
+      />
+      {keyboardOpen && <div className="h-[320px] md:h-[360px]" aria-hidden />}
     </section>
   );
 };
