@@ -50,12 +50,23 @@ const MenuSection = ({
   const [active, setActive] = useState<CategoryId | 'all'>('all');
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [rawEditMode, setEditMode] = useState(false);
+  const [onlyExpired, setOnlyExpired] = useState(false);
   const editMode = isAdmin && rawEditMode;
+
+  const expiredCount = useMemo(
+    () => products.filter((p) => expiredIds?.has(p.id)).length,
+    [products, expiredIds],
+  );
+
+  useEffect(() => {
+    if (onlyExpired && expiredCount === 0) setOnlyExpired(false);
+  }, [onlyExpired, expiredCount]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return products
       .filter((p) => {
+        if (onlyExpired && !expiredIds?.has(p.id)) return false;
         const byCat = active === 'all' || productCategories(p).includes(active);
         const byQuery = !q || p.name.toLowerCase().includes(q) || p.composition.toLowerCase().includes(q);
         return byCat && byQuery;
@@ -66,7 +77,7 @@ const MenuSection = ({
         if (sa !== sb) return sa - sb;
         return a.name.localeCompare(b.name, 'ru');
       });
-  }, [query, active, products]);
+  }, [query, active, products, onlyExpired, expiredIds]);
 
   const tabsRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLLabelElement>(null);
@@ -172,17 +183,34 @@ const MenuSection = ({
           </div>
         </div>
 
-        <div className="mt-8 flex justify-center">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <button
             onClick={() => {
               setKeyboardOpen(false);
-              onPrintBatch(visible, activeLabel);
+              setOnlyExpired((v) => !v);
+            }}
+            disabled={!expiredCount && !onlyExpired}
+            className={`flex items-center justify-center gap-3 border-2 px-6 py-4 font-head text-[0.95rem] font-medium uppercase tracking-[0.06em] transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50 ${
+              onlyExpired
+                ? 'border-destructive bg-destructive text-destructive-foreground'
+                : 'border-destructive bg-card text-destructive'
+            }`}
+          >
+            <Icon name={onlyExpired ? 'ListRestart' : 'AlarmClock'} size={20} strokeWidth={2.5} />
+            {onlyExpired ? 'Показать все' : 'Только просроченные'}
+            <span className="border-l-2 border-current pl-3 tabular-nums">{expiredCount}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setKeyboardOpen(false);
+              onPrintBatch(visible, onlyExpired ? 'Просроченные' : activeLabel);
             }}
             disabled={!visible.length}
             className="flex items-center justify-center gap-3 border-2 border-primary bg-accent px-6 py-4 font-head text-[0.95rem] font-medium uppercase tracking-[0.06em] text-accent-foreground transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50 md:text-[1.05rem]"
           >
             <Icon name="Printer" size={20} strokeWidth={2.5} />
-            Печатать всю категорию
+            {onlyExpired ? 'Печатать просроченные' : 'Печатать всю категорию'}
             <span className="border-l-2 border-accent-foreground/40 pl-3">{visible.length}</span>
           </button>
         </div>
@@ -295,8 +323,14 @@ const MenuSection = ({
 
         {visible.length === 0 ? (
           <div className="mt-12 border-2 border-dashed border-primary p-10 text-center">
-            <p className="font-head text-lg uppercase text-primary">Ничего не нашли</p>
-            <p className="mt-2 text-muted-foreground">Попробуйте другое название или категорию</p>
+            <p className="font-head text-lg uppercase text-primary">
+              {onlyExpired ? 'Просроченных нет' : 'Ничего не нашли'}
+            </p>
+            <p className="mt-2 text-muted-foreground">
+              {onlyExpired
+                ? 'Все позиции в этой категории с действующим сроком'
+                : 'Попробуйте другое название или категорию'}
+            </p>
           </div>
         ) : (
           <div className="mt-8 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8">
