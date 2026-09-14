@@ -31,7 +31,12 @@ const Index = () => {
     resetCategories,
     replaceCategories,
   } = useCategories();
-  const { isAdmin, login, logout } = useAdmin();
+  const { isAdmin, login, logout } = useAdmin(() =>
+    toast({
+      title: 'Режим администратора отключён',
+      description: '10 минут без действий — вход сброшен для безопасности',
+    }),
+  );
   const [adminOpen, setAdminOpen] = useState(false);
   const { settings, update, reset } = useLabelSettings();
   const [quickPrint, setQuickPrint] = useState<Product | null>(null);
