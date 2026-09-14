@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TerminalHeader from '@/components/TerminalHeader';
 import MenuSection from '@/components/MenuSection';
 import PrintDialog from '@/components/PrintDialog';
@@ -16,6 +16,7 @@ import PrintLog, { PrintJob } from '@/components/PrintLog';
 import Footer from '@/components/Footer';
 import { Product, productCategories } from '@/data/products';
 import { toast } from '@/hooks/use-toast';
+import { playAlertTune, unlockAudio } from '@/lib/chiptune';
 
 const Index = () => {
   const [selected, setSelected] = useState<Product | null>(null);
@@ -56,6 +57,44 @@ const Index = () => {
     });
     return set;
   }, [items, getExpiry, now]);
+
+  const soonIds = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((p) => {
+      if (getStatus(p).soon) set.add(p.id);
+    });
+    return set;
+  }, [items, getStatus, now]);
+
+  const alertedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const unlock = () => unlockAudio();
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
+
+  useEffect(() => {
+    const fresh = Array.from(soonIds).filter((id) => !alertedRef.current.has(id));
+    alertedRef.current.forEach((id) => {
+      if (!soonIds.has(id) && !expiredIds.has(id)) alertedRef.current.delete(id);
+    });
+    if (!fresh.length) return;
+    fresh.forEach((id) => alertedRef.current.add(id));
+    playAlertTune(10);
+    const names = fresh
+      .map((id) => items.find((p) => p.id === id)?.name)
+      .filter(Boolean)
+      .join(', ');
+    toast({
+      title: 'Меньше часа до конца срока',
+      description: names || `${fresh.length} позиций пора перепечатать`,
+    });
+  }, [soonIds, expiredIds, items]);
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
