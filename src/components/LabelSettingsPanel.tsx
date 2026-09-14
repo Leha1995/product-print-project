@@ -227,6 +227,67 @@ const LabelSettingsPanel = ({
         })}
       </div>
 
+      <div className="mt-3 border-2 border-dashed border-primary p-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-2 font-head text-[0.65rem] font-medium uppercase tracking-[0.06em] text-primary">
+            <Icon name="Move" size={13} strokeWidth={2.5} />
+            Подстройка печати под принтер
+          </span>
+          <button
+            onClick={() => onChange({ offsetXmm: 0, offsetYmm: 0 })}
+            className="font-head text-[0.6rem] font-medium uppercase tracking-[0.06em] text-muted-foreground underline-offset-4 hover:underline"
+          >
+            Обнулить
+          </button>
+        </div>
+        <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+          Минус — влево и вверх, плюс — вправо и вниз. Шаг 0,5 мм.
+        </p>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          {[
+            { key: 'offsetXmm' as const, label: 'Сдвиг ←→, мм', icon: 'MoveHorizontal' },
+            { key: 'offsetYmm' as const, label: 'Сдвиг ↑↓, мм', icon: 'MoveVertical' },
+          ].map((f) => {
+            const value = Number(settings[f.key]) || 0;
+            const setValue = (v: number) =>
+              onChange({ [f.key]: Math.round(Math.min(20, Math.max(-20, v)) * 10) / 10 } as Partial<LabelSettings>);
+            return (
+              <div key={f.key} className="border-2 border-primary bg-card p-2">
+                <span className="flex items-center gap-1.5 font-head text-[0.6rem] font-medium uppercase tracking-[0.06em] text-primary">
+                  <Icon name={f.icon} size={12} strokeWidth={2.5} />
+                  {f.label}
+                </span>
+                <div className="mt-1.5 flex items-center gap-1">
+                  <button
+                    onClick={() => setValue(value - 0.5)}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center border-2 border-primary bg-card text-primary hover:bg-muted"
+                    aria-label="Уменьшить"
+                  >
+                    <Icon name="Minus" size={14} strokeWidth={3} />
+                  </button>
+                  <input
+                    type="number"
+                    step={0.5}
+                    min={-20}
+                    max={20}
+                    value={value}
+                    onChange={(e) => setValue(Number(e.target.value) || 0)}
+                    className="h-8 w-full min-w-0 border-2 border-primary bg-card px-1 text-center font-head text-[15px] text-primary outline-none focus:bg-muted"
+                  />
+                  <button
+                    onClick={() => setValue(value + 0.5)}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center border-2 border-primary bg-card text-primary hover:bg-muted"
+                    aria-label="Увеличить"
+                  >
+                    <Icon name="Plus" size={14} strokeWidth={3} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="mt-3 flex flex-wrap gap-2">
         {toggles.map((t) => {
           const active = Boolean(settings[t.key]);

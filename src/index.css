@@ -192,7 +192,7 @@
   }
   .print-area {
     position: fixed !important;
-    inset: 0 auto auto -1mm !important;
+    inset: 0 auto auto 0 !important;
     width: var(--label-width, 80mm) !important;
     height: var(--label-height, auto) !important;
     overflow: hidden !important;

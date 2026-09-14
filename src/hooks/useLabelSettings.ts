@@ -50,6 +50,8 @@ export interface LabelSettings {
   printMode: 'browser' | 'bartender';
   bartenderTemplate: string;
   bartenderPrinter: string;
+  offsetXmm: number;
+  offsetYmm: number;
 }
 
 export const defaultLabelSettings: LabelSettings = {
@@ -72,6 +74,8 @@ export const defaultLabelSettings: LabelSettings = {
   printMode: 'browser',
   bartenderTemplate: 'cennik.btw',
   bartenderPrinter: '',
+  offsetXmm: 0,
+  offsetYmm: 0,
 };
 
 const STORAGE_KEY = 'asap-label-settings-v1';

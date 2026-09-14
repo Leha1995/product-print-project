@@ -62,6 +62,8 @@ const PrintDialog = ({
           paper.widthMm,
           paper.heightMm,
           settings.rotate90,
+          settings.offsetXmm,
+          settings.offsetYmm,
         );
       }
     }, 700);

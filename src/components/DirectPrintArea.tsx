@@ -16,6 +16,8 @@ export const printNodeHtml = (
   widthMm: number,
   heightMm?: number,
   rotate90 = false,
+  offsetXmm = 0,
+  offsetYmm = 0,
 ) => {
   const styles = Array.from(
     document.querySelectorAll('style, link[rel="stylesheet"]'),
@@ -58,7 +60,11 @@ export const printNodeHtml = (
     width: ${rotate90 ? pageH : widthMm}mm;
     height: ${rotate90 ? widthMm : pageH}mm;
     transform-origin: top left;
-    ${rotate90 ? `transform: translateX(${widthMm}mm) rotate(90deg) translateY(2mm);` : 'transform: translateX(2mm);'}
+    ${
+      rotate90
+        ? `transform: translate(${widthMm + offsetXmm}mm, ${offsetYmm}mm) rotate(90deg) translateY(2mm);`
+        : `transform: translate(${2 + offsetXmm}mm, ${offsetYmm}mm);`
+    }
   }
   .rot .print-area {
     position: static !important;
@@ -154,7 +160,14 @@ const DirectPrintArea = ({ product, settings, printedAt, onDone }: DirectPrintAr
 
     const paper = getPaper(settings.paper);
     const id = window.setTimeout(() => {
-      printNodeHtml(node.outerHTML, paper.widthMm, paper.heightMm, settings.rotate90);
+      printNodeHtml(
+        node.outerHTML,
+        paper.widthMm,
+        paper.heightMm,
+        settings.rotate90,
+        settings.offsetXmm,
+        settings.offsetYmm,
+      );
       onDone(product);
     }, 60);
 
