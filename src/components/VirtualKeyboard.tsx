@@ -34,7 +34,7 @@ const VirtualKeyboard = ({ open, value, onChange, onClose }: VirtualKeyboardProp
   const press = (char: string) => onChange(value + char);
 
   return (
-    <div className="print-hide fixed inset-x-0 bottom-0 z-50 border-t-2 border-primary bg-background p-3 shadow-[0_-8px_0_0_rgba(0,0,0,0.08)]">
+    <div data-virtual-keyboard className="print-hide fixed inset-x-0 bottom-0 z-50 border-t-2 border-primary bg-background p-3 shadow-[0_-8px_0_0_rgba(0,0,0,0.08)]">
       <div className="mx-auto w-full max-w-[900px]">
         <div className="mb-2 flex items-center justify-between gap-2">
           <span className="truncate border-2 border-primary bg-card px-3 py-1.5 font-body text-[15px] text-primary">

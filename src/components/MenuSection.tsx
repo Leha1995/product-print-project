@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Icon from '@/components/ui/icon';
 import ProductCard from '@/components/ProductCard';
 import CategoryEditor from '@/components/CategoryEditor';
@@ -67,6 +67,36 @@ const MenuSection = ({
   }, [query, active, products]);
 
   const tabsRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLLabelElement>(null);
+
+  useEffect(() => {
+    if (!keyboardOpen) return;
+    const handler = (e: PointerEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (searchRef.current?.contains(target)) return;
+      if (target.closest('[data-virtual-keyboard]')) return;
+      setKeyboardOpen(false);
+    };
+    document.addEventListener('pointerdown', handler);
+    return () => document.removeEventListener('pointerdown', handler);
+  }, [keyboardOpen]);
+
+  const handleSelect = useCallback(
+    (product: Product) => {
+      setKeyboardOpen(false);
+      onSelect(product);
+    },
+    [onSelect],
+  );
+
+  const handlePrint = useCallback(
+    (product: Product) => {
+      setKeyboardOpen(false);
+      onPrint(product);
+    },
+    [onPrint],
+  );
 
   const scrollTabs = (dir: 1 | -1) =>
     tabsRef.current?.scrollBy({ left: dir * 280, behavior: 'smooth' });
@@ -90,7 +120,10 @@ const MenuSection = ({
           </div>
 
           <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
-            <label className="flex w-full items-center gap-3 border-2 border-primary bg-card px-3 py-3 md:w-[340px]">
+            <label
+              ref={searchRef}
+              className="flex w-full items-center gap-3 border-2 border-primary bg-card px-3 py-3 md:w-[340px]"
+            >
               <Icon name="Search" size={20} className="text-primary" strokeWidth={2.5} />
               <input
                 value={query}
@@ -139,7 +172,10 @@ const MenuSection = ({
 
         <div className="mt-8 flex justify-center">
           <button
-            onClick={() => onPrintBatch(visible, activeLabel)}
+            onClick={() => {
+              setKeyboardOpen(false);
+              onPrintBatch(visible, activeLabel);
+            }}
             disabled={!visible.length}
             className="flex items-center justify-center gap-3 border-2 border-primary bg-accent px-6 py-4 font-head text-[0.95rem] font-medium uppercase tracking-[0.06em] text-accent-foreground transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50 md:text-[1.05rem]"
           >
@@ -267,8 +303,8 @@ const MenuSection = ({
                 <ProductCard
                   product={product}
                   index={i}
-                  onSelect={onSelect}
-                  onPrint={onPrint}
+                  onSelect={handleSelect}
+                  onPrint={handlePrint}
                 />
                 {editMode && (
                   <div className="absolute right-1 top-1 flex gap-1">
