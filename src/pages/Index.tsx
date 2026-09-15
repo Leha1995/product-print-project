@@ -202,6 +202,7 @@ const Index = () => {
         {
           id: `defrost-${Date.now()}`,
           name: 'Дефрост',
+          staff: info.staff,
           copies: defrostCopies,
           time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
         },
@@ -244,6 +245,7 @@ const Index = () => {
       ...Array.from(grouped.values()).map(({ product, copies }) => ({
         id: `${product.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         name: product.name,
+        staff: settings.makerName,
         copies,
         time,
       })),
@@ -253,13 +255,14 @@ const Index = () => {
       title: 'Партия отправлена на принтер',
       description: `${batchLabel} · ${list.length} этикеток`,
     });
-  }, [batchLabel, markPrinted]);
+  }, [batchLabel, markPrinted, settings.makerName]);
 
   const handlePrinted = (product: Product, copies: number) => {
     setJobs((prev) => [
       {
         id: `${product.id}-${Date.now()}`,
         name: product.name,
+        staff: settings.makerName,
         copies,
         time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
       },

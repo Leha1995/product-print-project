@@ -5,6 +5,7 @@ export interface PrintJob {
   name: string;
   copies: number;
   time: string;
+  staff?: string;
 }
 
 interface PrintLogProps {
@@ -18,7 +19,7 @@ const PrintLog = ({ jobs, onClear }: PrintLogProps) => {
       <div className="mx-auto w-full max-w-[1400px] px-4 py-10 md:px-8 md:py-12">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <h2 className="font-head text-[28px] font-medium uppercase leading-none text-white md:text-[40px]">
-            Очередь печати
+            Журнал печати
           </h2>
           {jobs.length > 0 && (
             <button
@@ -46,7 +47,13 @@ const PrintLog = ({ jobs, onClear }: PrintLogProps) => {
                   <Icon name="Printer" size={16} strokeWidth={2.5} />
                   {job.name}
                 </span>
-                <span className="flex items-center gap-4 text-sm text-muted-foreground">
+                <span className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                  {job.staff && (
+                    <span className="flex items-center gap-1.5">
+                      <Icon name="User" size={14} strokeWidth={2.5} />
+                      {job.staff}
+                    </span>
+                  )}
                   <span>{job.copies} шт.</span>
                   <span className="tabular-nums">{job.time}</span>
                 </span>
