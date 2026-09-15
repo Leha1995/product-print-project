@@ -54,6 +54,7 @@ const MenuSection = ({
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [rawEditMode, setEditMode] = useState(false);
   const [onlyExpired, setOnlyExpired] = useState(false);
+  const [onlySoon, setOnlySoon] = useState(false);
   const editMode = isAdmin && rawEditMode;
 
   const expiredCount = useMemo(
@@ -61,15 +62,25 @@ const MenuSection = ({
     [products, expiredIds],
   );
 
+  const soonCount = useMemo(
+    () => products.filter((p) => getStatus?.(p).soon).length,
+    [products, getStatus],
+  );
+
   useEffect(() => {
     if (onlyExpired && expiredCount === 0) setOnlyExpired(false);
   }, [onlyExpired, expiredCount]);
+
+  useEffect(() => {
+    if (onlySoon && soonCount === 0) setOnlySoon(false);
+  }, [onlySoon, soonCount]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
     return products
       .filter((p) => {
         if (onlyExpired && !expiredIds?.has(p.id)) return false;
+        if (onlySoon && !getStatus?.(p).soon) return false;
         const byCat = active === 'all' || productCategories(p).includes(active);
         const byQuery = !q || p.name.toLowerCase().includes(q) || p.composition.toLowerCase().includes(q);
         return byCat && byQuery;
@@ -89,7 +100,7 @@ const MenuSection = ({
         if (sa !== sb) return sa - sb;
         return a.name.localeCompare(b.name, 'ru');
       });
-  }, [query, active, products, onlyExpired, expiredIds, getStatus]);
+  }, [query, active, products, onlyExpired, onlySoon, expiredIds, getStatus]);
 
   const tabsRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLLabelElement>(null);
@@ -210,6 +221,7 @@ const MenuSection = ({
           <button
             onClick={() => {
               setKeyboardOpen(false);
+              setOnlySoon(false);
               setOnlyExpired((v) => !v);
             }}
             disabled={!expiredCount && !onlyExpired}
@@ -227,13 +239,36 @@ const MenuSection = ({
           <button
             onClick={() => {
               setKeyboardOpen(false);
-              onPrintBatch(visible, onlyExpired ? 'Просроченные' : activeLabel);
+              setOnlyExpired(false);
+              setOnlySoon((v) => !v);
+            }}
+            disabled={!soonCount && !onlySoon}
+            className={`flex items-center justify-center gap-3 border-2 border-primary px-6 py-4 font-head text-[0.95rem] font-medium uppercase tracking-[0.06em] transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50 ${
+              onlySoon ? 'bg-accent text-accent-foreground' : 'bg-card text-primary'
+            }`}
+          >
+            <Icon name={onlySoon ? 'ListRestart' : 'Timer'} size={20} strokeWidth={2.5} />
+            {onlySoon ? 'Показать все' : 'Скоро истекает'}
+            <span className="border-l-2 border-current pl-3 tabular-nums">{soonCount}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setKeyboardOpen(false);
+              onPrintBatch(
+                visible,
+                onlyExpired ? 'Просроченные' : onlySoon ? 'Скоро истекает' : activeLabel,
+              );
             }}
             disabled={!visible.length}
             className="flex items-center justify-center gap-3 border-2 border-primary bg-accent px-6 py-4 font-head text-[0.95rem] font-medium uppercase tracking-[0.06em] text-accent-foreground transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50 md:text-[1.05rem]"
           >
             <Icon name="Printer" size={20} strokeWidth={2.5} />
-            {onlyExpired ? 'Печатать просроченные' : 'Печатать всю категорию'}
+            {onlyExpired
+              ? 'Печатать просроченные'
+              : onlySoon
+                ? 'Печатать истекающие'
+                : 'Печатать всю категорию'}
             <span className="border-l-2 border-accent-foreground/40 pl-3">{visible.length}</span>
           </button>
         </div>
@@ -331,10 +366,10 @@ const MenuSection = ({
         {visible.length === 0 ? (
           <div className="mt-12 border-2 border-dashed border-primary p-10 text-center">
             <p className="font-head text-lg uppercase text-primary">
-              {onlyExpired ? 'Просроченных нет' : 'Ничего не нашли'}
+              {onlyExpired ? 'Просроченных нет' : onlySoon ? 'Истекающих нет' : 'Ничего не нашли'}
             </p>
             <p className="mt-2 text-muted-foreground">
-              {onlyExpired
+              {onlyExpired || onlySoon
                 ? 'Все позиции в этой категории с действующим сроком'
                 : 'Попробуйте другое название или категорию'}
             </p>
