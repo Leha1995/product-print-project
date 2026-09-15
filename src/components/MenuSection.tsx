@@ -16,6 +16,7 @@ interface MenuSectionProps {
   onSelect: (product: Product) => void;
   onPrint: (product: Product) => void;
   onPrintBatch: (products: Product[], label: string) => void;
+  onDefrost: () => void;
   onAdd: () => void;
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
@@ -38,6 +39,7 @@ const MenuSection = ({
   onSelect,
   onPrint,
   onPrintBatch,
+  onDefrost,
   onAdd,
   onEdit,
   onDelete,
@@ -187,6 +189,17 @@ const MenuSection = ({
         </div>
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <button
+            onClick={() => {
+              setKeyboardOpen(false);
+              onDefrost();
+            }}
+            className="flex items-center justify-center gap-3 border-2 border-primary bg-card px-6 py-4 font-head text-[0.95rem] font-medium uppercase tracking-[0.06em] text-primary transition-transform hover:-translate-y-0.5 hover:bg-muted"
+          >
+            <Icon name="Snowflake" size={20} strokeWidth={2.5} />
+            Дефрост
+          </button>
+
           <button
             onClick={() => {
               setKeyboardOpen(false);

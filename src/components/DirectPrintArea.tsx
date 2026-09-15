@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import ReceiptPreview from '@/components/ReceiptPreview';
+import ReceiptPreview, { DefrostInfo } from '@/components/ReceiptPreview';
 import { LabelSettings, getPaper } from '@/hooks/useLabelSettings';
 import { downloadBartenderJob } from '@/lib/bartender';
 import { Product } from '@/data/products';
@@ -9,6 +9,8 @@ interface DirectPrintAreaProps {
   settings: LabelSettings;
   printedAt: Date;
   onDone: (product: Product) => void;
+  defrost?: DefrostInfo | null;
+  copies?: number;
 }
 
 export const printNodeHtml = (
@@ -141,7 +143,14 @@ export const printNodeHtml = (
   }
 };
 
-const DirectPrintArea = ({ product, settings, printedAt, onDone }: DirectPrintAreaProps) => {
+const DirectPrintArea = ({
+  product,
+  settings,
+  printedAt,
+  onDone,
+  defrost = null,
+  copies = 1,
+}: DirectPrintAreaProps) => {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -149,7 +158,7 @@ const DirectPrintArea = ({ product, settings, printedAt, onDone }: DirectPrintAr
 
     if (settings.printMode === 'bartender') {
       const id = window.setTimeout(() => {
-        downloadBartenderJob(product, 1, printedAt, settings);
+        downloadBartenderJob(product, copies, printedAt, settings);
         onDone(product);
       }, 60);
       return () => window.clearTimeout(id);
@@ -161,7 +170,7 @@ const DirectPrintArea = ({ product, settings, printedAt, onDone }: DirectPrintAr
     const paper = getPaper(settings.paper);
     const id = window.setTimeout(() => {
       printNodeHtml(
-        node.outerHTML,
+        Array.from({ length: Math.max(1, copies) }, () => node.outerHTML).join(''),
         paper.widthMm,
         paper.heightMm,
         settings.rotate90,
@@ -172,7 +181,7 @@ const DirectPrintArea = ({ product, settings, printedAt, onDone }: DirectPrintAr
     }, 60);
 
     return () => window.clearTimeout(id);
-  }, [product, settings, printedAt, onDone]);
+  }, [product, settings, printedAt, onDone, copies]);
 
   if (!product) return null;
 
@@ -182,7 +191,13 @@ const DirectPrintArea = ({ product, settings, printedAt, onDone }: DirectPrintAr
       aria-hidden
       className="print-hide pointer-events-none fixed left-[-10000px] top-0 w-[320px]"
     >
-      <ReceiptPreview product={product} copies={1} printedAt={printedAt} settings={settings} />
+      <ReceiptPreview
+        product={product}
+        copies={1}
+        printedAt={printedAt}
+        settings={settings}
+        defrost={defrost}
+      />
     </div>
   );
 };

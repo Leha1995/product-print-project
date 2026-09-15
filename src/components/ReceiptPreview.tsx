@@ -2,11 +2,17 @@ import Icon from '@/components/ui/icon';
 import { Product } from '@/data/products';
 import { LabelSettings, defaultLabelSettings, getPaper } from '@/hooks/useLabelSettings';
 
+export interface DefrostInfo {
+  staff: string;
+  temp: string;
+}
+
 interface ReceiptPreviewProps {
   product: Product;
   copies: number;
   printedAt: Date;
   settings?: LabelSettings;
+  defrost?: DefrostInfo | null;
 }
 
 const ReceiptPreview = ({
@@ -14,6 +20,7 @@ const ReceiptPreview = ({
   copies,
   printedAt,
   settings = defaultLabelSettings,
+  defrost = null,
 }: ReceiptPreviewProps) => {
   const paper = getPaper(settings.paper);
   const tiny = paper.widthMm <= 45;
@@ -51,6 +58,16 @@ const ReceiptPreview = ({
       >
         {settings.shopName}
       </div>
+
+      {defrost && (
+        <div
+          className={`mt-1 border-primary bg-primary text-center font-head font-black uppercase tracking-[0.12em] text-primary-foreground ${
+            micro ? 'border py-px text-[8px]' : tiny ? 'border-2 py-0.5 text-[10px]' : 'border-2 py-1 text-sm'
+          }`}
+        >
+          Дефрост
+        </div>
+      )}
 
       <div
         className={`border-dashed border-primary ${micro ? 'my-0.5 border-t' : tiny ? 'my-1.5 border-t-2' : 'my-3 border-t-2'}`}
@@ -92,11 +109,20 @@ const ReceiptPreview = ({
         )}
         {settings.showDate && (
           <div className="flex justify-between">
-            <dt className="shrink-0">{micro ? 'Изгот.' : 'Изготовлено'}</dt>
+            <dt className="shrink-0">
+              {defrost ? (micro ? 'Выл.' : 'Выложено') : micro ? 'Изгот.' : 'Изготовлено'}
+            </dt>
             <dd className="font-semibold">{stamp}</dd>
           </div>
         )}
-        {settings.showStaff &&
+        {defrost && (
+          <div className="flex justify-between gap-2">
+            <dt className="shrink-0">Выложил</dt>
+            <dd className="truncate font-semibold">{defrost.staff || '—'}</dd>
+          </div>
+        )}
+        {!defrost &&
+          settings.showStaff &&
           (micro ? (
             <div className="flex justify-between gap-1">
               <dt className="shrink-0">Изг. / пров.</dt>
@@ -144,7 +170,7 @@ const ReceiptPreview = ({
         </>
       )}
 
-      {settings.showStorage && (
+      {(settings.showStorage || defrost) && (
         <div
           className={`flex items-center justify-center gap-1 border border-primary font-head font-bold uppercase leading-tight ${
             micro
@@ -160,7 +186,7 @@ const ReceiptPreview = ({
             strokeWidth={2.5}
             className="shrink-0"
           />
-          <span>{settings.storageText}</span>
+          <span>{defrost ? defrost.temp : settings.storageText}</span>
         </div>
       )}
 
