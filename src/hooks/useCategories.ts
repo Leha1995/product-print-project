@@ -3,28 +3,12 @@ import { Category, categories as seedCategories } from '@/data/products';
 
 const STORAGE_KEY = 'asap-categories-v1';
 
-const withSeeds = (list: Category[]): Category[] => {
-  const known = new Set(list.map((c) => c.id));
-  const missing = seedCategories.filter((c) => !known.has(c.id));
-  if (!missing.length) return list;
-  const merged = [...list, ...missing];
-  const order = seedCategories.map((c) => c.id);
-  return merged.sort((a, b) => {
-    const ia = order.indexOf(a.id);
-    const ib = order.indexOf(b.id);
-    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-  });
-};
-
 const load = (): Category[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return seedCategories;
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || !parsed.length) return seedCategories;
-    const merged = withSeeds(parsed as Category[]);
-    if (merged.length !== parsed.length) save(merged);
-    return merged;
+    return Array.isArray(parsed) && parsed.length ? (parsed as Category[]) : seedCategories;
   } catch {
     return seedCategories;
   }
