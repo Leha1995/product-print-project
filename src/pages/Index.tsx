@@ -27,7 +27,7 @@ const Index = () => {
   const [jobs, setJobs] = useState<PrintJob[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  const { items, saveProduct, removeProduct, resetCatalog, replaceCatalog } = useCatalog();
+  const { items, saveProduct, removeProduct, replaceCatalog } = useCatalog();
   const {
     categories,
     addCategory,
@@ -323,10 +323,6 @@ const Index = () => {
           onDelete={(product) => {
             removeProduct(product.id);
             toast({ title: 'Продукт удалён', description: product.name });
-          }}
-          onReset={() => {
-            resetCatalog();
-            toast({ title: 'Каталог возвращён к исходному списку' });
           }}
           isAdmin={isAdmin}
           onRequestAdmin={() => setAdminOpen(true)}

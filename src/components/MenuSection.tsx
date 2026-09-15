@@ -20,7 +20,6 @@ interface MenuSectionProps {
   onAdd: () => void;
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
-  onReset: () => void;
   onExport: () => void;
   onImport: (file: File) => void;
   isAdmin: boolean;
@@ -43,7 +42,6 @@ const MenuSection = ({
   onAdd,
   onEdit,
   onDelete,
-  onReset,
   onExport,
   onImport,
   isAdmin,
@@ -310,22 +308,6 @@ const MenuSection = ({
             )}
           </div>
         </div>
-
-        {editMode && (
-          <div className="mt-4 flex flex-col gap-2 border-2 border-dashed border-primary p-3 text-[13px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <span>
-              Нажмите на карандаш, чтобы изменить цену или название. Изменения сохраняются в этом
-              терминале.
-            </span>
-            <button
-              onClick={onReset}
-              className="flex shrink-0 items-center gap-1.5 font-head text-[0.7rem] font-medium uppercase tracking-[0.06em] text-primary underline-offset-4 hover:underline"
-            >
-              <Icon name="RotateCcw" size={14} strokeWidth={2.5} />
-              Вернуть исходный список
-            </button>
-          </div>
-        )}
 
         {editMode && (
           <CategoryEditor
