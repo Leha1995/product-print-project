@@ -75,12 +75,21 @@ const MenuSection = ({
         return byCat && byQuery;
       })
       .sort((a, b) => {
+        const rank = (p: Product) => {
+          const st = getStatus?.(p);
+          if (st?.expired) return 0;
+          if (st?.soon) return 1;
+          return 2;
+        };
+        const ra = rank(a);
+        const rb = rank(b);
+        if (ra !== rb) return ra - rb;
         const sa = a.shelfLifeHours ?? Number.POSITIVE_INFINITY;
         const sb = b.shelfLifeHours ?? Number.POSITIVE_INFINITY;
         if (sa !== sb) return sa - sb;
         return a.name.localeCompare(b.name, 'ru');
       });
-  }, [query, active, products, onlyExpired, expiredIds]);
+  }, [query, active, products, onlyExpired, expiredIds, getStatus]);
 
   const tabsRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLLabelElement>(null);
