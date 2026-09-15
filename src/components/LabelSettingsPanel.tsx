@@ -14,8 +14,6 @@ interface LabelSettingsPanelProps {
 }
 
 const toggles: { key: keyof LabelSettings; label: string }[] = [
-  { key: 'showComposition', label: 'Состав' },
-  { key: 'showWeight', label: 'Вес / объём' },
   { key: 'showBarcode', label: 'Штрих-код' },
   { key: 'showDate', label: 'Дата изготовления' },
   { key: 'showExpiry', label: 'Годен до' },

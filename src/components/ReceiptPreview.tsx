@@ -61,14 +61,6 @@ const ReceiptPreview = ({
       >
         {product.name}
       </div>
-      {settings.showComposition && (
-        <div
-          className={`mt-1 ${micro ? 'line-clamp-2 text-[7px] leading-[1.15]' : tiny ? 'line-clamp-2 text-[9px] leading-tight' : 'text-[13px]'}`}
-        >
-          {product.composition}
-        </div>
-      )}
-
       <div
         className={`border-dashed border-primary ${micro ? 'my-0.5 border-t' : tiny ? 'my-1.5 border-t-2' : 'my-3 border-t-2'}`}
       />
@@ -78,12 +70,6 @@ const ReceiptPreview = ({
           micro ? 'space-y-0 text-[7px] leading-[1.25]' : tiny ? 'space-y-0.5 text-[9px]' : 'space-y-1 text-[13px]'
         }
       >
-        {settings.showWeight && (
-          <div className="flex justify-between">
-            <dt>{micro ? 'Вес' : 'Вес / объём'}</dt>
-            <dd className="font-semibold">{product.weight}</dd>
-          </div>
-        )}
         {!tiny && (
           <div className="flex justify-between">
             <dt>Копий</dt>
@@ -164,10 +150,10 @@ const ReceiptPreview = ({
         </div>
       )}
 
-      {settings.showBarcode && (
+      {settings.showBarcode && !micro && (
         <>
           <div
-            className={`flex items-end gap-[2px] overflow-hidden ${micro ? 'mt-1 h-3.5' : tiny ? 'mt-1.5 h-5' : 'mt-4 h-10'}`}
+            className={`flex items-end gap-[2px] overflow-hidden ${tiny ? 'mt-1.5 h-5' : 'mt-4 h-10'}`}
           >
             {product.barcode
               .split('')
@@ -184,7 +170,7 @@ const ReceiptPreview = ({
               ))}
           </div>
           <div
-            className={`mt-0.5 text-center ${micro ? 'text-[7px] tracking-[0.08em]' : tiny ? 'text-[8px] tracking-[0.15em]' : 'text-[11px] tracking-[0.3em]'}`}
+            className={`mt-0.5 text-center ${tiny ? 'text-[8px] tracking-[0.15em]' : 'text-[11px] tracking-[0.3em]'}`}
           >
             {product.barcode}
           </div>
