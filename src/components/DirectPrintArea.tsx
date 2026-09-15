@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import ReceiptPreview, { DefrostInfo } from '@/components/ReceiptPreview';
+import ReceiptPreview from '@/components/ReceiptPreview';
 import { LabelSettings, getPaper } from '@/hooks/useLabelSettings';
 import { downloadBartenderJob } from '@/lib/bartender';
 import { Product } from '@/data/products';
@@ -9,7 +9,6 @@ interface DirectPrintAreaProps {
   settings: LabelSettings;
   printedAt: Date;
   onDone: (product: Product) => void;
-  defrost?: DefrostInfo | null;
   copies?: number;
 }
 
@@ -148,7 +147,6 @@ const DirectPrintArea = ({
   settings,
   printedAt,
   onDone,
-  defrost = null,
   copies = 1,
 }: DirectPrintAreaProps) => {
   const ref = useRef<HTMLDivElement>(null);
@@ -191,13 +189,7 @@ const DirectPrintArea = ({
       aria-hidden
       className="print-hide pointer-events-none fixed left-[-10000px] top-0 w-[320px]"
     >
-      <ReceiptPreview
-        product={product}
-        copies={1}
-        printedAt={printedAt}
-        settings={settings}
-        defrost={defrost}
-      />
+      <ReceiptPreview product={product} copies={1} printedAt={printedAt} settings={settings} />
     </div>
   );
 };

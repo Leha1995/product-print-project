@@ -14,7 +14,8 @@ import BatchPrintArea from '@/components/BatchPrintArea';
 import BatchPrintDialog from '@/components/BatchPrintDialog';
 import PrintLog, { PrintJob } from '@/components/PrintLog';
 import DefrostDialog from '@/components/DefrostDialog';
-import { DefrostInfo } from '@/components/ReceiptPreview';
+import DefrostPrintArea from '@/components/DefrostPrintArea';
+import { DefrostInfo } from '@/components/DefrostLabel';
 import Footer from '@/components/Footer';
 import { Product, productCategories } from '@/data/products';
 import { toast } from '@/hooks/use-toast';
@@ -53,7 +54,6 @@ const Index = () => {
   const [batchOpen, setBatchOpen] = useState(false);
   const [defrostOpen, setDefrostOpen] = useState(false);
   const [defrostInfo, setDefrostInfo] = useState<DefrostInfo | null>(null);
-  const [defrostPrint, setDefrostPrint] = useState<Product | null>(null);
   const [defrostCopies, setDefrostCopies] = useState(1);
   const [defrostStamp, setDefrostStamp] = useState(() => new Date());
 
@@ -189,22 +189,20 @@ const Index = () => {
     handlePrinted(product, 1);
   }, [markPrinted]);
 
-  const handleDefrostConfirm = (product: Product, info: DefrostInfo, copies: number) => {
-    setDefrostInfo(info);
+  const handleDefrostConfirm = (info: DefrostInfo, copies: number) => {
     setDefrostCopies(copies);
     setDefrostStamp(new Date());
-    setDefrostPrint(product);
+    setDefrostInfo(info);
   };
 
   const handleDefrostDone = useCallback(
-    (product: Product) => {
-      setDefrostPrint(null);
-      markPrinted([product.id]);
+    (info: DefrostInfo) => {
+      setDefrostInfo(null);
       setJobs((prev) => [
         {
-          id: `defrost-${product.id}-${Date.now()}`,
-          name: `Дефрост · ${product.name}`,
-          price: product.price,
+          id: `defrost-${Date.now()}`,
+          name: 'Дефрост',
+          price: 0,
           copies: defrostCopies,
           time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
         },
@@ -212,10 +210,10 @@ const Index = () => {
       ]);
       toast({
         title: 'Маркировка дефроста отправлена',
-        description: `${product.name} · ${defrostInfo?.staff ?? ''} · ${defrostInfo?.temp ?? ''}`,
+        description: `${info.staff} · ${info.temp}`,
       });
     },
-    [markPrinted, defrostCopies, defrostInfo],
+    [defrostCopies],
   );
 
   const handlePrintBatch = (list: Product[], label: string) => {
@@ -358,19 +356,17 @@ const Index = () => {
         onDone={handleQuickDone}
       />
       <DefrostDialog
-        products={items}
         staffList={settings.staffList}
         open={defrostOpen}
         onOpenChange={setDefrostOpen}
         onConfirm={handleDefrostConfirm}
       />
-      <DirectPrintArea
-        product={defrostPrint}
+      <DefrostPrintArea
+        info={defrostInfo}
         settings={settings}
         printedAt={defrostStamp}
-        onDone={handleDefrostDone}
-        defrost={defrostInfo}
         copies={defrostCopies}
+        onDone={handleDefrostDone}
       />
       <BatchPrintDialog
         products={batchPick}
