@@ -145,9 +145,6 @@ const MenuSection = ({
       <div className="mx-auto w-full max-w-[1400px] px-4 py-10 md:px-8 md:py-14">
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <span className="inline-block border-2 border-primary bg-primary px-2 py-1 font-head text-[0.7rem] font-medium uppercase tracking-[0.1em] text-primary-foreground">
-              Терминал зала
-            </span>
             {editMode && (
               <h2 className="mt-3 font-head text-[34px] font-medium uppercase leading-[1.04] text-primary md:text-[52px]">
                 Редактирование и добавление позиций
