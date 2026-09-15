@@ -38,16 +38,9 @@ const DefrostLabel = ({ info, printedAt, settings }: DefrostLabelProps) => {
       </div>
 
       <div
-        className={`border-primary bg-primary text-center font-head font-black uppercase tracking-[0.16em] text-primary-foreground ${
-          micro
-            ? 'mt-1 border-2 py-1 text-[14px]'
-            : tiny
-              ? 'mt-1.5 border-[3px] py-1.5 text-[20px]'
-              : large
-                ? 'mt-3 border-4 py-4 text-6xl'
-                : 'mt-3 border-[3px] py-3 text-4xl'
+        className={`text-center font-head font-bold uppercase leading-tight text-primary ${
+          large ? 'mt-3 text-2xl' : micro ? 'mt-1 text-[9px]' : tiny ? 'mt-1.5 text-[11px]' : 'mt-3 text-lg'
         }`}
-        style={{ WebkitTextStroke: micro ? '0.4px currentColor' : '1px currentColor' }}
       >
         Дефрост
       </div>
