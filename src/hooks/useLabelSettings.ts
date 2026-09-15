@@ -52,6 +52,8 @@ export interface LabelSettings {
   bartenderPrinter: string;
   offsetXmm: number;
   offsetYmm: number;
+  alertTune: string;
+  expiredTune: string;
 }
 
 export const defaultLabelSettings: LabelSettings = {
@@ -76,6 +78,8 @@ export const defaultLabelSettings: LabelSettings = {
   bartenderPrinter: '',
   offsetXmm: 0,
   offsetYmm: 0,
+  alertTune: 'march',
+  expiredTune: 'funeral',
 };
 
 const STORAGE_KEY = 'asap-label-settings-v1';

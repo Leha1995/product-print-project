@@ -93,7 +93,7 @@ const Index = () => {
     });
     if (!fresh.length) return;
     fresh.forEach((id) => alertedRef.current.add(id));
-    playAlertTune(10);
+    playAlertTune(settings.alertTune, 10);
     const names = fresh
       .map((id) => items.find((p) => p.id === id)?.name)
       .filter(Boolean)
@@ -102,7 +102,7 @@ const Index = () => {
       title: 'Меньше часа до конца срока',
       description: names || `${fresh.length} позиций пора перепечатать`,
     });
-  }, [soonIds, expiredIds, items]);
+  }, [soonIds, expiredIds, items, settings.alertTune]);
 
   useEffect(() => {
     deadRef.current.forEach((id) => {
@@ -111,7 +111,7 @@ const Index = () => {
     const fresh = Array.from(expiredIds).filter((id) => !deadRef.current.has(id));
     if (!fresh.length) return;
     fresh.forEach((id) => deadRef.current.add(id));
-    playFuneralTune(17);
+    playFuneralTune(settings.expiredTune, 17);
     const names = fresh
       .map((id) => items.find((p) => p.id === id)?.name)
       .filter(Boolean)
@@ -120,7 +120,7 @@ const Index = () => {
       title: 'Срок годности вышел',
       description: names || `${fresh.length} позиций нужно снять и перепечатать`,
     });
-  }, [expiredIds, items]);
+  }, [expiredIds, items, settings.expiredTune]);
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });

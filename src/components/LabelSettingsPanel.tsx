@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Icon from '@/components/ui/icon';
+import SoundPicker from '@/components/SoundPicker';
 import { LabelSettings, paperFormats } from '@/hooks/useLabelSettings';
 
 const staffFieldClass =
@@ -323,6 +324,20 @@ const LabelSettingsPanel = ({
           />
         </label>
       )}
+
+      <SoundPicker
+        title="Сигнал: меньше часа до конца срока"
+        icon="BellRing"
+        value={settings.alertTune}
+        onChange={(alertTune) => onChange({ alertTune })}
+      />
+
+      <SoundPicker
+        title="Сигнал: срок годности вышел"
+        icon="AlarmClockOff"
+        value={settings.expiredTune}
+        onChange={(expiredTune) => onChange({ expiredTune })}
+      />
         </>
       )}
 
