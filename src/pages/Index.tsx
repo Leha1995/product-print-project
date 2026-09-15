@@ -218,7 +218,7 @@ const Index = () => {
 
   const handlePrintBatch = (list: Product[], label: string) => {
     if (!list.length) {
-      toast({ title: 'В категории нет товаров' });
+      toast({ title: 'В категории нет продуктов' });
       return;
     }
     setBatchLabel(label);
@@ -298,7 +298,7 @@ const Index = () => {
             if (used) {
               toast({
                 title: 'Категория не пустая',
-                description: `Сначала удалите или перенесите товары (${used} шт.)`,
+                description: `Сначала удалите или перенесите продукты (${used} шт.)`,
               });
               return;
             }
@@ -322,7 +322,7 @@ const Index = () => {
           }}
           onDelete={(product) => {
             removeProduct(product.id);
-            toast({ title: 'Товар удалён', description: product.name });
+            toast({ title: 'Продукт удалён', description: product.name });
           }}
           onReset={() => {
             resetCatalog();
@@ -389,7 +389,7 @@ const Index = () => {
         onSave={(product) => {
           saveProduct(product);
           toast({
-            title: editing ? 'Товар обновлён' : 'Товар добавлен',
+            title: editing ? 'Продукт обновлён' : 'Продукт добавлен',
             description: `${product.name} · ${product.price} ₽`,
           });
         }}

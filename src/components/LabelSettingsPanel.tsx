@@ -419,7 +419,7 @@ const LabelSettingsPanel = ({
 
       {!staffOnly && settings.showStorage && (
         <p className="mt-3 border-2 border-dashed border-primary p-3 text-[11px] leading-snug text-muted-foreground">
-          Температура хранения задаётся у каждого товара отдельно — в карточке товара, кнопка
+          Температура хранения задаётся у каждого продукта отдельно — в карточке продукта, кнопка
           «Изменить». Если не задана, печатается «{settings.storageText}».
         </p>
       )}

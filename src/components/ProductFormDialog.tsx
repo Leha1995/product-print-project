@@ -124,7 +124,7 @@ const ProductFormDialog = ({
       <DialogContent className="max-h-[92vh] max-w-[620px] overflow-y-auto border-2 border-primary bg-background p-0">
         <form onSubmit={submit} className="p-5 md:p-6">
           <h3 className="font-head text-2xl font-bold uppercase leading-tight text-primary">
-            {product ? 'Изменить товар' : 'Новый товар'}
+            {product ? 'Изменить продукт' : 'Новый продукт'}
           </h3>
           <p className="mt-1 text-[14px] text-muted-foreground">
             Название, срок и температура хранения попадут в маркировку при печати
