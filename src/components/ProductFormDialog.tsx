@@ -98,7 +98,7 @@ const ProductFormDialog = ({
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const price = Number(form.price.replace(',', '.'));
-    if (!form.name.trim() || Number.isNaN(price)) return;
+    if (!form.name.trim()) return;
 
     const picked = form.categories.length ? form.categories : [form.category];
 
@@ -107,7 +107,7 @@ const ProductFormDialog = ({
       name: form.name.trim(),
       category: picked[0],
       categories: picked,
-      price: Math.round(price),
+      price: Number.isNaN(price) ? (product?.price ?? 0) : Math.round(price),
       weight: form.weight.trim() || '—',
       composition: form.composition.trim() || 'Состав не указан',
       image: form.image.trim() || fallbackImg(picked[0]),
@@ -127,7 +127,7 @@ const ProductFormDialog = ({
             {product ? 'Изменить товар' : 'Новый товар'}
           </h3>
           <p className="mt-1 text-[14px] text-muted-foreground">
-            Название, цена и состав попадут в маркировку при печати
+            Название, срок и температура хранения попадут в маркировку при печати
           </p>
 
           <div className="mt-5 grid gap-4">
@@ -137,18 +137,6 @@ const ProductFormDialog = ({
                 value={form.name}
                 onChange={(e) => set('name', e.target.value)}
                 placeholder="Филадельфия классик"
-                required
-                className={fieldClass}
-              />
-            </label>
-
-            <label className="grid gap-1.5">
-              <span className={labelClass}>Цена, ₽</span>
-              <input
-                value={form.price}
-                onChange={(e) => set('price', e.target.value)}
-                inputMode="decimal"
-                placeholder="489"
                 required
                 className={fieldClass}
               />
@@ -183,26 +171,15 @@ const ProductFormDialog = ({
               )}
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="grid gap-1.5">
-                <span className={labelClass}>Вес / объём</span>
-                <input
-                  value={form.weight}
-                  onChange={(e) => set('weight', e.target.value)}
-                  placeholder="260 г"
-                  className={fieldClass}
-                />
-              </label>
-              <label className="grid gap-1.5">
-                <span className={labelClass}>Штрих-код</span>
-                <input
-                  value={form.barcode}
-                  onChange={(e) => set('barcode', e.target.value)}
-                  placeholder="4600001000018"
-                  className={fieldClass}
-                />
-              </label>
-            </div>
+            <label className="grid gap-1.5">
+              <span className={labelClass}>Штрих-код</span>
+              <input
+                value={form.barcode}
+                onChange={(e) => set('barcode', e.target.value)}
+                placeholder="4600001000018"
+                className={fieldClass}
+              />
+            </label>
 
             <label className="grid gap-1.5">
               <span className={labelClass}>Срок хранения, часов</span>
@@ -244,17 +221,6 @@ const ProductFormDialog = ({
                 })}
               </div>
             </div>
-
-            <label className="grid gap-1.5">
-              <span className={labelClass}>Состав</span>
-              <textarea
-                value={form.composition}
-                onChange={(e) => set('composition', e.target.value)}
-                rows={2}
-                placeholder="Лосось, сыр творожный, огурец, рис, нори"
-                className={`${fieldClass} resize-none`}
-              />
-            </label>
 
             <div className="grid gap-1.5">
               <span className={labelClass}>Фото</span>
