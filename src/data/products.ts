@@ -11,7 +11,6 @@ export interface Product {
   name: string;
   category: CategoryId;
   categories?: CategoryId[];
-  price: number;
   weight: string;
   composition: string;
   image: string;
@@ -48,7 +47,6 @@ export const products: Product[] = [
     id: 'sus-01',
     name: 'Филадельфия классик',
     category: 'sushi',
-    price: 489,
     weight: '260 г',
     composition: 'Лосось, сыр творожный, огурец, рис, нори',
     image: SUSHI_IMG,
@@ -59,7 +57,6 @@ export const products: Product[] = [
     id: 'sus-02',
     name: 'Калифорния с крабом',
     category: 'sushi',
-    price: 419,
     weight: '245 г',
     composition: 'Краб-микс, авокадо, огурец, икра тобико, рис',
     image: SUSHI_IMG,
@@ -69,7 +66,6 @@ export const products: Product[] = [
     id: 'sus-03',
     name: 'Запечённый с угрём',
     category: 'sushi',
-    price: 529,
     weight: '280 г',
     composition: 'Угорь, соус унаги, сыр, кунжут, рис',
     image: SUSHI_IMG,
@@ -79,7 +75,6 @@ export const products: Product[] = [
     id: 'sus-04',
     name: 'Сет «Автосуши 32»',
     category: 'sushi',
-    price: 1690,
     weight: '1240 г',
     composition: '4 вида роллов, имбирь, васаби, соевый соус',
     image: SUSHI_IMG,
@@ -90,7 +85,6 @@ export const products: Product[] = [
     id: 'piz-01',
     name: 'Пепперони острая',
     category: 'pizza',
-    price: 649,
     weight: '480 г, 30 см',
     composition: 'Пепперони, моцарелла, томатный соус, чили',
     image: PIZZA_IMG,
@@ -101,7 +95,6 @@ export const products: Product[] = [
     id: 'piz-02',
     name: 'Четыре сыра',
     category: 'pizza',
-    price: 699,
     weight: '470 г, 30 см',
     composition: 'Моцарелла, дорблю, пармезан, чеддер, сливки',
     image: PIZZA_IMG,
@@ -111,7 +104,6 @@ export const products: Product[] = [
     id: 'piz-03',
     name: 'Мясная мега',
     category: 'pizza',
-    price: 759,
     weight: '540 г, 30 см',
     composition: 'Бекон, ветчина, курица, лук, моцарелла, соус',
     image: PIZZA_IMG,
@@ -121,7 +113,6 @@ export const products: Product[] = [
     id: 'piz-04',
     name: 'Маргарита',
     category: 'pizza',
-    price: 499,
     weight: '420 г, 30 см',
     composition: 'Томаты, моцарелла, базилик, оливковое масло',
     image: PIZZA_IMG,
@@ -131,7 +122,6 @@ export const products: Product[] = [
     id: 'drk-01',
     name: 'Кола классик 0,5',
     category: 'drinks',
-    price: 129,
     weight: '500 мл',
     composition: 'Газированный напиток, сахар, кофеин',
     image: DRINK_IMG,
@@ -141,7 +131,6 @@ export const products: Product[] = [
     id: 'drk-02',
     name: 'Лимонад домашний',
     category: 'drinks',
-    price: 189,
     weight: '400 мл',
     composition: 'Лимон, мята, тростниковый сахар, содовая',
     image: DRINK_IMG,
@@ -152,7 +141,6 @@ export const products: Product[] = [
     id: 'drk-03',
     name: 'Зелёный чай холодный',
     category: 'drinks',
-    price: 149,
     weight: '450 мл',
     composition: 'Чай сенча, лайм, лёд',
     image: DRINK_IMG,
@@ -162,7 +150,6 @@ export const products: Product[] = [
     id: 'drk-04',
     name: 'Вода без газа 0,5',
     category: 'drinks',
-    price: 79,
     weight: '500 мл',
     composition: 'Питьевая вода первой категории',
     image: DRINK_IMG,

@@ -76,9 +76,6 @@ const PrintDialog = ({
           <div className="print-hide border-b-2 border-primary md:border-b-0 md:border-r-2">
             <div className="relative aspect-[4/3] w-full overflow-hidden bg-secondary">
               <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
-              <span className="absolute bottom-0 right-0 border-l-2 border-t-2 border-primary bg-accent px-4 py-2 font-head text-2xl font-black text-accent-foreground">
-                {product.price} ₽
-              </span>
             </div>
 
             <div className="p-5">

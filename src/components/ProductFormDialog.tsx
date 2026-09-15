@@ -27,7 +27,6 @@ const emptyForm = {
   name: '',
   category: 'sushi' as CategoryId,
   categories: [] as CategoryId[],
-  price: '',
   weight: '',
   composition: '',
   image: '',
@@ -60,7 +59,6 @@ const ProductFormDialog = ({
             name: product.name,
             category: product.category,
             categories: productCategories(product),
-            price: String(product.price),
             weight: product.weight,
             composition: product.composition,
             image: product.image,
@@ -97,7 +95,6 @@ const ProductFormDialog = ({
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    const price = Number(form.price.replace(',', '.'));
     if (!form.name.trim()) return;
 
     const picked = form.categories.length ? form.categories : [form.category];
@@ -107,7 +104,6 @@ const ProductFormDialog = ({
       name: form.name.trim(),
       category: picked[0],
       categories: picked,
-      price: Number.isNaN(price) ? (product?.price ?? 0) : Math.round(price),
       weight: form.weight.trim() || '—',
       composition: form.composition.trim() || 'Состав не указан',
       image: form.image.trim() || fallbackImg(picked[0]),

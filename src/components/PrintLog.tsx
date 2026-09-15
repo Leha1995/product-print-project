@@ -3,7 +3,6 @@ import Icon from '@/components/ui/icon';
 export interface PrintJob {
   id: string;
   name: string;
-  price: number;
   copies: number;
   time: string;
 }
@@ -49,7 +48,6 @@ const PrintLog = ({ jobs, onClear }: PrintLogProps) => {
                 </span>
                 <span className="flex items-center gap-4 text-sm text-muted-foreground">
                   <span>{job.copies} шт.</span>
-                  <span className="font-head font-bold text-primary">{job.price} ₽</span>
                   <span className="tabular-nums">{job.time}</span>
                 </span>
               </li>

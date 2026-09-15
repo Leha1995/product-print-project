@@ -202,7 +202,6 @@ const Index = () => {
         {
           id: `defrost-${Date.now()}`,
           name: 'Дефрост',
-          price: 0,
           copies: defrostCopies,
           time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
         },
@@ -245,7 +244,6 @@ const Index = () => {
       ...Array.from(grouped.values()).map(({ product, copies }) => ({
         id: `${product.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         name: product.name,
-        price: product.price,
         copies,
         time,
       })),
@@ -262,7 +260,6 @@ const Index = () => {
       {
         id: `${product.id}-${Date.now()}`,
         name: product.name,
-        price: product.price,
         copies,
         time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
       },
@@ -386,7 +383,7 @@ const Index = () => {
           saveProduct(product);
           toast({
             title: editing ? 'Продукт обновлён' : 'Продукт добавлен',
-            description: `${product.name} · ${product.price} ₽`,
+            description: product.name,
           });
         }}
       />
