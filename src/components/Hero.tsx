@@ -14,7 +14,7 @@ const Hero = ({ onOpenMenu }: HeroProps) => {
       />
       <div className="absolute left-6 top-1/2 z-[2] max-w-[640px] -translate-y-1/2 md:left-14">
         <h1 className="animate-fade-in font-head text-[38px] font-medium uppercase leading-[1.06] tracking-[-0.005em] text-white sm:text-[48px] lg:text-[62px]">
-          Жми на блюдо —<br />
+          Жми на продукт —<br />
           чек печатается
         </h1>
         <button

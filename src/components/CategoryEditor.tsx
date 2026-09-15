@@ -11,7 +11,7 @@ interface CategoryEditorProps {
 }
 
 const iconChoices: { name: string; title: string }[] = [
-  { name: 'Utensils', title: 'Блюда' },
+  { name: 'Utensils', title: 'Продукты' },
   { name: 'Fish', title: 'Рыба' },
   { name: 'Pizza', title: 'Пицца' },
   { name: 'CupSoda', title: 'Напитки' },
