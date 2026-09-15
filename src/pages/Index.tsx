@@ -183,11 +183,15 @@ const Index = () => {
     setQuickPrint(product);
   };
 
-  const handleQuickDone = useCallback((product: Product) => {
-    setQuickPrint(null);
-    markPrinted([product.id]);
-    handlePrinted(product, 1);
-  }, [markPrinted]);
+  const handleQuickDone = useCallback(
+    (product: Product) => {
+      setQuickPrint(null);
+      markPrinted([product.id]);
+      handlePrinted(product, 1);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [markPrinted, settings.makerName],
+  );
 
   const handleDefrostConfirm = (info: DefrostInfo, copies: number) => {
     setDefrostCopies(copies);
