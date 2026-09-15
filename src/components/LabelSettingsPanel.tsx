@@ -420,25 +420,10 @@ const LabelSettingsPanel = ({
       )}
 
       {!staffOnly && settings.showStorage && (
-        <div className="mt-3 grid gap-2">
-          <input
-            value={settings.storageText}
-            onChange={(e) => onChange({ storageText: e.target.value })}
-            placeholder="Условия хранения"
-            className="w-full border-2 border-primary bg-card px-3 py-2 font-body text-[14px] text-primary outline-none placeholder:text-muted-foreground focus:bg-muted"
-          />
-          <div className="flex flex-wrap gap-2">
-            {['Хранить при +2…+4 °C', 'Хранить при -18 °C', 'Хранить при +25 °C'].map((t) => (
-              <button
-                key={t}
-                onClick={() => onChange({ storageText: t })}
-                className="border-2 border-dashed border-primary px-2 py-1 text-[11px] text-primary transition-colors hover:bg-muted"
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-        </div>
+        <p className="mt-3 border-2 border-dashed border-primary p-3 text-[11px] leading-snug text-muted-foreground">
+          Температура хранения задаётся у каждого товара отдельно — в карточке товара, кнопка
+          «Изменить». Если не задана, печатается «{settings.storageText}».
+        </p>
       )}
 
       {!staffOnly && (

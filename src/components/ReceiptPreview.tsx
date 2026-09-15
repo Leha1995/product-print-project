@@ -160,7 +160,7 @@ const ReceiptPreview = ({
             strokeWidth={2.5}
             className="shrink-0"
           />
-          <span>{settings.storageText}</span>
+          <span>{product.storageText || settings.storageText}</span>
         </div>
       )}
 

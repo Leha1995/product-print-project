@@ -18,7 +18,14 @@ export interface Product {
   barcode: string;
   hit?: boolean;
   shelfLifeHours?: number;
+  storageText?: string;
 }
+
+export const storagePresets = [
+  'Хранить при +2…+4 °C',
+  'Хранить при -18 °C',
+  'Хранить при +25 °C',
+];
 
 export const categories: Category[] = [
   { id: 'sushi', label: 'Суши бар', icon: 'Fish' },

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
-import { Category, CategoryId, Product, productCategories } from '@/data/products';
+import { Category, CategoryId, Product, productCategories, storagePresets } from '@/data/products';
 
 interface ProductFormDialogProps {
   product: Product | null;
@@ -33,6 +33,7 @@ const emptyForm = {
   image: '',
   barcode: '',
   shelfLifeHours: '',
+  storageText: storagePresets[0],
   hit: false,
 };
 
@@ -65,6 +66,7 @@ const ProductFormDialog = ({
             image: product.image,
             barcode: product.barcode,
             shelfLifeHours: product.shelfLifeHours ? String(product.shelfLifeHours) : '',
+            storageText: product.storageText || storagePresets[0],
             hit: Boolean(product.hit),
           }
         : {
@@ -111,6 +113,7 @@ const ProductFormDialog = ({
       image: form.image.trim() || fallbackImg(picked[0]),
       barcode: form.barcode.trim() || String(4600000000000 + Math.floor(Math.random() * 999999)),
       shelfLifeHours: form.shelfLifeHours ? Number(form.shelfLifeHours) : undefined,
+      storageText: form.storageText.trim() || undefined,
       hit: form.hit,
     });
     onOpenChange(false);
@@ -211,6 +214,36 @@ const ProductFormDialog = ({
                 className={fieldClass}
               />
             </label>
+
+            <div className="grid gap-1.5">
+              <span className={labelClass}>Температура хранения</span>
+              <input
+                value={form.storageText}
+                onChange={(e) => set('storageText', e.target.value)}
+                placeholder="Хранить при +2…+4 °C"
+                className={fieldClass}
+              />
+              <div className="flex flex-wrap gap-2">
+                {storagePresets.map((t) => {
+                  const on = form.storageText === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => set('storageText', t)}
+                      className={`flex items-center gap-1.5 border-2 border-primary px-2.5 py-1.5 text-[12px] transition-colors ${
+                        on
+                          ? 'bg-accent text-accent-foreground'
+                          : 'bg-card text-muted-foreground hover:bg-muted'
+                      }`}
+                    >
+                      <Icon name="Thermometer" size={13} strokeWidth={2.5} />
+                      {t}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             <label className="grid gap-1.5">
               <span className={labelClass}>Состав</span>

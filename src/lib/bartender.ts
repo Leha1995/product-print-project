@@ -54,7 +54,7 @@ const buildRow = (
     settings.showDate ? fmt(printedAt) : '',
     settings.showExpiry ? fmt(expiry) : '',
     hours,
-    settings.showStorage ? settings.storageText : '',
+    settings.showStorage ? product.storageText || settings.storageText : '',
     settings.shopName,
     settings.showStaff ? settings.makerName : '',
     settings.showStaff ? settings.checkerName : '',
