@@ -100,6 +100,22 @@ export const useLabelSettings = () => {
   }, []);
 
   useEffect(() => {
+    let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    if (settings.logo) {
+      link.type = settings.logo.startsWith('data:image/svg') ? 'image/svg+xml' : 'image/png';
+      link.href = settings.logo;
+    } else {
+      link.type = 'image/svg+xml';
+      link.href = '/favicon.svg';
+    }
+  }, [settings.logo]);
+
+  useEffect(() => {
     const paper = getPaper(settings.paper);
     const root = document.documentElement;
     root.style.setProperty('--label-width', `${paper.widthMm}mm`);
