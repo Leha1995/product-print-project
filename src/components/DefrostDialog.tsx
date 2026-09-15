@@ -4,10 +4,7 @@ import Icon from '@/components/ui/icon';
 import { DefrostInfo } from '@/components/DefrostLabel';
 
 export const defrostTemps = [
-  { value: 'Хранить при +2…+4 °C', label: '+2…+4 °C', hint: 'Холодильник, рыба' },
-  { value: 'Хранить при +2…+6 °C', label: '+2…+6 °C', hint: 'Холодильник, общий' },
-  { value: 'Хранить при 0…+2 °C', label: '0…+2 °C', hint: 'Дефрост-камера' },
-  { value: 'Хранить при -18 °C', label: '-18 °C', hint: 'Морозильник' },
+  { value: 'Хранить при +2…+4 °C', label: '+2…+4 °C', hint: 'Режим хранения дефроста' },
 ];
 
 interface DefrostDialogProps {
@@ -70,24 +67,14 @@ const DefrostDialog = ({ staffList, open, onOpenChange, onConfirm }: DefrostDial
             <div className="mb-2 font-head text-[0.7rem] font-medium uppercase tracking-[0.1em] text-primary">
               Температурный режим хранения
             </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {defrostTemps.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setTemp(option.value)}
-                  className={`flex items-center gap-2 border-2 border-primary px-3 py-2.5 text-left transition-colors ${
-                    temp === option.value
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-card text-primary hover:bg-muted'
-                  }`}
-                >
-                  <Icon name="Thermometer" size={16} strokeWidth={2.5} className="shrink-0" />
-                  <span>
-                    <span className="block font-head text-[0.9rem] font-bold">{option.label}</span>
-                    <span className="block text-[11px] opacity-70">{option.hint}</span>
-                  </span>
-                </button>
-              ))}
+            <div className="flex items-center gap-2 border-2 border-primary bg-primary px-3 py-2.5 text-primary-foreground">
+              <Icon name="Thermometer" size={16} strokeWidth={2.5} className="shrink-0" />
+              <span>
+                <span className="block font-head text-[0.9rem] font-bold">
+                  {defrostTemps[0].label}
+                </span>
+                <span className="block text-[11px] opacity-70">{defrostTemps[0].hint}</span>
+              </span>
             </div>
           </div>
 
