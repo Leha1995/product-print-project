@@ -52,7 +52,7 @@ const CategoryEditor = ({
     <div className="mt-4 border-2 border-dashed border-primary p-3">
       <div className="flex items-center justify-between gap-3">
         <span className="font-head text-[0.75rem] font-medium uppercase tracking-[0.08em] text-primary">
-          Категории меню
+          Категории продуктов
         </span>
         <button
           onClick={onReset}

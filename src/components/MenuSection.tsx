@@ -138,7 +138,7 @@ const MenuSection = ({
     tabsRef.current?.scrollBy({ left: dir * 280, behavior: 'smooth' });
 
   const activeLabel =
-    active === 'all' ? 'Всё меню' : (categories.find((c) => c.id === active)?.label ?? 'Категория');
+    active === 'all' ? 'Все продукты' : (categories.find((c) => c.id === active)?.label ?? 'Категория');
 
   return (
     <section id="menu" className="print-hide border-t-2 border-primary bg-background">
@@ -284,7 +284,7 @@ const MenuSection = ({
               ref={tabsRef}
               className="cat-scroll flex min-w-0 flex-1 gap-3 overflow-x-auto pb-2"
             >
-              {[{ id: 'all', label: 'Всё меню', icon: 'LayoutGrid' }, ...categories].map((cat) => {
+              {[{ id: 'all', label: 'Все продукты', icon: 'LayoutGrid' }, ...categories].map((cat) => {
                 const isActive = active === cat.id;
                 return (
                   <button

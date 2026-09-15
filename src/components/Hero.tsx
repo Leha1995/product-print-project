@@ -21,7 +21,7 @@ const Hero = ({ onOpenMenu }: HeroProps) => {
           onClick={onOpenMenu}
           className="mt-8 inline-block animate-fade-in rounded-[3px] bg-accent px-8 py-4 font-head text-base font-medium uppercase tracking-[0.01em] text-accent-foreground transition-transform [animation-delay:120ms] hover:-translate-y-0.5 md:px-11 md:text-xl"
         >
-          Открыть меню
+          Открыть продукты
         </button>
       </div>
     </section>
