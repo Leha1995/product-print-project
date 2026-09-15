@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { applyFavicon } from '@/lib/favicon';
 
 export type PaperId = 'label43x25' | 'roll58' | 'roll80' | 'label58x40' | 'a6';
 
@@ -100,59 +101,7 @@ export const useLabelSettings = () => {
   }, []);
 
   useEffect(() => {
-    const setIcon = (href: string, type: string) => {
-      document
-        .querySelectorAll('link[rel~="icon"], link[rel="apple-touch-icon"]')
-        .forEach((el) => el.remove());
-      const link = document.createElement('link');
-      link.rel = 'icon';
-      link.type = type;
-      link.href = href;
-      document.head.appendChild(link);
-      const touch = document.createElement('link');
-      touch.rel = 'apple-touch-icon';
-      touch.href = href;
-      document.head.appendChild(touch);
-    };
-
-    if (!settings.logo) {
-      setIcon(`/favicon.svg?v=${Date.now()}`, 'image/svg+xml');
-      return;
-    }
-
-    let cancelled = false;
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      if (cancelled) return;
-      const size = 128;
-      const canvas = document.createElement('canvas');
-      canvas.width = size;
-      canvas.height = size;
-      const c = canvas.getContext('2d');
-      if (!c) {
-        setIcon(settings.logo, 'image/png');
-        return;
-      }
-      c.clearRect(0, 0, size, size);
-      const scale = Math.min(size / img.width, size / img.height);
-      const w = img.width * scale;
-      const h = img.height * scale;
-      c.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
-      try {
-        setIcon(canvas.toDataURL('image/png'), 'image/png');
-      } catch {
-        setIcon(settings.logo, 'image/png');
-      }
-    };
-    img.onerror = () => {
-      if (!cancelled) setIcon(`/favicon.svg?v=${Date.now()}`, 'image/svg+xml');
-    };
-    img.src = settings.logo;
-
-    return () => {
-      cancelled = true;
-    };
+    applyFavicon(settings.logo);
   }, [settings.logo]);
 
   useEffect(() => {
