@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import { applyFavicon } from '@/lib/favicon';
 
 export type PaperId = 'label43x25' | 'roll58' | 'roll80' | 'label58x40' | 'a6';
 
@@ -99,10 +98,6 @@ export const useLabelSettings = () => {
       /* storage unavailable */
     }
   }, []);
-
-  useEffect(() => {
-    applyFavicon(settings.logo);
-  }, [settings.logo]);
 
   useEffect(() => {
     const paper = getPaper(settings.paper);
