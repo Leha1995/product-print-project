@@ -29,6 +29,9 @@ export const storagePresets = [
 export const categories: Category[] = [
   { id: 'sushi', label: 'Суши бар', icon: 'Fish' },
   { id: 'pizza', label: 'Пицца', icon: 'Pizza' },
+  { id: 'hot', label: 'Горячка', icon: 'Flame' },
+  { id: 'prep', label: 'Заготовки', icon: 'Package' },
+  { id: 'admin', label: 'Админы', icon: 'ClipboardList' },
   { id: 'drinks', label: 'Напитки', icon: 'CupSoda' },
 ];
 
