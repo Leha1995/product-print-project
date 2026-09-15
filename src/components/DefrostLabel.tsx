@@ -28,54 +28,60 @@ const DefrostLabel = ({ info, printedAt, settings }: DefrostLabelProps) => {
 
   return (
     <div
-      className={`print-area animate-print-out mx-auto border-2 border-primary bg-white font-body text-primary ${micro ? 'p-1.5' : tiny ? 'p-2' : 'p-4'}`}
-      style={{ maxWidth: `${paper.widthMm * 3.5}px` }}
+      className={`print-area animate-print-out mx-auto border-2 border-primary bg-white font-body text-primary ${micro ? 'p-1' : tiny ? 'p-2' : 'p-4'}`}
+      style={{ maxWidth: `${paper.widthMm * 3.5}px`, minHeight: micro ? `${paper.heightMm! * 3.5}px` : undefined }}
     >
-      <div
-        className={`text-center font-head font-black uppercase tracking-[0.04em] ${large ? 'text-lg' : micro ? 'text-[8px] leading-none' : tiny ? 'text-[10px] leading-tight' : 'text-sm'}`}
-      >
-        {settings.shopName}
-      </div>
-
-      <div
-        className={`text-center font-head font-bold uppercase leading-tight text-primary ${
-          large ? 'mt-3 text-2xl' : micro ? 'mt-1 text-[9px]' : tiny ? 'mt-1.5 text-[11px]' : 'mt-3 text-lg'
-        }`}
-      >
-        Дефрост
-      </div>
-
-      <dl
-        className={`${
-          micro ? 'mt-1 space-y-0 text-[8px] leading-[1.25]' : tiny ? 'mt-2 space-y-0.5 text-[10px]' : 'mt-3 space-y-1 text-[14px]'
-        }`}
-      >
-        <div className="flex justify-between gap-2">
-          <dt className="shrink-0">Выложено</dt>
-          <dd className="font-semibold">{stamp}</dd>
+      <div className="flex h-full w-full flex-col justify-between">
+        <div
+          className={`text-center font-head font-black uppercase tracking-[0.04em] ${large ? 'text-lg' : micro ? 'text-[11px] leading-tight' : tiny ? 'text-[10px] leading-tight' : 'text-sm'}`}
+        >
+          {settings.shopName}
         </div>
-        <div className="flex justify-between gap-2">
-          <dt className="shrink-0">Выложил</dt>
-          <dd className="truncate font-semibold">{info.staff || '—'}</dd>
-        </div>
-      </dl>
 
-      <div
-        className={`flex items-center justify-center gap-1 border-primary font-head font-bold uppercase leading-tight ${
-          micro
-            ? 'mt-1 border px-1 py-px text-[8px]'
-            : tiny
-              ? 'mt-1.5 border-2 px-1 py-0.5 text-[9px]'
-              : 'mt-3 border-2 px-2 py-1.5 text-[13px] tracking-[0.04em]'
-        }`}
-      >
-        <Icon
-          name="Thermometer"
-          size={micro ? 9 : tiny ? 11 : 15}
-          strokeWidth={2.5}
-          className="shrink-0"
-        />
-        <span>{info.temp}</span>
+        <div
+          className={`text-center font-head font-bold uppercase leading-tight text-primary ${
+            large ? 'text-2xl' : micro ? 'text-[19px]' : tiny ? 'mt-1.5 text-[11px]' : 'mt-3 text-lg'
+          }`}
+        >
+          Дефрост
+        </div>
+
+        <dl
+          className={`${
+            micro
+              ? 'space-y-0 text-[10px] leading-[1.2]'
+              : tiny
+                ? 'mt-2 space-y-0.5 text-[10px]'
+                : 'mt-3 space-y-1 text-[14px]'
+          }`}
+        >
+          <div className="flex justify-between gap-1">
+            <dt className="shrink-0">Выложено</dt>
+            <dd className="font-semibold">{stamp}</dd>
+          </div>
+          <div className="flex justify-between gap-1">
+            <dt className="shrink-0">Выложил</dt>
+            <dd className="truncate font-semibold">{info.staff || '—'}</dd>
+          </div>
+        </dl>
+
+        <div
+          className={`flex items-center justify-center gap-1 border-primary font-head font-bold uppercase leading-tight ${
+            micro
+              ? 'border-2 px-1 py-0.5 text-[10px]'
+              : tiny
+                ? 'mt-1.5 border-2 px-1 py-0.5 text-[9px]'
+                : 'mt-3 border-2 px-2 py-1.5 text-[13px] tracking-[0.04em]'
+          }`}
+        >
+          <Icon
+            name="Thermometer"
+            size={micro ? 11 : tiny ? 11 : 15}
+            strokeWidth={2.5}
+            className="shrink-0"
+          />
+          <span>{info.temp}</span>
+        </div>
       </div>
     </div>
   );
