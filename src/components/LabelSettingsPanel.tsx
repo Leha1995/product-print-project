@@ -428,7 +428,7 @@ const LabelSettingsPanel = ({
             className="w-full border-2 border-primary bg-card px-3 py-2 font-body text-[14px] text-primary outline-none placeholder:text-muted-foreground focus:bg-muted"
           />
           <div className="flex flex-wrap gap-2">
-            {['Хранить при +2…+6 °C', 'Хранить при -18 °C', 'Хранить при +18…+25 °C'].map((t) => (
+            {['Хранить при +2…+4 °C', 'Хранить при -18 °C', 'Хранить при +25 °C'].map((t) => (
               <button
                 key={t}
                 onClick={() => onChange({ storageText: t })}

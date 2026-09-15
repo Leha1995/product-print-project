@@ -65,7 +65,7 @@ export const defaultLabelSettings: LabelSettings = {
   showDate: true,
   showExpiry: true,
   showStorage: true,
-  storageText: 'Хранить при +2…+6 °C',
+  storageText: 'Хранить при +2…+4 °C',
   showStaff: true,
   makerName: '',
   checkerName: '',
