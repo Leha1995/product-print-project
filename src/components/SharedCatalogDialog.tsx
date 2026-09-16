@@ -45,6 +45,22 @@ const SharedCatalogDialog = ({
     apply(next);
   };
 
+  const currentSet = tab === 'base' ? picked : pickedLocal;
+  const applySet = tab === 'base' ? setPicked : setPickedLocal;
+  const allPicked = filtered.length > 0 && filtered.every((p) => currentSet.has(p.id));
+
+  const toggleAll = () => {
+    if (allPicked) {
+      const next = new Set(currentSet);
+      filtered.forEach((p) => next.delete(p.id));
+      applySet(next);
+      return;
+    }
+    const next = new Set(currentSet);
+    filtered.forEach((p) => next.add(p.id));
+    applySet(next);
+  };
+
   const handleImport = () => {
     const list = items.filter((p) => picked.has(p.id)).map(stripMeta);
     if (!list.length) return;
@@ -105,15 +121,27 @@ const SharedCatalogDialog = ({
             </button>
           </div>
 
-          <label className="flex items-center gap-3 border-2 border-primary bg-card px-3 py-2.5">
-            <Icon name="Search" size={18} className="text-primary" strokeWidth={2.5} />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Поиск по названию"
-              className="w-full bg-transparent text-[15px] text-primary outline-none placeholder:text-muted-foreground"
-            />
-          </label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <label className="flex flex-1 items-center gap-3 border-2 border-primary bg-card px-3 py-2.5">
+              <Icon name="Search" size={18} className="text-primary" strokeWidth={2.5} />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Поиск по названию"
+                className="w-full bg-transparent text-[15px] text-primary outline-none placeholder:text-muted-foreground"
+              />
+            </label>
+            <button
+              onClick={toggleAll}
+              disabled={!filtered.length}
+              className={`flex shrink-0 items-center justify-center gap-2 border-2 border-primary px-4 py-2.5 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] transition-colors disabled:opacity-50 ${
+                allPicked ? 'bg-accent text-accent-foreground' : 'bg-card text-primary hover:bg-muted'
+              }`}
+            >
+              <Icon name={allPicked ? 'SquareX' : 'CheckCheck'} size={16} strokeWidth={2.5} />
+              {allPicked ? 'Снять все' : 'Выбрать все'}
+            </button>
+          </div>
 
           <div className="max-h-[42vh] space-y-2 overflow-y-auto pr-1">
             {loading && tab === 'base' && (
