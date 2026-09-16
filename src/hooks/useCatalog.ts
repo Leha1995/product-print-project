@@ -1,160 +1,132 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Product, products as seedProducts, categories as seedCategories } from '@/data/products';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Product, products as seedProducts } from '@/data/products';
 import {
-  deleteProduct,
-  fetchCatalog,
-  pushProduct,
-  pushProducts,
-  replaceAll,
-  seedCatalog,
-} from '@/lib/catalogApi';
+  IMG_PREFIX,
+  compressImage,
+  getAllImages,
+  putImage,
+  removeImage,
+} from '@/lib/imageStore';
 import { toast } from '@/hooks/use-toast';
 
-const CACHE_KEY = 'asap-catalog-cache-v2';
+const STORAGE_KEY = 'asap-catalog-v1';
 
-const readCache = (): Product[] => {
+const loadRaw = (): Product[] => {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return seedProducts;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed) || !parsed.length) return seedProducts;
-    return parsed as Product[];
+    const clean = (parsed as Product[]).filter((p) => p && p.id && p.name);
+    return Array.from(new Map(clean.map((p) => [p.id, p])).values());
   } catch {
     return seedProducts;
   }
 };
 
-const writeCache = (list: Product[]) => {
+const write = (list: Product[]) => {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(list));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
   } catch {
-    /* cache is optional */
+    toast({
+      title: 'Не удалось сохранить каталог',
+      description: 'Память браузера переполнена — выгрузите каталог в файл',
+    });
   }
 };
 
 export const useCatalog = () => {
-  const [items, setItems] = useState<Product[]>(readCache);
-  const [syncing, setSyncing] = useState(true);
+  const [items, setItems] = useState<Product[]>(seedProducts);
+  const imagesRef = useRef<Record<string, string>>({});
 
-  const apply = useCallback((list: Product[]) => {
-    setItems(list);
-    writeCache(list);
-  }, []);
-
-  const refresh = useCallback(async () => {
-    const snap = await fetchCatalog();
-    if (!snap.seeded) {
-      const local = readCache();
-      const base = local.length ? local : seedProducts;
-      const res = await seedCatalog(base, seedCategories);
-      apply(res.products ?? base);
-      return;
-    }
-    apply(snap.products);
-  }, [apply]);
+  const resolve = useCallback(
+    (list: Product[]) =>
+      list.map((p) =>
+        p.image?.startsWith(IMG_PREFIX)
+          ? { ...p, image: imagesRef.current[p.image.slice(IMG_PREFIX.length)] ?? '' }
+          : p,
+      ),
+    [],
+  );
 
   useEffect(() => {
     let alive = true;
-    (async () => {
+    const boot = async () => {
+      const stored = loadRaw();
       try {
-        await refresh();
+        imagesRef.current = await getAllImages();
       } catch {
-        if (alive) {
-          toast({ title: 'Нет связи с облаком', description: 'Показан сохранённый каталог' });
-        }
-      } finally {
-        if (alive) setSyncing(false);
+        imagesRef.current = {};
       }
-    })();
+      if (!alive) return;
+      setItems(
+        stored.map((p) =>
+          p.image?.startsWith(IMG_PREFIX)
+            ? { ...p, image: imagesRef.current[p.image.slice(IMG_PREFIX.length)] ?? '' }
+            : p,
+        ),
+      );
+    };
+    boot();
     return () => {
       alive = false;
     };
-  }, [refresh]);
+  }, []);
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      fetchCatalog()
-        .then((snap) => {
-          if (snap.seeded) apply(snap.products);
-        })
-        .catch(() => undefined);
-    }, 60000);
-    return () => window.clearInterval(timer);
-  }, [apply]);
+  const toStored = useCallback(async (product: Product): Promise<Product> => {
+    if (!product.image?.startsWith('data:')) return product;
+    const key = `img-${product.id}`;
+    const small = await compressImage(product.image);
+    imagesRef.current[key] = small;
+    try {
+      await putImage(key, small);
+      return { ...product, image: `${IMG_PREFIX}${key}` };
+    } catch {
+      return { ...product, image: small };
+    }
+  }, []);
+
+  const persist = useCallback(
+    async (next: Product[]) => {
+      const stored = await Promise.all(next.map(toStored));
+      write(stored);
+      setItems(resolve(stored));
+    },
+    [resolve, toStored],
+  );
 
   const saveProduct = useCallback(
     async (product: Product) => {
-      setItems((prev) => {
-        const exists = prev.some((p) => p.id === product.id);
-        return exists ? prev.map((p) => (p.id === product.id ? product : p)) : [product, ...prev];
-      });
-      try {
-        const res = await pushProduct(product);
-        apply(res.products ?? []);
-      } catch {
-        toast({ title: 'Не удалось сохранить в облако', description: 'Проверьте интернет' });
-      }
+      const stored = await toStored(product);
+      const prev = loadRaw();
+      const exists = prev.some((p) => p.id === stored.id);
+      const next = exists
+        ? prev.map((p) => (p.id === stored.id ? stored : p))
+        : [stored, ...prev];
+      write(next);
+      setItems(resolve(next));
     },
-    [apply],
+    [resolve, toStored],
   );
 
   const removeProduct = useCallback(
-    async (id: string) => {
-      setItems((prev) => prev.filter((p) => p.id !== id));
-      try {
-        const res = await deleteProduct(id);
-        apply(res.products ?? []);
-      } catch {
-        toast({ title: 'Не удалось удалить в облаке' });
-      }
+    (id: string) => {
+      const next = loadRaw().filter((p) => p.id !== id);
+      write(next);
+      setItems(resolve(next));
+      removeImage(`img-${id}`).catch(() => undefined);
     },
-    [apply],
+    [resolve],
   );
 
-  const resetCatalog = useCallback(async () => {
-    try {
-      const res = await replaceAll(seedProducts, seedCategories);
-      apply(res.products ?? seedProducts);
-    } catch {
-      toast({ title: 'Не удалось сбросить каталог' });
-    }
-  }, [apply]);
+  const resetCatalog = useCallback(() => {
+    write(seedProducts);
+    setItems(seedProducts);
+  }, []);
 
-  const replaceCatalog = useCallback(
-    async (next: Product[]) => {
-      apply(next);
-      try {
-        const res = await replaceAll(next);
-        apply(res.products ?? next);
-      } catch {
-        toast({ title: 'Не удалось загрузить каталог в облако' });
-      }
-    },
-    [apply],
-  );
+  const replaceCatalog = useCallback((next: Product[]) => persist(next), [persist]);
 
-  const addProducts = useCallback(
-    async (list: Product[]) => {
-      try {
-        const res = await pushProducts(list);
-        apply(res.products ?? items);
-      } catch {
-        toast({ title: 'Не удалось добавить карточки' });
-      }
-    },
-    [apply, items],
-  );
-
-  return {
-    items,
-    syncing,
-    refresh,
-    saveProduct,
-    removeProduct,
-    resetCatalog,
-    replaceCatalog,
-    addProducts,
-  };
+  return { items, saveProduct, removeProduct, resetCatalog, replaceCatalog };
 };
 
 export default useCatalog;
