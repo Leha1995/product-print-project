@@ -1,32 +1,40 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Category, categories as seedCategories } from '@/data/products';
-import { fetchCatalog, pushCategories } from '@/lib/catalogApi';
 
-const CACHE_KEY = 'asap-categories-cache-v2';
+const STORAGE_KEY = 'asap-categories-v1';
 
 const withSeeds = (list: Category[]): Category[] => {
   const known = new Set(list.map((c) => c.id));
   const missing = seedCategories.filter((c) => !known.has(c.id));
-  return missing.length ? [...list, ...missing] : list;
+  if (!missing.length) return list;
+  const merged = [...list, ...missing];
+  const order = seedCategories.map((c) => c.id);
+  return merged.sort((a, b) => {
+    const ia = order.indexOf(a.id);
+    const ib = order.indexOf(b.id);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
 };
 
-const readCache = (): Category[] => {
+const load = (): Category[] => {
   try {
-    const raw = localStorage.getItem(CACHE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return seedCategories;
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed) || !parsed.length) return seedCategories;
-    return withSeeds(parsed as Category[]);
+    const merged = withSeeds(parsed as Category[]);
+    if (merged.length !== parsed.length) save(merged);
+    return merged;
   } catch {
     return seedCategories;
   }
 };
 
-const writeCache = (next: Category[]) => {
+const save = (next: Category[]) => {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify(next));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   } catch {
-    /* cache is optional */
+    /* storage unavailable */
   }
 };
 
@@ -39,52 +47,30 @@ const slug = (label: string) =>
     .slice(0, 20)}-${Date.now().toString(36).slice(-4)}`;
 
 export const useCategories = () => {
-  const [list, setList] = useState<Category[]>(readCache);
-
-  const sync = useCallback((next: Category[]) => {
-    setList(next);
-    writeCache(next);
-    pushCategories(next).catch(() => undefined);
-  }, []);
+  const [list, setList] = useState<Category[]>(seedCategories);
 
   useEffect(() => {
-    let alive = true;
-    fetchCatalog()
-      .then((snap) => {
-        if (!alive || !snap.categories.length) return;
-        const merged = withSeeds(snap.categories);
-        setList(merged);
-        writeCache(merged);
-      })
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
+    setList(load());
   }, []);
 
-  const addCategory = useCallback(
-    (label: string, icon = 'Utensils') => {
-      const clean = label.trim();
-      if (!clean) return null;
-      const item: Category = { id: slug(clean), label: clean, icon };
-      setList((prev) => {
-        const next = [...prev, item];
-        writeCache(next);
-        pushCategories(next).catch(() => undefined);
-        return next;
-      });
-      return item;
-    },
-    [],
-  );
+  const addCategory = useCallback((label: string, icon = 'Utensils') => {
+    const clean = label.trim();
+    if (!clean) return null;
+    const item: Category = { id: slug(clean), label: clean, icon };
+    setList((prev) => {
+      const next = [...prev, item];
+      save(next);
+      return next;
+    });
+    return item;
+  }, []);
 
   const renameCategory = useCallback((id: string, label: string, icon?: string) => {
     setList((prev) => {
       const next = prev.map((c) =>
         c.id === id ? { ...c, label: label.trim() || c.label, icon: icon ?? c.icon } : c,
       );
-      writeCache(next);
-      pushCategories(next).catch(() => undefined);
+      save(next);
       return next;
     });
   }, []);
@@ -92,15 +78,20 @@ export const useCategories = () => {
   const removeCategory = useCallback((id: string) => {
     setList((prev) => {
       const next = prev.filter((c) => c.id !== id);
-      writeCache(next);
-      pushCategories(next).catch(() => undefined);
+      save(next);
       return next;
     });
   }, []);
 
-  const resetCategories = useCallback(() => sync(seedCategories), [sync]);
+  const resetCategories = useCallback(() => {
+    setList(seedCategories);
+    save(seedCategories);
+  }, []);
 
-  const replaceCategories = useCallback((next: Category[]) => sync(next), [sync]);
+  const replaceCategories = useCallback((next: Category[]) => {
+    setList(next);
+    save(next);
+  }, []);
 
   return {
     categories: list,

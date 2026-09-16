@@ -28,7 +28,7 @@ const Index = () => {
   const [jobs, setJobs] = useState<PrintJob[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  const { items, saveProduct, removeProduct, replaceCatalog, addProducts } = useCatalog();
+  const { items, saveProduct, removeProduct, replaceCatalog } = useCatalog();
   const {
     categories,
     addCategory,
@@ -363,7 +363,7 @@ const Index = () => {
         onOpenChange={setSharedOpen}
         localProducts={items}
         onImport={(list) => {
-          addProducts(list);
+          list.forEach((p) => saveProduct(p));
           toast({ title: 'Карточки добавлены', description: `${list.length} шт. из общей базы` });
         }}
       />
