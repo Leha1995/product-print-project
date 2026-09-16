@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
 import { Category, CategoryId, Product, productCategories, storagePresets } from '@/data/products';
+import { compressImage } from '@/lib/imageStore';
 
 interface ProductFormDialogProps {
   product: Product | null;
@@ -89,7 +90,11 @@ const ProductFormDialog = ({
   const handleFile = (file?: File) => {
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => set('image', String(reader.result));
+    reader.onload = () => {
+      compressImage(String(reader.result))
+        .then((small) => set('image', small))
+        .catch(() => set('image', String(reader.result)));
+    };
     reader.readAsDataURL(file);
   };
 
