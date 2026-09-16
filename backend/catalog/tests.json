@@ -1,0 +1,21 @@
+{
+  "tests": [
+    {
+      "name": "Каталог загружается",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {"seeded": false},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Запись без пина запрещена",
+      "method": "POST",
+      "path": "/",
+      "body": {"products": []},
+      "expectedStatus": 403,
+      "expectedBody": {"error": "forbidden"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

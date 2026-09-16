@@ -1,0 +1,13 @@
+CREATE TABLE IF NOT EXISTS catalog_categories (
+    id TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    icon TEXT NOT NULL DEFAULT 'Utensils',
+    position INTEGER NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS catalog_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
