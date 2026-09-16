@@ -4,6 +4,7 @@ import { LabelSettings, getPaper } from '@/hooks/useLabelSettings';
 export interface DefrostInfo {
   staff: string;
   temp: string;
+  hours?: number;
 }
 
 interface DefrostLabelProps {
@@ -18,13 +19,19 @@ const DefrostLabel = ({ info, printedAt, settings }: DefrostLabelProps) => {
   const micro = tiny && (paper.heightMm ?? 99) <= 30;
   const large = paper.widthMm >= 105;
 
-  const stamp = printedAt.toLocaleString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: micro ? '2-digit' : 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const fmt = (d: Date) =>
+    d.toLocaleString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: micro ? '2-digit' : 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+  const stamp = fmt(printedAt);
+  const bestBefore = info.hours
+    ? fmt(new Date(printedAt.getTime() + info.hours * 3600000))
+    : null;
 
   return (
     <div
@@ -59,6 +66,12 @@ const DefrostLabel = ({ info, printedAt, settings }: DefrostLabelProps) => {
             <dt className="shrink-0">Выложено</dt>
             <dd className="font-semibold">{stamp}</dd>
           </div>
+          {bestBefore && (
+            <div className="flex justify-between gap-1">
+              <dt className="shrink-0">Годен до</dt>
+              <dd className="font-semibold">{bestBefore}</dd>
+            </div>
+          )}
           <div className="flex justify-between gap-1">
             <dt className="shrink-0">Выложил</dt>
             <dd className="truncate font-semibold">{info.staff || '—'}</dd>
