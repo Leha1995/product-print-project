@@ -1,0 +1,21 @@
+{
+  "tests": [
+    {
+      "name": "Список общей базы",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {"items": []},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Публикация без пина запрещена",
+      "method": "POST",
+      "path": "/",
+      "body": {"items": []},
+      "expectedStatus": 403,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

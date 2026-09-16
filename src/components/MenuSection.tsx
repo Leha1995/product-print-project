@@ -22,6 +22,7 @@ interface MenuSectionProps {
   onDelete: (product: Product) => void;
   onExport: () => void;
   onImport: (file: File) => void;
+  onSharedBase: () => void;
   isAdmin: boolean;
   onRequestAdmin: () => void;
   expiredIds?: Set<string>;
@@ -44,6 +45,7 @@ const MenuSection = ({
   onDelete,
   onExport,
   onImport,
+  onSharedBase,
   isAdmin,
   onRequestAdmin,
   expiredIds,
@@ -324,6 +326,13 @@ const MenuSection = ({
             )}
             {editMode && (
               <>
+                <button
+                  onClick={onSharedBase}
+                  className="flex items-center gap-2 border-2 border-primary bg-primary px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] text-primary-foreground transition-transform hover:-translate-y-0.5"
+                >
+                  <Icon name="Database" size={16} strokeWidth={2.5} />
+                  Общая база
+                </button>
                 <button
                   onClick={onExport}
                   className="flex items-center gap-2 border-2 border-primary bg-card px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] text-primary transition-colors hover:bg-muted"

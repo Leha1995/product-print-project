@@ -5,6 +5,14 @@ const TOUCH_KEY = 'asap-admin-touch';
 const ADMIN_PIN = '15271527';
 const IDLE_MS = 10 * 60 * 1000;
 
+export const getAdminPin = () => {
+  try {
+    return sessionStorage.getItem(SESSION_KEY) === '1' ? ADMIN_PIN : '';
+  } catch {
+    return '';
+  }
+};
+
 const readTouch = () => {
   try {
     return Number(sessionStorage.getItem(TOUCH_KEY)) || 0;

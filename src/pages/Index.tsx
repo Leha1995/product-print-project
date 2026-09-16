@@ -14,6 +14,7 @@ import BatchPrintArea from '@/components/BatchPrintArea';
 import BatchPrintDialog from '@/components/BatchPrintDialog';
 import PrintLog, { PrintJob } from '@/components/PrintLog';
 import DefrostDialog from '@/components/DefrostDialog';
+import SharedCatalogDialog from '@/components/SharedCatalogDialog';
 import DefrostPrintArea from '@/components/DefrostPrintArea';
 import { DefrostInfo } from '@/components/DefrostLabel';
 import Footer from '@/components/Footer';
@@ -53,6 +54,7 @@ const Index = () => {
   const [batchPick, setBatchPick] = useState<Product[]>([]);
   const [batchOpen, setBatchOpen] = useState(false);
   const [defrostOpen, setDefrostOpen] = useState(false);
+  const [sharedOpen, setSharedOpen] = useState(false);
   const [defrostInfo, setDefrostInfo] = useState<DefrostInfo | null>(null);
   const [defrostCopies, setDefrostCopies] = useState(1);
   const [defrostStamp, setDefrostStamp] = useState(() => new Date());
@@ -312,6 +314,7 @@ const Index = () => {
           onResetCategories={resetCategories}
           onExport={handleExport}
           onImport={handleImport}
+          onSharedBase={() => setSharedOpen(true)}
           onSelect={handleSelect}
           onPrint={handleQuickPrint}
           onPrintBatch={handlePrintBatch}
@@ -354,6 +357,15 @@ const Index = () => {
         settings={settings}
         printedAt={quickStamp}
         onDone={handleQuickDone}
+      />
+      <SharedCatalogDialog
+        open={sharedOpen}
+        onOpenChange={setSharedOpen}
+        localProducts={items}
+        onImport={(list) => {
+          list.forEach((p) => saveProduct(p));
+          toast({ title: 'Карточки добавлены', description: `${list.length} шт. из общей базы` });
+        }}
       />
       <DefrostDialog
         staffList={settings.staffList}
