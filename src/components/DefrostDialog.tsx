@@ -18,14 +18,13 @@ const DefrostDialog = ({ staffList, open, onOpenChange, onConfirm }: DefrostDial
   const [staff, setStaff] = useState('');
   const [temp, setTemp] = useState(defrostTemps[0].value);
   const [copies, setCopies] = useState(1);
-  const [hours, setHours] = useState(24);
+  const hours = 12;
 
   useEffect(() => {
     if (!open) return;
     setStaff(staffList[0] ?? '');
     setTemp(defrostTemps[0].value);
     setCopies(1);
-    setHours(24);
   }, [open, staffList]);
 
   const bestBefore = new Date(Date.now() + hours * 3600000).toLocaleString('ru-RU', {
@@ -87,34 +86,13 @@ const DefrostDialog = ({ staffList, open, onOpenChange, onConfirm }: DefrostDial
             </div>
           </div>
 
-          <div className="border-2 border-primary p-3">
-            <div className="flex items-center justify-between">
-              <span className="font-head text-[0.75rem] font-medium uppercase tracking-[0.08em] text-primary">
-                Годен до
-              </span>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setHours((h) => Math.max(12, h - 12))}
-                  className="flex h-8 w-8 items-center justify-center border-2 border-primary text-primary transition-colors hover:bg-accent"
-                  aria-label="Меньше часов"
-                >
-                  <Icon name="Minus" size={16} strokeWidth={3} />
-                </button>
-                <span className="w-14 text-center font-head text-lg font-bold text-primary">
-                  {hours} ч
-                </span>
-                <button
-                  onClick={() => setHours((h) => Math.min(240, h + 12))}
-                  className="flex h-8 w-8 items-center justify-center border-2 border-primary text-primary transition-colors hover:bg-accent"
-                  aria-label="Больше часов"
-                >
-                  <Icon name="Plus" size={16} strokeWidth={3} />
-                </button>
-              </div>
-            </div>
-            <div className="mt-2 text-right text-[12px] text-muted-foreground">
-              До {bestBefore}
-            </div>
+          <div className="flex items-center justify-between border-2 border-primary p-3">
+            <span className="font-head text-[0.75rem] font-medium uppercase tracking-[0.08em] text-primary">
+              Годен до
+            </span>
+            <span className="font-head text-[0.95rem] font-bold text-primary">
+              {bestBefore} <span className="text-[12px] font-medium opacity-70">(12 ч)</span>
+            </span>
           </div>
 
           <div className="flex items-center justify-between border-2 border-primary p-3">
