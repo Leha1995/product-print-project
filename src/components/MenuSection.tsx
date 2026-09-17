@@ -8,14 +8,15 @@ import { ExpiryStatus } from '@/hooks/usePrintHistory';
 
 const SHELF_STEPS = [3, 12, 48, 72, 120, 168, 720, 1440, 2160, 4320, 8760];
 
+const round = (n: number) => Math.round(n * 10) / 10;
+
 const shelfLabel = (hours: number) => {
-  if (hours < 24) return `${hours} ч`;
+  if (hours < 24) return `${round(hours)} ч`;
   const days = hours / 24;
-  if (days < 30) return `${days} сут`;
-  const months = Math.round(days / 30);
-  if (months < 12) return `${months} мес`;
-  const years = Math.round(days / 365);
-  return `${years} год${years > 1 ? 'а' : ''}`;
+  if (days < 30) return `${round(days)} сут`;
+  if (days < 365) return `${round(days / 30)} мес`;
+  const years = round(days / 365);
+  return `${years} ${years === 1 ? 'год' : years < 5 ? 'года' : 'лет'}`;
 };
 
 interface MenuSectionProps {
@@ -78,11 +79,14 @@ const MenuSection = ({
       if (typeof p.shelfLifeHours !== 'number') return;
       counts.set(p.shelfLifeHours, (counts.get(p.shelfLifeHours) ?? 0) + 1);
     });
-    return SHELF_STEPS.map((hours) => ({
-      hours,
-      label: shelfLabel(hours),
-      count: counts.get(hours) ?? 0,
-    }));
+    const all = new Set<number>([...SHELF_STEPS, ...counts.keys()]);
+    return [...all]
+      .sort((a, b) => a - b)
+      .map((hours) => ({
+        hours,
+        label: shelfLabel(hours),
+        count: counts.get(hours) ?? 0,
+      }));
   }, [products]);
 
   const expiredCount = useMemo(
