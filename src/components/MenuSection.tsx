@@ -6,6 +6,18 @@ import VirtualKeyboard from '@/components/VirtualKeyboard';
 import { Category, CategoryId, Product, productCategories } from '@/data/products';
 import { ExpiryStatus } from '@/hooks/usePrintHistory';
 
+const SHELF_STEPS = [3, 12, 48, 72, 120, 168, 720, 1440, 2160, 4320, 8760];
+
+const shelfLabel = (hours: number) => {
+  if (hours < 24) return `${hours} ч`;
+  const days = hours / 24;
+  if (days < 30) return `${days} сут`;
+  const months = Math.round(days / 30);
+  if (months < 12) return `${months} мес`;
+  const years = Math.round(days / 365);
+  return `${years} год${years > 1 ? 'а' : ''}`;
+};
+
 interface MenuSectionProps {
   products: Product[];
   categories: Category[];
@@ -57,7 +69,21 @@ const MenuSection = ({
   const [rawEditMode, setEditMode] = useState(false);
   const [onlyExpired, setOnlyExpired] = useState(false);
   const [onlySoon, setOnlySoon] = useState(false);
+  const [shelfFilter, setShelfFilter] = useState<number | 'all'>('all');
   const editMode = isAdmin && rawEditMode;
+
+  const shelfOptions = useMemo(() => {
+    const counts = new Map<number, number>();
+    products.forEach((p) => {
+      if (typeof p.shelfLifeHours !== 'number') return;
+      counts.set(p.shelfLifeHours, (counts.get(p.shelfLifeHours) ?? 0) + 1);
+    });
+    return SHELF_STEPS.map((hours) => ({
+      hours,
+      label: shelfLabel(hours),
+      count: counts.get(hours) ?? 0,
+    }));
+  }, [products]);
 
   const expiredCount = useMemo(
     () => products.filter((p) => expiredIds?.has(p.id)).length,
@@ -83,6 +109,7 @@ const MenuSection = ({
       .filter((p) => {
         if (onlyExpired && !expiredIds?.has(p.id)) return false;
         if (onlySoon && !getStatus?.(p).soon) return false;
+        if (shelfFilter !== 'all' && p.shelfLifeHours !== shelfFilter) return false;
         const byCat = active === 'all' || productCategories(p).includes(active);
         const byQuery = !q || p.name.toLowerCase().includes(q) || p.composition.toLowerCase().includes(q);
         return byCat && byQuery;
@@ -102,7 +129,7 @@ const MenuSection = ({
         if (sa !== sb) return sa - sb;
         return a.name.localeCompare(b.name, 'ru');
       });
-  }, [query, active, products, onlyExpired, onlySoon, expiredIds, getStatus]);
+  }, [query, active, products, onlyExpired, onlySoon, shelfFilter, expiredIds, getStatus]);
 
   const tabsRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLLabelElement>(null);
@@ -357,6 +384,35 @@ const MenuSection = ({
               </>
             )}
           </div>
+        </div>
+
+        <div className="cat-scroll mt-3 flex gap-3 overflow-x-auto pb-2">
+          <button
+            onClick={() => setShelfFilter('all')}
+            className={`flex shrink-0 items-center gap-2 border-2 border-primary px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] transition-colors ${
+              shelfFilter === 'all'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-card text-primary hover:bg-accent hover:text-accent-foreground'
+            }`}
+          >
+            <Icon name="Clock" size={16} strokeWidth={2.5} />
+            Все сроки
+          </button>
+          {shelfOptions.map((opt) => (
+            <button
+              key={opt.hours}
+              onClick={() => setShelfFilter((v) => (v === opt.hours ? 'all' : opt.hours))}
+              disabled={!opt.count}
+              className={`flex shrink-0 items-center gap-2 border-2 border-primary px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] transition-colors disabled:opacity-40 ${
+                shelfFilter === opt.hours
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-card text-primary hover:bg-accent hover:text-accent-foreground'
+              }`}
+            >
+              {opt.label}
+              <span className="border-l-2 border-current pl-2 tabular-nums">{opt.count}</span>
+            </button>
+          ))}
         </div>
 
         {editMode && (
