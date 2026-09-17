@@ -220,40 +220,6 @@ const MenuSection = ({
           <button
             onClick={() => {
               setKeyboardOpen(false);
-              setOnlySoon(false);
-              setOnlyExpired((v) => !v);
-            }}
-            disabled={!expiredCount && !onlyExpired}
-            className={`flex items-center justify-center gap-3 border-2 px-6 py-4 font-head text-[0.95rem] font-medium uppercase tracking-[0.06em] transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50 ${
-              onlyExpired
-                ? 'border-destructive bg-destructive text-destructive-foreground'
-                : 'border-destructive bg-card text-destructive'
-            }`}
-          >
-            <Icon name={onlyExpired ? 'ListRestart' : 'AlarmClock'} size={20} strokeWidth={2.5} />
-            {onlyExpired ? 'Показать все' : 'Только просроченные'}
-            <span className="border-l-2 border-current pl-3 tabular-nums">{expiredCount}</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setKeyboardOpen(false);
-              setOnlyExpired(false);
-              setOnlySoon((v) => !v);
-            }}
-            disabled={!soonCount && !onlySoon}
-            className={`flex items-center justify-center gap-3 border-2 border-primary px-6 py-4 font-head text-[0.95rem] font-medium uppercase tracking-[0.06em] transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50 ${
-              onlySoon ? 'bg-accent text-accent-foreground' : 'bg-card text-primary'
-            }`}
-          >
-            <Icon name={onlySoon ? 'ListRestart' : 'Timer'} size={20} strokeWidth={2.5} />
-            {onlySoon ? 'Показать все' : 'Скоро истекает'}
-            <span className="border-l-2 border-current pl-3 tabular-nums">{soonCount}</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setKeyboardOpen(false);
               onPrintBatch(
                 visible,
                 onlyExpired ? 'Просроченные' : onlySoon ? 'Скоро истекает' : activeLabel,
@@ -357,6 +323,60 @@ const MenuSection = ({
               </>
             )}
           </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => {
+              setKeyboardOpen(false);
+              setOnlySoon(false);
+              setOnlyExpired(false);
+            }}
+            className={`flex shrink-0 items-center gap-2 border-2 border-primary px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] transition-colors ${
+              !onlyExpired && !onlySoon
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-card text-primary hover:bg-accent hover:text-accent-foreground'
+            }`}
+          >
+            <Icon name="Clock" size={16} strokeWidth={2.5} />
+            Все сроки
+          </button>
+
+          <button
+            onClick={() => {
+              setKeyboardOpen(false);
+              setOnlySoon(false);
+              setOnlyExpired((v) => !v);
+            }}
+            disabled={!expiredCount && !onlyExpired}
+            className={`flex shrink-0 items-center gap-2 border-2 border-destructive px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] transition-colors disabled:opacity-50 ${
+              onlyExpired
+                ? 'bg-destructive text-destructive-foreground'
+                : 'bg-card text-destructive hover:bg-destructive hover:text-destructive-foreground'
+            }`}
+          >
+            <Icon name="AlarmClock" size={16} strokeWidth={2.5} />
+            Просроченные
+            <span className="border-l-2 border-current pl-2 tabular-nums">{expiredCount}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setKeyboardOpen(false);
+              setOnlyExpired(false);
+              setOnlySoon((v) => !v);
+            }}
+            disabled={!soonCount && !onlySoon}
+            className={`flex shrink-0 items-center gap-2 border-2 border-primary px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] transition-colors disabled:opacity-50 ${
+              onlySoon
+                ? 'bg-accent text-accent-foreground'
+                : 'bg-card text-primary hover:bg-accent hover:text-accent-foreground'
+            }`}
+          >
+            <Icon name="Timer" size={16} strokeWidth={2.5} />
+            Скоро истекает
+            <span className="border-l-2 border-current pl-2 tabular-nums">{soonCount}</span>
+          </button>
         </div>
 
         {editMode && (
