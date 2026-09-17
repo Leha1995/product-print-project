@@ -414,7 +414,6 @@ const MenuSection = ({
               }`}
             >
               {opt.label}
-              <span className="border-l-2 border-current pl-2 tabular-nums">{opt.count}</span>
             </button>
           ))}
         </div>
