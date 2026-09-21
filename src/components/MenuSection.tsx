@@ -458,7 +458,7 @@ const MenuSection = ({
                   status={getStatus?.(product)}
                 />
                 {editMode && (
-                  <div className="absolute bottom-1 right-1 flex gap-1">
+                  <div className="absolute right-1 top-1/2 flex -translate-y-1/2 flex-col gap-1">
                     <button
                       onClick={() => onEdit(product)}
                       aria-label="Изменить продукт"
