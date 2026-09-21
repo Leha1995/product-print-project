@@ -135,11 +135,14 @@ const UsersDialog = ({
                 Пользователи
               </h3>
               <p className="text-[13px] text-muted-foreground">
-                Добавляйте сотрудников и управляйте доступом
+                {isSuperAdmin
+                  ? 'Добавляйте сотрудников и управляйте доступом'
+                  : 'Ваши сотрудники: смена пароля и доступа'}
               </p>
             </div>
           </div>
 
+          {isSuperAdmin && (
           <div className="mt-5 grid gap-2 border-2 border-primary bg-card p-4 md:grid-cols-2">
             <input
               value={username}
@@ -193,6 +196,7 @@ const UsersDialog = ({
               Добавить пользователя
             </button>
           </div>
+          )}
 
           <div className="mt-5 grid gap-2">
             {users.map((u) => (
@@ -268,14 +272,16 @@ const UsersDialog = ({
                   <Icon name={u.active ? 'UserX' : 'UserCheck'} size={14} strokeWidth={2.5} />
                   {u.active ? 'Отключить' : 'Включить'}
                 </button>
-                <button
-                  onClick={() => remove(u)}
-                  disabled={u.id === currentId}
-                  className="flex items-center gap-1 border-2 border-destructive bg-destructive px-2 py-1 font-head text-[0.7rem] uppercase text-destructive-foreground transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-40"
-                >
-                  <Icon name="Trash2" size={14} strokeWidth={2.5} />
-                  Удалить
-                </button>
+                {isSuperAdmin && (
+                  <button
+                    onClick={() => remove(u)}
+                    disabled={u.id === currentId}
+                    className="flex items-center gap-1 border-2 border-destructive bg-destructive px-2 py-1 font-head text-[0.7rem] uppercase text-destructive-foreground transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-40"
+                  >
+                    <Icon name="Trash2" size={14} strokeWidth={2.5} />
+                    Удалить
+                  </button>
+                )}
               </div>
             ))}
           </div>

@@ -196,20 +196,8 @@ def handler(event: dict, context) -> dict:
 
         if me['role'] == 'admin':
             target = int(body.get('id') or 0)
-            if action == 'create_user':
-                username = str(body.get('username', '')).strip().lower()
-                password = str(body.get('password', ''))
-                full_name = str(body.get('fullName', '')).strip()
-                if len(username) < 3 or len(password) < 4:
-                    return done({'error': 'invalid_input'}, 400)
-                cur.execute(f'SELECT 1 FROM app_users WHERE lower(username) = {q(username)}')
-                if cur.fetchone():
-                    return done({'error': 'username_taken'}, 409)
-                cur.execute(
-                    'INSERT INTO app_users (username, full_name, password_hash, role, manager_id) VALUES '
-                    f"({q(username)}, {q(full_name)}, {q(hash_password(password))}, {q('user')}, {me['id']})"
-                )
-                return done({'users': list_users(cur, me)})
+            if action in ('create_user', 'delete_user'):
+                return done({'error': 'forbidden'}, 403)
 
             cur.execute(f'SELECT manager_id, role FROM app_users WHERE id = {target}')
             row = cur.fetchone()
@@ -230,11 +218,6 @@ def handler(event: dict, context) -> dict:
                         cur.execute(
                             f'UPDATE app_sessions SET expires_at = NOW() WHERE user_id = {target}'
                         )
-                return done({'users': list_users(cur, me)})
-
-            if action == 'delete_user':
-                cur.execute(f'DELETE FROM app_sessions WHERE user_id = {target}')
-                cur.execute(f'DELETE FROM app_users WHERE id = {target}')
                 return done({'users': list_users(cur, me)})
 
             return done({'error': 'forbidden'}, 403)
