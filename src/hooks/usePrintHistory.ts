@@ -25,6 +25,8 @@ const save = (history: PrintHistory) => {
   }
 };
 
+const nameKey = (name: string) => `name:${name.trim().toLowerCase()}`;
+
 export const SOON_MS = 3600000;
 
 export interface ExpiryStatus {
@@ -45,7 +47,7 @@ export const formatLeft = (ms: number) => {
   return restHours ? `${days} сут ${restHours} ч` : `${days} сут`;
 };
 
-export const usePrintHistory = () => {
+export const usePrintHistory = (products: Product[] = []) => {
   const [history, setHistory] = useState<PrintHistory>({});
   const [now, setNow] = useState(() => Date.now());
 
@@ -54,23 +56,36 @@ export const usePrintHistory = () => {
   }, []);
 
   useEffect(() => {
+    const sync = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY) setHistory(load());
+    };
+    window.addEventListener('storage', sync);
+    return () => window.removeEventListener('storage', sync);
+  }, []);
+
+  useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30000);
     return () => window.clearInterval(timer);
   }, []);
 
-  const markPrinted = useCallback((ids: string[]) => {
-    if (!ids.length) return;
-    const stamp = Date.now();
-    setHistory((prev) => {
-      const next = { ...prev };
-      ids.forEach((id) => {
-        next[id] = stamp;
+  const markPrinted = useCallback(
+    (ids: string[]) => {
+      if (!ids.length) return;
+      const stamp = Date.now();
+      setHistory((prev) => {
+        const next = { ...prev };
+        ids.forEach((id) => {
+          next[id] = stamp;
+          const product = products.find((p) => p.id === id);
+          if (product?.name) next[nameKey(product.name)] = stamp;
+        });
+        save(next);
+        return next;
       });
-      save(next);
-      return next;
-    });
-    setNow(stamp);
-  }, []);
+      setNow(stamp);
+    },
+    [products],
+  );
 
   const clearHistory = useCallback(() => {
     setHistory({});
@@ -79,9 +94,11 @@ export const usePrintHistory = () => {
 
   const getExpiry = useCallback(
     (product: Product) => {
-      const printedAt = history[product.id];
+      const byId = history[product.id];
+      const byName = product.name ? history[nameKey(product.name)] : undefined;
+      const printedAt = Math.max(byId ?? 0, byName ?? 0) || null;
       if (!printedAt || product.shelfLifeHours === undefined) {
-        return { printedAt: printedAt ?? null, expiresAt: null, expired: false, leftMs: null };
+        return { printedAt, expiresAt: null, expired: false, leftMs: null };
       }
       const expiresAt = printedAt + product.shelfLifeHours * 3600000;
       return {

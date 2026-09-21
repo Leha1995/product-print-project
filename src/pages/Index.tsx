@@ -56,7 +56,7 @@ const Index = () => {
     replaceCategories,
   } = useCategories(catList, saveCategories);
   const [usersOpen, setUsersOpen] = useState(false);
-  const { markPrinted, getExpiry, getStatus, now } = usePrintHistory();
+  const { markPrinted, getExpiry, getStatus, now } = usePrintHistory(items);
   const [adminOpen, setAdminOpen] = useState(false);
   const { settings, update, reset } = useLabelSettings();
   const [quickPrint, setQuickPrint] = useState<Product | null>(null);
