@@ -3,7 +3,7 @@ import Icon from '@/components/ui/icon';
 import ProductCard from '@/components/ProductCard';
 import CategoryEditor from '@/components/CategoryEditor';
 import VirtualKeyboard from '@/components/VirtualKeyboard';
-import { Category, CategoryId, Product, productCategories } from '@/data/products';
+import { Category, CategoryId, Product, productCategories, UNCATEGORIZED } from '@/data/products';
 import { ExpiryStatus } from '@/hooks/usePrintHistory';
 
 const SHELF_STEPS = [3, 12, 48, 72, 120, 168, 720, 1440, 2160, 4320, 8760];
@@ -73,6 +73,17 @@ const MenuSection = ({
   const [shelfFilter, setShelfFilter] = useState<number | 'all'>('all');
   const editMode = isAdmin && rawEditMode;
 
+  const knownCategoryIds = useMemo(() => new Set(categories.map((c) => c.id)), [categories]);
+
+  const hasUncategorized = useMemo(
+    () =>
+      products.some((p) => {
+        const cats = productCategories(p);
+        return !cats.length || !cats.some((c) => knownCategoryIds.has(c));
+      }),
+    [products, knownCategoryIds],
+  );
+
   const shelfOptions = useMemo(() => {
     const counts = new Map<number, number>();
     products.forEach((p) => {
@@ -121,7 +132,13 @@ const MenuSection = ({
         if (onlyExpired && !expiredIds?.has(p.id)) return false;
         if (onlySoon && !getStatus?.(p).soon) return false;
         if (shelfFilter !== 'all' && p.shelfLifeHours !== shelfFilter) return false;
-        const byCat = active === 'all' || productCategories(p).includes(active);
+        const cats = productCategories(p);
+        const byCat =
+          active === 'all'
+            ? true
+            : active === UNCATEGORIZED
+              ? !cats.length || !cats.some((c) => knownCategoryIds.has(c))
+              : cats.includes(active);
         const byQuery = !q || p.name.toLowerCase().includes(q) || p.composition.toLowerCase().includes(q);
         return byCat && byQuery;
       })
@@ -140,7 +157,17 @@ const MenuSection = ({
         if (sa !== sb) return sa - sb;
         return a.name.localeCompare(b.name, 'ru');
       });
-  }, [query, active, products, onlyExpired, onlySoon, shelfFilter, expiredIds, getStatus]);
+  }, [
+    query,
+    active,
+    products,
+    onlyExpired,
+    onlySoon,
+    shelfFilter,
+    expiredIds,
+    getStatus,
+    knownCategoryIds,
+  ]);
 
   const tabsRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLLabelElement>(null);
@@ -178,7 +205,15 @@ const MenuSection = ({
     tabsRef.current?.scrollBy({ left: dir * 280, behavior: 'smooth' });
 
   const activeLabel =
-    active === 'all' ? 'Все продукты' : (categories.find((c) => c.id === active)?.label ?? 'Категория');
+    active === 'all'
+      ? 'Все продукты'
+      : active === UNCATEGORIZED
+        ? 'Без категории'
+        : (categories.find((c) => c.id === active)?.label ?? 'Категория');
+
+  useEffect(() => {
+    if (active === UNCATEGORIZED && !hasUncategorized) setActive('all');
+  }, [active, hasUncategorized]);
 
   return (
     <section id="menu" className="print-hide border-t-2 border-primary bg-background">
@@ -324,7 +359,13 @@ const MenuSection = ({
               ref={tabsRef}
               className="cat-scroll flex min-w-0 flex-1 gap-3 overflow-x-auto pb-2"
             >
-              {[{ id: 'all', label: 'Все продукты', icon: 'LayoutGrid' }, ...categories].map((cat) => {
+              {[
+                { id: 'all', label: 'Все продукты', icon: 'LayoutGrid' },
+                ...categories,
+                ...(hasUncategorized
+                  ? [{ id: UNCATEGORIZED, label: 'Без категории', icon: 'CircleHelp' }]
+                  : []),
+              ].map((cat) => {
                 const isActive = active === cat.id;
                 return (
                   <button

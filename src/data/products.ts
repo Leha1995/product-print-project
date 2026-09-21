@@ -159,6 +159,8 @@ export const products: Product[] = [
     barcode: '4600003000047',
   },
 ];
+export const UNCATEGORIZED = '__none__';
+
 export const productCategories = (product: Product): CategoryId[] => {
   const list = product.categories?.length ? product.categories : [product.category];
   return list.filter(Boolean);

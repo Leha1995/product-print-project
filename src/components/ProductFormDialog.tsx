@@ -67,11 +67,7 @@ const ProductFormDialog = ({
             storageText: product.storageText || storagePresets[0],
             hit: Boolean(product.hit),
           }
-        : {
-            ...emptyForm,
-            category: categories[0]?.id ?? 'sushi',
-            categories: [categories[0]?.id ?? 'sushi'],
-          },
+        : { ...emptyForm },
     );
   }, [open, product, categories]);
 
@@ -97,16 +93,16 @@ const ProductFormDialog = ({
     e.preventDefault();
     if (!form.name.trim()) return;
 
-    const picked = form.categories.length ? form.categories : [form.category];
+    const picked = form.categories;
 
     onSave({
       id: product?.id ?? `usr-${Date.now().toString(36)}`,
       name: form.name.trim(),
-      category: picked[0],
+      category: picked[0] ?? '',
       categories: picked,
       weight: form.weight.trim() || '—',
       composition: form.composition.trim() || 'Состав не указан',
-      image: form.image.trim() || fallbackImg(picked[0]),
+      image: form.image.trim() || fallbackImg(picked[0] ?? ''),
       barcode: form.barcode.trim() || String(4600000000000 + Math.floor(Math.random() * 999999)),
       shelfLifeHours: form.shelfLifeHours ? Number(form.shelfLifeHours) : undefined,
       storageText: form.storageText.trim() || undefined,
@@ -162,7 +158,7 @@ const ProductFormDialog = ({
               </div>
               {!form.categories.length && (
                 <span className="text-[12px] text-muted-foreground">
-                  Выберите хотя бы одну категорию
+                  Без категории — продукт попадёт в фильтр «Без категории»
                 </span>
               )}
             </div>
