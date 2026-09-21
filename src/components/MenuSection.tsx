@@ -81,6 +81,7 @@ const MenuSection = ({
     });
     const all = new Set<number>([...SHELF_STEPS, ...counts.keys()]);
     return [...all]
+      .filter((hours) => (counts.get(hours) ?? 0) > 0)
       .sort((a, b) => a - b)
       .map((hours) => ({
         hours,
@@ -106,6 +107,12 @@ const MenuSection = ({
   useEffect(() => {
     if (onlySoon && soonCount === 0) setOnlySoon(false);
   }, [onlySoon, soonCount]);
+
+  useEffect(() => {
+    if (shelfFilter !== 'all' && !shelfOptions.some((o) => o.hours === shelfFilter)) {
+      setShelfFilter('all');
+    }
+  }, [shelfFilter, shelfOptions]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
