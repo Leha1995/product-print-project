@@ -6,6 +6,10 @@ interface VirtualKeyboardProps {
   value: string;
   onChange: (value: string) => void;
   onClose: () => void;
+  placeholder?: string;
+  mask?: boolean;
+  onSubmit?: () => void;
+  submitLabel?: string;
 }
 
 const ruRows = [
@@ -25,7 +29,16 @@ const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
 const keyClass =
   'flex h-12 min-w-[38px] flex-1 items-center justify-center border-2 border-primary bg-card font-head text-[16px] uppercase text-primary transition-colors active:bg-primary active:text-primary-foreground md:h-14 md:text-[18px]';
 
-const VirtualKeyboard = ({ open, value, onChange, onClose }: VirtualKeyboardProps) => {
+const VirtualKeyboard = ({
+  open,
+  value,
+  onChange,
+  onClose,
+  placeholder = 'Поиск по названию',
+  mask = false,
+  onSubmit,
+  submitLabel = 'Готово',
+}: VirtualKeyboardProps) => {
   const [lang, setLang] = useState<'ru' | 'en'>('ru');
 
   if (!open) return null;
@@ -38,7 +51,7 @@ const VirtualKeyboard = ({ open, value, onChange, onClose }: VirtualKeyboardProp
       <div className="mx-auto w-full max-w-[900px]">
         <div className="mb-2 flex items-center justify-between gap-2">
           <span className="truncate border-2 border-primary bg-card px-3 py-1.5 font-body text-[15px] text-primary">
-            {value || 'Поиск по названию'}
+            {value ? (mask ? '•'.repeat(value.length) : value) : placeholder}
           </span>
           <button
             onMouseDown={(e) => e.preventDefault()}
@@ -92,6 +105,15 @@ const VirtualKeyboard = ({ open, value, onChange, onClose }: VirtualKeyboardProp
               <Icon name="X" size={20} strokeWidth={2.5} />
             </button>
           </div>
+
+          {onSubmit && (
+            <button
+              className={`${keyClass} bg-accent text-accent-foreground`}
+              onClick={onSubmit}
+            >
+              {submitLabel}
+            </button>
+          )}
         </div>
       </div>
     </div>

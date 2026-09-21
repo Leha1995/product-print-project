@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Icon from '@/components/ui/icon';
+import VirtualKeyboard from '@/components/VirtualKeyboard';
 import { forgetLogin, getRemembered } from '@/lib/authApi';
 
 interface LoginScreenProps {
@@ -12,9 +13,11 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
   const [password, setPassword] = useState(saved.password);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [field, setField] = useState<'username' | 'password' | null>(null);
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setField(null);
     if (!username.trim() || !password) {
       setError('Введите логин и пароль');
       return;
@@ -32,7 +35,11 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div
+      className={`flex min-h-screen items-center justify-center bg-background px-4 pt-8 ${
+        field ? 'items-start pb-[420px]' : 'pb-8'
+      }`}
+    >
       <form
         onSubmit={submit}
         className="w-full max-w-[420px] border-2 border-primary bg-card p-6 md:p-8"
@@ -59,8 +66,11 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
               setUsername(e.target.value);
               setError('');
             }}
+            onFocus={() => setField('username')}
             autoComplete="username"
-            className="mt-1 w-full border-2 border-primary bg-background px-3 py-3 font-body text-[15px] text-primary outline-none"
+            className={`mt-1 w-full border-2 bg-background px-3 py-3 font-body text-[15px] text-primary outline-none ${
+              field === 'username' ? 'border-secondary' : 'border-primary'
+            }`}
           />
         </label>
 
@@ -75,8 +85,11 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
               setPassword(e.target.value);
               setError('');
             }}
+            onFocus={() => setField('password')}
             autoComplete="current-password"
-            className="mt-1 w-full border-2 border-primary bg-background px-3 py-3 font-body text-[15px] text-primary outline-none"
+            className={`mt-1 w-full border-2 bg-background px-3 py-3 font-body text-[15px] text-primary outline-none ${
+              field === 'password' ? 'border-secondary' : 'border-primary'
+            }`}
           />
         </label>
 
@@ -107,6 +120,24 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
           </button>
         )}
       </form>
+
+      <VirtualKeyboard
+        open={!!field}
+        value={field === 'password' ? password : username}
+        mask={field === 'password'}
+        placeholder={field === 'password' ? 'Пароль' : 'Логин'}
+        onChange={(v) => {
+          setError('');
+          if (field === 'password') setPassword(v);
+          else setUsername(v);
+        }}
+        onSubmit={() => {
+          if (field === 'username') setField('password');
+          else submit();
+        }}
+        submitLabel={field === 'username' ? 'Далее' : 'Войти'}
+        onClose={() => setField(null)}
+      />
     </div>
   );
 };
