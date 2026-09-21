@@ -16,6 +16,31 @@ import {
 } from '@/lib/catalogApi';
 import { toast } from '@/hooks/use-toast';
 
+const LEGACY_KEY = 'asap-print-history-v1';
+
+const readLegacyHistory = (): PrintHistoryMap => {
+  try {
+    const raw = localStorage.getItem(LEGACY_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== 'object') return {};
+    const clean: PrintHistoryMap = {};
+    Object.entries(parsed as Record<string, unknown>).forEach(([key, value]) => {
+      if (!key.startsWith('name:') && typeof value === 'number') clean[key] = value;
+    });
+    return clean;
+  } catch {
+    return {};
+  }
+};
+
+const clearLegacyHistory = () => {
+  try {
+    localStorage.removeItem(LEGACY_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+};
+
 export const useCatalog = (userId?: number | null, targetId?: number | null) => {
   const [items, setItems] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -54,7 +79,21 @@ export const useCatalog = (userId?: number | null, targetId?: number | null) => 
         setItems(snap.products);
         setCategories(snap.categories.length ? snap.categories : seedCategories);
         setPrefs(snap.prefs);
-        setHistory(snap.history);
+
+        let merged = snap.history;
+        if (!targetId || targetId === userId) {
+          const legacy = readLegacyHistory();
+          const patch: PrintHistoryMap = {};
+          Object.entries(legacy).forEach(([key, stamp]) => {
+            if (typeof stamp === 'number' && stamp > (merged[key] ?? 0)) patch[key] = stamp;
+          });
+          if (Object.keys(patch).length) {
+            merged = { ...merged, ...patch };
+            pushHistory(patch).catch(() => undefined);
+          }
+          clearLegacyHistory();
+        }
+        setHistory(merged);
       } catch {
         if (alive) toast({ title: 'Не удалось загрузить ваш каталог' });
       } finally {
