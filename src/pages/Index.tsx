@@ -189,17 +189,22 @@ const Index = () => {
 
   const handleImport = (file: File) => {
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const data = JSON.parse(String(reader.result));
         const nextProducts = Array.isArray(data) ? data : data.products;
         if (!Array.isArray(nextProducts) || !nextProducts.length) {
           throw new Error('empty');
         }
-        replaceCatalog(nextProducts as Product[]);
+        toast({
+          title: 'Загружаем каталог',
+          description: `${nextProducts.length} позиций, это займёт несколько секунд`,
+        });
         if (Array.isArray(data.categories) && data.categories.length) {
           replaceCategories(data.categories);
         }
+        const ok = await replaceCatalog(nextProducts as Product[]);
+        if (!ok) return;
         if (data.settings) update(data.settings);
         toast({
           title: 'Каталог загружен',

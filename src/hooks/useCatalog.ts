@@ -10,7 +10,7 @@ import {
   pushPrefs,
   pushProduct,
   pushProducts,
-  replaceAll,
+  replaceAllChunked,
   seedCatalog,
   setTargetUser,
 } from '@/lib/catalogApi';
@@ -141,10 +141,19 @@ export const useCatalog = (userId?: number | null, targetId?: number | null) => 
 
   const replaceCatalog = useCallback(async (next: Product[]) => {
     try {
-      const res = await replaceAll(next);
+      const res = await replaceAllChunked(next, undefined, (done, total) => {
+        if (done < total) {
+          toast({ title: 'Загружаем каталог', description: `${done} из ${total} позиций` });
+        }
+      });
       setItems(res.products ?? next);
+      return true;
     } catch {
-      toast({ title: 'Не удалось обновить каталог' });
+      toast({
+        title: 'Не удалось обновить каталог',
+        description: 'Проверьте связь и попробуйте снова',
+      });
+      return false;
     }
   }, []);
 

@@ -112,3 +112,44 @@ export const pushPrefs = (prefs: UserPrefs) => post({ action: 'prefs', prefs });
 
 export const replaceAll = (products: Product[], categories?: Category[]) =>
   post({ action: 'replace', products, categories });
+
+export const clearProducts = () => post({ action: 'replace', products: [] });
+
+const MAX_CHUNK_BYTES = 900000;
+
+const chunkProducts = (products: Product[]): Product[][] => {
+  const chunks: Product[][] = [];
+  let current: Product[] = [];
+  let size = 0;
+  products.forEach((p) => {
+    const weight = JSON.stringify(p).length;
+    if (current.length && (size + weight > MAX_CHUNK_BYTES || current.length >= 60)) {
+      chunks.push(current);
+      current = [];
+      size = 0;
+    }
+    current.push(p);
+    size += weight;
+  });
+  if (current.length) chunks.push(current);
+  return chunks;
+};
+
+export const replaceAllChunked = async (
+  products: Product[],
+  categories?: Category[],
+  onProgress?: (done: number, total: number) => void,
+) => {
+  const chunks = chunkProducts(products);
+  let result: { products?: Product[] } = {};
+  if (!chunks.length) return replaceAll([], categories);
+  result = await post({ action: 'replace', products: chunks[0], categories });
+  onProgress?.(chunks[0].length, products.length);
+  let done = chunks[0].length;
+  for (let i = 1; i < chunks.length; i += 1) {
+    result = await post({ products: chunks[i] });
+    done += chunks[i].length;
+    onProgress?.(done, products.length);
+  }
+  return result;
+};
