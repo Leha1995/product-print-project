@@ -462,16 +462,16 @@ const MenuSection = ({
                     <button
                       onClick={() => onEdit(product)}
                       aria-label="Изменить продукт"
-                      className="flex h-6 w-6 items-center justify-center border-2 border-primary bg-background text-primary transition-colors hover:bg-accent"
+                      className="flex h-9 w-9 items-center justify-center border-2 border-primary bg-background text-primary transition-colors hover:bg-accent"
                     >
-                      <Icon name="Pencil" size={11} strokeWidth={2.5} />
+                      <Icon name="Pencil" size={18} strokeWidth={2.5} />
                     </button>
                     <button
                       onClick={() => onDelete(product)}
                       aria-label="Удалить продукт"
-                      className="flex h-6 w-6 items-center justify-center border-2 border-primary bg-background text-primary transition-colors hover:bg-destructive hover:text-destructive-foreground"
+                      className="flex h-9 w-9 items-center justify-center border-2 border-primary bg-background text-primary transition-colors hover:bg-destructive hover:text-destructive-foreground"
                     >
-                      <Icon name="Trash2" size={11} strokeWidth={2.5} />
+                      <Icon name="Trash2" size={18} strokeWidth={2.5} />
                     </button>
                   </div>
                 )}
