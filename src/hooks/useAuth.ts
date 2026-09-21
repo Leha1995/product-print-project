@@ -6,6 +6,7 @@ import {
   AuthUser,
   forgetLogin,
   getCachedUser,
+  getRemembered,
   getToken,
   rememberLogin,
   setCachedUser,
@@ -45,6 +46,22 @@ export const useAuth = () => {
         setCachedUser(res.user);
         setUser(res.user);
       } else if (res.status === 'invalid') {
+        const saved = getRemembered();
+        if (saved.username && saved.password) {
+          try {
+            const again = await apiLogin(saved.username, saved.password);
+            if (!alive) return;
+            setToken(again.token);
+            rememberRole(again.user);
+            setCachedUser(again.user);
+            setUser(again.user);
+            setReady(true);
+            return;
+          } catch {
+            /* сохранённые данные больше не подходят */
+          }
+        }
+        if (!alive) return;
         setToken('');
         setCachedUser(null);
         rememberRole(null);
@@ -62,8 +79,7 @@ export const useAuth = () => {
     setToken(res.token);
     rememberRole(res.user);
     setCachedUser(res.user);
-    if (res.user.role === 'user') rememberLogin(username.trim(), password);
-    else rememberLogin(username.trim(), '');
+    rememberLogin(username.trim(), password);
     setUser(res.user);
     return res.user;
   }, []);
