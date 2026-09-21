@@ -15,6 +15,8 @@ interface UsersDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentId?: number;
+  isSuperAdmin?: boolean;
+  onChanged?: () => void;
 }
 
 const roleLabel: Record<Role, string> = {
@@ -26,13 +28,27 @@ const roleLabel: Record<Role, string> = {
 const inputClass =
   'w-full border-2 border-primary bg-background px-3 py-2 font-body text-[14px] text-primary outline-none';
 
-const UsersDialog = ({ open, onOpenChange, currentId }: UsersDialogProps) => {
+const UsersDialog = ({
+  open,
+  onOpenChange,
+  currentId,
+  isSuperAdmin = false,
+  onChanged,
+}: UsersDialogProps) => {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [username, setUsername] = useState('');
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>('user');
+  const [managerId, setManagerId] = useState<number | ''>('');
   const [busy, setBusy] = useState(false);
+
+  const admins = users.filter((u) => u.role === 'admin' || u.role === 'superadmin');
+
+  const apply = (list: ManagedUser[]) => {
+    setUsers(list);
+    onChanged?.();
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -48,12 +64,19 @@ const UsersDialog = ({ open, onOpenChange, currentId }: UsersDialogProps) => {
     }
     setBusy(true);
     try {
-      const r = await apiCreateUser({ username: username.trim(), password, fullName, role });
-      setUsers(r.users);
+      const r = await apiCreateUser({
+        username: username.trim(),
+        password,
+        fullName,
+        role,
+        managerId: role === 'user' ? managerId || null : null,
+      });
+      apply(r.users);
       setUsername('');
       setFullName('');
       setPassword('');
       setRole('user');
+      setManagerId('');
       toast({ title: 'Пользователь добавлен' });
     } catch (e) {
       toast({
@@ -67,7 +90,7 @@ const UsersDialog = ({ open, onOpenChange, currentId }: UsersDialogProps) => {
   const patch = async (payload: Parameters<typeof apiUpdateUser>[0], msg: string) => {
     try {
       const r = await apiUpdateUser(payload);
-      setUsers(r.users);
+      apply(r.users);
       toast({ title: msg });
     } catch {
       toast({ title: 'Не удалось сохранить' });
@@ -78,7 +101,7 @@ const UsersDialog = ({ open, onOpenChange, currentId }: UsersDialogProps) => {
     if (!window.confirm(`Удалить пользователя «${u.username}»? Отменить это нельзя.`)) return;
     try {
       const r = await apiDeleteUser(u.id);
-      setUsers(r.users);
+      apply(r.users);
       toast({ title: 'Пользователь удалён' });
     } catch (e) {
       toast({
@@ -136,15 +159,31 @@ const UsersDialog = ({ open, onOpenChange, currentId }: UsersDialogProps) => {
               placeholder="Пароль"
               className={inputClass}
             />
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as Role)}
-              className={inputClass}
-            >
-              <option value="user">Сотрудник</option>
-              <option value="admin">Админ</option>
-              <option value="superadmin">Супер-админ</option>
-            </select>
+            {isSuperAdmin && (
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as Role)}
+                className={inputClass}
+              >
+                <option value="user">Сотрудник</option>
+                <option value="admin">Админ</option>
+                <option value="superadmin">Супер-админ</option>
+              </select>
+            )}
+            {isSuperAdmin && role === 'user' && (
+              <select
+                value={managerId}
+                onChange={(e) => setManagerId(e.target.value ? Number(e.target.value) : '')}
+                className={`${inputClass} md:col-span-2`}
+              >
+                <option value="">Без руководителя</option>
+                {admins.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    Закрепить за: {a.fullName || a.username}
+                  </option>
+                ))}
+              </select>
+            )}
             <button
               onClick={create}
               disabled={busy}
@@ -168,18 +207,48 @@ const UsersDialog = ({ open, onOpenChange, currentId }: UsersDialogProps) => {
                   </p>
                   <p className="truncate text-[12px] text-muted-foreground">
                     {u.fullName || '—'} · {roleLabel[u.role]}
+                    {u.managerId
+                      ? ` · руководитель: ${
+                          users.find((a) => a.id === u.managerId)?.fullName ||
+                          users.find((a) => a.id === u.managerId)?.username ||
+                          '—'
+                        }`
+                      : ''}
                   </p>
                 </div>
-                <select
-                  value={u.role}
-                  disabled={u.id === currentId}
-                  onChange={(e) => patch({ id: u.id, role: e.target.value as Role }, 'Роль обновлена')}
-                  className="border-2 border-primary bg-background px-2 py-1 font-body text-[13px] text-primary outline-none disabled:opacity-50"
-                >
-                  <option value="user">Сотрудник</option>
-                  <option value="admin">Админ</option>
-                  <option value="superadmin">Супер-админ</option>
-                </select>
+                {isSuperAdmin && (
+                  <select
+                    value={u.role}
+                    disabled={u.id === currentId}
+                    onChange={(e) =>
+                      patch({ id: u.id, role: e.target.value as Role }, 'Роль обновлена')
+                    }
+                    className="border-2 border-primary bg-background px-2 py-1 font-body text-[13px] text-primary outline-none disabled:opacity-50"
+                  >
+                    <option value="user">Сотрудник</option>
+                    <option value="admin">Админ</option>
+                    <option value="superadmin">Супер-админ</option>
+                  </select>
+                )}
+                {isSuperAdmin && u.role === 'user' && (
+                  <select
+                    value={u.managerId ?? ''}
+                    onChange={(e) =>
+                      patch(
+                        { id: u.id, managerId: e.target.value ? Number(e.target.value) : null },
+                        'Руководитель обновлён',
+                      )
+                    }
+                    className="border-2 border-primary bg-background px-2 py-1 font-body text-[13px] text-primary outline-none"
+                  >
+                    <option value="">Без руководителя</option>
+                    {admins.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.fullName || a.username}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <button
                   onClick={() => resetPassword(u)}
                   className="flex items-center gap-1 border-2 border-primary bg-background px-2 py-1 font-head text-[0.7rem] uppercase text-primary transition-colors hover:bg-muted"

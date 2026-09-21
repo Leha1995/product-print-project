@@ -4,6 +4,8 @@ import MenuSection from '@/components/MenuSection';
 import PrintDialog from '@/components/PrintDialog';
 import ProductFormDialog from '@/components/ProductFormDialog';
 import useCatalog from '@/hooks/useCatalog';
+import useManagedUsers from '@/hooks/useManagedUsers';
+import WorkspaceSwitcher from '@/components/WorkspaceSwitcher';
 import useCategories from '@/hooks/useCategories';
 import AdminLoginDialog from '@/components/AdminLoginDialog';
 import LoginScreen from '@/components/LoginScreen';
@@ -31,6 +33,9 @@ const Index = () => {
   const [editing, setEditing] = useState<Product | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const { user, ready, login, logout, isAuthed, isAdmin, isSuperAdmin } = useAuth();
+  const { managed, refreshManaged } = useManagedUsers(isAdmin);
+  const [targetId, setTargetId] = useState<number | null>(null);
+  const activeTarget = targetId ?? user?.id ?? null;
   const {
     items,
     categories: catList,
@@ -41,7 +46,7 @@ const Index = () => {
     replaceCatalog,
     saveCategories,
     savePrefs,
-  } = useCatalog(user?.id);
+  } = useCatalog(user?.id, activeTarget);
   const {
     categories,
     addCategory,
@@ -311,6 +316,14 @@ const Index = () => {
         onUsersClick={() => setUsersOpen(true)}
         onAdminClick={() => setAdminOpen(true)}
       />
+      {isAdmin && user && (
+        <WorkspaceSwitcher
+          managed={managed}
+          currentId={user.id}
+          targetId={activeTarget ?? user.id}
+          onChange={setTargetId}
+        />
+      )}
       <main>
         <MenuSection
           products={items}
@@ -445,7 +458,13 @@ const Index = () => {
           });
         }}
       />
-      <UsersDialog open={usersOpen} onOpenChange={setUsersOpen} currentId={user?.id} />
+      <UsersDialog
+        open={usersOpen}
+        onOpenChange={setUsersOpen}
+        currentId={user?.id}
+        isSuperAdmin={isSuperAdmin}
+        onChanged={refreshManaged}
+      />
     </div>
   );
 };

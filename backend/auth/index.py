@@ -67,8 +67,14 @@ def session_user(cur, token: str):
     return {'id': row[0], 'username': row[1], 'fullName': row[2], 'role': row[3]}
 
 
-def list_users(cur):
-    cur.execute('SELECT id, username, full_name, role, active, created_at FROM app_users ORDER BY id')
+def list_users(cur, me=None):
+    where = ''
+    if me and me['role'] == 'admin':
+        where = f"WHERE manager_id = {me['id']} OR id = {me['id']}"
+    cur.execute(
+        'SELECT id, username, full_name, role, active, created_at, manager_id '
+        f'FROM app_users {where} ORDER BY id'
+    )
     return [
         {
             'id': r[0],
@@ -77,9 +83,23 @@ def list_users(cur):
             'role': r[3],
             'active': r[4],
             'createdAt': r[5].isoformat() if r[5] else None,
+            'managerId': r[6],
         }
         for r in cur.fetchall()
     ]
+
+
+def managed_ids(cur, me):
+    """Список id пользователей, чьим каталогом может управлять текущий аккаунт."""
+    if me['role'] == 'superadmin':
+        cur.execute('SELECT id FROM app_users WHERE active ORDER BY id')
+    elif me['role'] == 'admin':
+        cur.execute(
+            f"SELECT id FROM app_users WHERE active AND (manager_id = {me['id']} OR id = {me['id']}) ORDER BY id"
+        )
+    else:
+        return [me['id']]
+    return [r[0] for r in cur.fetchall()]
 
 
 def handler(event: dict, context) -> dict:
@@ -155,11 +175,69 @@ def handler(event: dict, context) -> dict:
             )
             return done({'ok': True})
 
-        if me['role'] != 'superadmin':
+        if action == 'managed':
+            cur.execute(
+                'SELECT id, username, full_name, role FROM app_users WHERE id IN ('
+                + ', '.join(str(i) for i in managed_ids(cur, me))
+                + ') ORDER BY role, username'
+            )
+            return done({
+                'managed': [
+                    {'id': r[0], 'username': r[1], 'fullName': r[2], 'role': r[3]}
+                    for r in cur.fetchall()
+                ]
+            })
+
+        if me['role'] not in ('superadmin', 'admin'):
             return done({'error': 'forbidden'}, 403)
 
         if action == 'users':
-            return done({'users': list_users(cur)})
+            return done({'users': list_users(cur, me)})
+
+        if me['role'] == 'admin':
+            target = int(body.get('id') or 0)
+            if action == 'create_user':
+                username = str(body.get('username', '')).strip().lower()
+                password = str(body.get('password', ''))
+                full_name = str(body.get('fullName', '')).strip()
+                if len(username) < 3 or len(password) < 4:
+                    return done({'error': 'invalid_input'}, 400)
+                cur.execute(f'SELECT 1 FROM app_users WHERE lower(username) = {q(username)}')
+                if cur.fetchone():
+                    return done({'error': 'username_taken'}, 409)
+                cur.execute(
+                    'INSERT INTO app_users (username, full_name, password_hash, role, manager_id) VALUES '
+                    f"({q(username)}, {q(full_name)}, {q(hash_password(password))}, {q('user')}, {me['id']})"
+                )
+                return done({'users': list_users(cur, me)})
+
+            cur.execute(f'SELECT manager_id, role FROM app_users WHERE id = {target}')
+            row = cur.fetchone()
+            if not row or row[0] != me['id'] or row[1] != 'user':
+                return done({'error': 'forbidden'}, 403)
+
+            if action == 'update_user':
+                sets = []
+                if body.get('password'):
+                    sets.append(f'password_hash = {q(hash_password(str(body["password"])))}')
+                if 'fullName' in body:
+                    sets.append(f'full_name = {q(str(body["fullName"]).strip())}')
+                if 'active' in body:
+                    sets.append(f'active = {str(bool(body["active"])).upper()}')
+                if sets:
+                    cur.execute(f'UPDATE app_users SET {", ".join(sets)} WHERE id = {target}')
+                    if body.get('active') is False:
+                        cur.execute(
+                            f'UPDATE app_sessions SET expires_at = NOW() WHERE user_id = {target}'
+                        )
+                return done({'users': list_users(cur, me)})
+
+            if action == 'delete_user':
+                cur.execute(f'DELETE FROM app_sessions WHERE user_id = {target}')
+                cur.execute(f'DELETE FROM app_users WHERE id = {target}')
+                return done({'users': list_users(cur, me)})
+
+            return done({'error': 'forbidden'}, 403)
 
         if action == 'create_user':
             username = str(body.get('username', '')).strip().lower()
@@ -173,11 +251,13 @@ def handler(event: dict, context) -> dict:
             cur.execute(f'SELECT 1 FROM app_users WHERE lower(username) = {q(username)}')
             if cur.fetchone():
                 return done({'error': 'username_taken'}, 409)
+            manager = body.get('managerId')
+            manager_sql = str(int(manager)) if manager else 'NULL'
             cur.execute(
-                'INSERT INTO app_users (username, full_name, password_hash, role) VALUES '
-                f'({q(username)}, {q(full_name)}, {q(hash_password(password))}, {q(role)})'
+                'INSERT INTO app_users (username, full_name, password_hash, role, manager_id) VALUES '
+                f'({q(username)}, {q(full_name)}, {q(hash_password(password))}, {q(role)}, {manager_sql})'
             )
-            return done({'users': list_users(cur)})
+            return done({'users': list_users(cur, me)})
 
         if action == 'update_user':
             user_id = int(body.get('id') or 0)
@@ -194,12 +274,15 @@ def handler(event: dict, context) -> dict:
                 sets.append(f'full_name = {q(str(body["fullName"]).strip())}')
             if 'active' in body:
                 sets.append(f'active = {str(bool(body["active"])).upper()}')
+            if 'managerId' in body:
+                mid = body.get('managerId')
+                sets.append(f'manager_id = {str(int(mid)) if mid else "NULL"}')
             if not sets:
-                return done({'users': list_users(cur)})
+                return done({'users': list_users(cur, me)})
             cur.execute(f'UPDATE app_users SET {", ".join(sets)} WHERE id = {user_id}')
             if body.get('active') is False:
                 cur.execute(f'UPDATE app_sessions SET expires_at = NOW() WHERE user_id = {user_id}')
-            return done({'users': list_users(cur)})
+            return done({'users': list_users(cur, me)})
 
         if action == 'delete_user':
             user_id = int(body.get('id') or 0)
@@ -216,8 +299,9 @@ def handler(event: dict, context) -> dict:
                 if cur.fetchone()[0] <= 1:
                     return done({'error': 'last_superadmin'}, 400)
             cur.execute(f'DELETE FROM app_sessions WHERE user_id = {user_id}')
+            cur.execute(f'UPDATE app_users SET manager_id = NULL WHERE manager_id = {user_id}')
             cur.execute(f'DELETE FROM app_users WHERE id = {user_id}')
-            return done({'users': list_users(cur)})
+            return done({'users': list_users(cur, me)})
 
         return done({'error': 'unknown_action'}, 400)
     finally:

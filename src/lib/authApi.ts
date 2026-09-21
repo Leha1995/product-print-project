@@ -12,6 +12,14 @@ export interface AuthUser {
 export interface ManagedUser extends AuthUser {
   active: boolean;
   createdAt: string | null;
+  managerId: number | null;
+}
+
+export interface ManagedTarget {
+  id: number;
+  username: string;
+  fullName: string;
+  role: Role;
 }
 
 const TOKEN_KEY = 'asap-auth-token';
@@ -132,11 +140,14 @@ export const apiLogout = () => call<{ ok: boolean }>({ action: 'logout' });
 
 export const apiUsers = () => call<{ users: ManagedUser[] }>({ action: 'users' });
 
+export const apiManaged = () => call<{ managed: ManagedTarget[] }>({ action: 'managed' });
+
 export const apiCreateUser = (payload: {
   username: string;
   password: string;
   fullName: string;
   role: Role;
+  managerId?: number | null;
 }) => call<{ users: ManagedUser[] }>({ action: 'create_user', ...payload });
 
 export const apiUpdateUser = (payload: {
@@ -145,6 +156,7 @@ export const apiUpdateUser = (payload: {
   fullName?: string;
   role?: Role;
   active?: boolean;
+  managerId?: number | null;
 }) => call<{ users: ManagedUser[] }>({ action: 'update_user', ...payload });
 
 export const apiDeleteUser = (id: number) =>

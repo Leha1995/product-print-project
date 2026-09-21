@@ -43,7 +43,7 @@ const TerminalHeader = ({
       </div>
 
       <div className="flex items-center justify-end gap-3">
-        {isSuperAdmin && (
+        {isAdmin && (
           <button
             onClick={onUsersClick}
             aria-label="Пользователи"
@@ -51,7 +51,7 @@ const TerminalHeader = ({
           >
             <Icon name="Users" size={20} strokeWidth={2.5} />
             <span className="hidden font-head text-[0.65rem] font-medium uppercase tracking-[0.06em] sm:inline">
-              Супер-админ
+              {isSuperAdmin ? 'Супер-админ' : 'Сотрудники'}
             </span>
           </button>
         )}

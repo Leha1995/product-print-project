@@ -9,7 +9,7 @@ import psycopg2
 CORS = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-Auth-Token',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Auth-Token, X-Target-User',
     'Access-Control-Max-Age': '86400',
     'Content-Type': 'application/json',
 }
@@ -45,6 +45,18 @@ def session_user(cur, token: str):
     if not row or not row[3]:
         return None
     return {'id': row[0], 'username': row[1], 'role': row[2]}
+
+
+def can_manage(cur, me, target_id: int) -> bool:
+    if target_id == me['id']:
+        return True
+    if me['role'] == 'superadmin':
+        return True
+    if me['role'] == 'admin':
+        cur.execute(f'SELECT manager_id FROM app_users WHERE id = {target_id}')
+        row = cur.fetchone()
+        return bool(row and row[0] == me['id'])
+    return False
 
 
 def read_products(cur, uid: int):
@@ -150,7 +162,14 @@ def handler(event: dict, context) -> dict:
     me = session_user(cur, token)
     if not me:
         return finish({'error': 'unauthorized'}, 401)
+
+    raw_target = headers.get('X-Target-User') or headers.get('x-target-user') or ''
     uid = me['id']
+    if raw_target and str(raw_target).isdigit():
+        target = int(raw_target)
+        if not can_manage(cur, me, target):
+            return finish({'error': 'forbidden'}, 403)
+        uid = target
 
     if method == 'GET':
         cur.execute(f'SELECT seeded FROM user_meta WHERE user_id = {uid}')

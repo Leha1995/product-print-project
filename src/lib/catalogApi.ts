@@ -27,10 +27,20 @@ export const normalize = (list: unknown): Product[] =>
     } as Product;
   });
 
-const authHeaders = () => ({
-  'Content-Type': 'application/json',
-  'X-Auth-Token': getToken(),
-});
+let targetUserId: number | null = null;
+
+export const setTargetUser = (id: number | null) => {
+  targetUserId = id;
+};
+
+const authHeaders = () => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Auth-Token': getToken(),
+  };
+  if (targetUserId) headers['X-Target-User'] = String(targetUserId);
+  return headers;
+};
 
 const post = async (body: Record<string, unknown>, method = 'POST') => {
   const res = await fetch(API, {

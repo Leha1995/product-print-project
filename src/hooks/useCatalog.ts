@@ -10,18 +10,22 @@ import {
   pushProducts,
   replaceAll,
   seedCatalog,
+  setTargetUser,
 } from '@/lib/catalogApi';
 import { toast } from '@/hooks/use-toast';
 
-export const useCatalog = (userId?: number | null) => {
+export const useCatalog = (userId?: number | null, targetId?: number | null) => {
   const [items, setItems] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [prefs, setPrefs] = useState<UserPrefs>({});
   const [loading, setLoading] = useState(true);
 
+  const viewedId = targetId || userId;
+  setTargetUser(targetId && targetId !== userId ? targetId : null);
+
   useEffect(() => {
     let alive = true;
-    if (!userId) {
+    if (!viewedId) {
       setItems([]);
       setCategories([]);
       setPrefs({});
@@ -54,7 +58,7 @@ export const useCatalog = (userId?: number | null) => {
     return () => {
       alive = false;
     };
-  }, [userId]);
+  }, [viewedId]);
 
   const saveProduct = useCallback(async (product: Product) => {
     try {
