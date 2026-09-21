@@ -10,10 +10,13 @@ export interface UserPrefs {
   onlySoon?: boolean;
 }
 
+export type PrintHistoryMap = Record<string, number>;
+
 export interface CatalogSnapshot {
   products: Product[];
   categories: Category[];
   prefs: UserPrefs;
+  history: PrintHistoryMap;
   seeded: boolean;
 }
 
@@ -62,9 +65,13 @@ export const fetchCatalog = async (): Promise<CatalogSnapshot> => {
     products: normalize(data.products),
     categories: Array.isArray(data.categories) ? data.categories : [],
     prefs: (data.prefs || {}) as UserPrefs,
+    history: (data.history || {}) as PrintHistoryMap,
     seeded: Boolean(data.seeded),
   };
 };
+
+export const pushHistory = (history: PrintHistoryMap) =>
+  post({ action: 'history', history });
 
 export const seedCatalog = (products: Product[], categories: Category[]) =>
   post({ action: 'seed', products, categories });

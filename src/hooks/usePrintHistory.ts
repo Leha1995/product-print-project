@@ -1,31 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Product } from '@/data/products';
+import { PrintHistoryMap } from '@/lib/catalogApi';
 
-const STORAGE_KEY = 'asap-print-history-v1';
-
-export type PrintHistory = Record<string, number>;
-
-const load = (): PrintHistory => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return {};
-    return parsed as PrintHistory;
-  } catch {
-    return {};
-  }
-};
-
-const save = (history: PrintHistory) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
-  } catch {
-    /* storage unavailable */
-  }
-};
-
-const nameKey = (name: string) => `name:${name.trim().toLowerCase()}`;
+export type PrintHistory = PrintHistoryMap;
 
 export const SOON_MS = 3600000;
 
@@ -47,21 +24,11 @@ export const formatLeft = (ms: number) => {
   return restHours ? `${days} сут ${restHours} ч` : `${days} сут`;
 };
 
-export const usePrintHistory = (products: Product[] = []) => {
-  const [history, setHistory] = useState<PrintHistory>({});
+export const usePrintHistory = (
+  history: PrintHistory = {},
+  onSave?: (patch: PrintHistory) => void,
+) => {
   const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    setHistory(load());
-  }, []);
-
-  useEffect(() => {
-    const sync = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY) setHistory(load());
-    };
-    window.addEventListener('storage', sync);
-    return () => window.removeEventListener('storage', sync);
-  }, []);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30000);
@@ -72,31 +39,27 @@ export const usePrintHistory = (products: Product[] = []) => {
     (ids: string[]) => {
       if (!ids.length) return;
       const stamp = Date.now();
-      setHistory((prev) => {
-        const next = { ...prev };
-        ids.forEach((id) => {
-          next[id] = stamp;
-          const product = products.find((p) => p.id === id);
-          if (product?.name) next[nameKey(product.name)] = stamp;
-        });
-        save(next);
-        return next;
+      const patch: PrintHistory = {};
+      ids.forEach((id) => {
+        patch[id] = stamp;
       });
+      onSave?.(patch);
       setNow(stamp);
     },
-    [products],
+    [onSave],
   );
 
   const clearHistory = useCallback(() => {
-    setHistory({});
-    save({});
-  }, []);
+    const patch: PrintHistory = {};
+    Object.keys(history).forEach((id) => {
+      patch[id] = 0;
+    });
+    onSave?.(patch);
+  }, [history, onSave]);
 
   const getExpiry = useCallback(
     (product: Product) => {
-      const byId = history[product.id];
-      const byName = product.name ? history[nameKey(product.name)] : undefined;
-      const printedAt = Math.max(byId ?? 0, byName ?? 0) || null;
+      const printedAt = history[product.id] || null;
       if (!printedAt || product.shelfLifeHours === undefined) {
         return { printedAt, expiresAt: null, expired: false, leftMs: null };
       }

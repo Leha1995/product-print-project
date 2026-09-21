@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Category, Product, categories as seedCategories, products as seedProducts } from '@/data/products';
 import {
+  PrintHistoryMap,
   UserPrefs,
   deleteProduct,
   fetchCatalog,
   pushCategories,
+  pushHistory,
   pushPrefs,
   pushProduct,
   pushProducts,
@@ -18,6 +20,7 @@ export const useCatalog = (userId?: number | null, targetId?: number | null) => 
   const [items, setItems] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [prefs, setPrefs] = useState<UserPrefs>({});
+  const [history, setHistory] = useState<PrintHistoryMap>({});
   const [loading, setLoading] = useState(true);
 
   const viewedId = targetId || userId;
@@ -29,6 +32,7 @@ export const useCatalog = (userId?: number | null, targetId?: number | null) => 
       setItems([]);
       setCategories([]);
       setPrefs({});
+      setHistory({});
       setLoading(false);
       return;
     }
@@ -42,6 +46,7 @@ export const useCatalog = (userId?: number | null, targetId?: number | null) => 
             products: res.products ?? seedProducts,
             categories: res.categories ?? seedCategories,
             prefs: {},
+            history: {},
             seeded: true,
           };
         }
@@ -49,6 +54,7 @@ export const useCatalog = (userId?: number | null, targetId?: number | null) => 
         setItems(snap.products);
         setCategories(snap.categories.length ? snap.categories : seedCategories);
         setPrefs(snap.prefs);
+        setHistory(snap.history);
       } catch {
         if (alive) toast({ title: 'Не удалось загрузить ваш каталог' });
       } finally {
@@ -121,10 +127,17 @@ export const useCatalog = (userId?: number | null, targetId?: number | null) => 
     pushPrefs(next).catch(() => undefined);
   }, []);
 
+  const saveHistory = useCallback((patch: PrintHistoryMap) => {
+    setHistory((prev) => ({ ...prev, ...patch }));
+    pushHistory(patch).catch(() => undefined);
+  }, []);
+
   return {
     items,
     categories,
     prefs,
+    history,
+    saveHistory,
     loading,
     saveProduct,
     addProducts,

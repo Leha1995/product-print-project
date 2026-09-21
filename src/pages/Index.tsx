@@ -40,6 +40,8 @@ const Index = () => {
     items,
     categories: catList,
     prefs,
+    history,
+    saveHistory,
     saveProduct,
     addProducts,
     removeProduct,
@@ -56,7 +58,7 @@ const Index = () => {
     replaceCategories,
   } = useCategories(catList, saveCategories);
   const [usersOpen, setUsersOpen] = useState(false);
-  const { markPrinted, getExpiry, getStatus, now } = usePrintHistory(items);
+  const { markPrinted, getExpiry, getStatus, now } = usePrintHistory(history, saveHistory);
   const [adminOpen, setAdminOpen] = useState(false);
   const { settings, update, reset } = useLabelSettings();
   const [quickPrint, setQuickPrint] = useState<Product | null>(null);

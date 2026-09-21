@@ -89,10 +89,21 @@ def read_categories(cur, uid: int):
     return [{'id': r[0], 'label': r[1], 'icon': r[2]} for r in cur.fetchall()]
 
 
-def read_prefs(cur, uid: int):
-    cur.execute(f'SELECT value FROM user_prefs WHERE user_id = {uid} AND key = {q("filters")}')
+def read_pref_key(cur, uid: int, key: str):
+    cur.execute(f'SELECT value FROM user_prefs WHERE user_id = {uid} AND key = {q(key)}')
     row = cur.fetchone()
     return row[0] if row and row[0] else {}
+
+
+def read_prefs(cur, uid: int):
+    return read_pref_key(cur, uid, 'filters')
+
+
+def save_pref_key(cur, uid: int, key: str, value: dict):
+    cur.execute(
+        f'INSERT INTO user_prefs (user_id, key, value) VALUES ({uid}, {q(key)}, {q(json.dumps(value))}::jsonb) '
+        'ON CONFLICT (user_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()'
+    )
 
 
 def save_product(cur, uid: int, p: dict):
@@ -179,6 +190,7 @@ def handler(event: dict, context) -> dict:
                 'products': read_products(cur, uid),
                 'categories': read_categories(cur, uid),
                 'prefs': read_prefs(cur, uid),
+                'history': read_pref_key(cur, uid, 'history'),
                 'seeded': bool(row and row[0]),
             }
         )
@@ -229,6 +241,17 @@ def handler(event: dict, context) -> dict:
             'ON CONFLICT (user_id, key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()'
         )
         return finish({'ok': True, 'prefs': read_prefs(cur, uid)})
+
+    if action == 'history':
+        current = read_pref_key(cur, uid, 'history') or {}
+        incoming = body.get('history') or {}
+        for key, stamp in incoming.items():
+            if not isinstance(stamp, (int, float)):
+                continue
+            if stamp > current.get(key, 0):
+                current[key] = int(stamp)
+        save_pref_key(cur, uid, 'history', current)
+        return finish({'ok': True, 'history': current})
 
     if action == 'categories':
         save_categories(cur, uid, body.get('categories') or [])
