@@ -83,6 +83,38 @@ export const forgetLogin = (keepUsername = false) => {
   }
 };
 
+const KNOWN_KEY = 'asap-known-logins';
+
+export const getKnownLogins = (): string[] => {
+  try {
+    const raw = localStorage.getItem(KNOWN_KEY);
+    const list = raw ? (JSON.parse(raw) as string[]) : [];
+    return Array.isArray(list) ? list.filter(Boolean).slice(0, 8) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const addKnownLogin = (username: string) => {
+  const clean = username.trim();
+  if (!clean) return;
+  try {
+    const next = [clean, ...getKnownLogins().filter((u) => u !== clean)].slice(0, 8);
+    localStorage.setItem(KNOWN_KEY, JSON.stringify(next));
+  } catch {
+    /* storage unavailable */
+  }
+};
+
+export const removeKnownLogin = (username: string) => {
+  try {
+    const next = getKnownLogins().filter((u) => u !== username);
+    localStorage.setItem(KNOWN_KEY, JSON.stringify(next));
+  } catch {
+    /* storage unavailable */
+  }
+};
+
 const call = async <T>(body: Record<string, unknown>): Promise<T> => {
   const res = await fetch(API, {
     method: 'POST',

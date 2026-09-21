@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Icon from '@/components/ui/icon';
 import VirtualKeyboard from '@/components/VirtualKeyboard';
-import { forgetLogin, getRemembered } from '@/lib/authApi';
+import { forgetLogin, getKnownLogins, getRemembered, removeKnownLogin } from '@/lib/authApi';
 
 interface LoginScreenProps {
   onLogin: (username: string, password: string) => Promise<unknown>;
@@ -15,6 +15,20 @@ const LoginScreen = ({ onLogin, kicked }: LoginScreenProps) => {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [field, setField] = useState<'username' | 'password' | null>(null);
+  const [known, setKnown] = useState<string[]>(getKnownLogins());
+
+  const pickLogin = (name: string) => {
+    setUsername(name);
+    setPassword('');
+    setError('');
+    setField('password');
+  };
+
+  const dropLogin = (name: string) => {
+    removeKnownLogin(name);
+    setKnown(getKnownLogins());
+    if (username === name) setUsername('');
+  };
 
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -63,6 +77,40 @@ const LoginScreen = ({ onLogin, kicked }: LoginScreenProps) => {
             <p className="text-[13px] text-destructive">
               Под вашим логином вошли на другом устройстве — здесь сеанс завершён
             </p>
+          </div>
+        )}
+
+        {known.length > 0 && (
+          <div className="mt-6">
+            <span className="font-head text-[0.72rem] font-medium uppercase tracking-[0.08em] text-primary">
+              Кто заходит
+            </span>
+            <div className="mt-2 grid gap-2">
+              {known.map((name) => (
+                <div key={name} className="flex items-stretch gap-1">
+                  <button
+                    type="button"
+                    onClick={() => pickLogin(name)}
+                    className={`flex flex-1 items-center gap-2 border-2 px-3 py-2.5 text-left font-head text-[0.8rem] font-bold uppercase tracking-[0.04em] transition-colors ${
+                      username === name
+                        ? 'border-primary bg-accent text-accent-foreground'
+                        : 'border-primary bg-background text-primary hover:bg-muted'
+                    }`}
+                  >
+                    <Icon name="CircleUser" size={18} strokeWidth={2.5} />
+                    {name}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => dropLogin(name)}
+                    aria-label={`Убрать ${name}`}
+                    className="flex w-10 shrink-0 items-center justify-center border-2 border-primary bg-background text-primary transition-colors hover:bg-destructive hover:text-destructive-foreground"
+                  >
+                    <Icon name="X" size={16} strokeWidth={2.5} />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

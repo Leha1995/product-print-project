@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  addKnownLogin,
   apiLogin,
   apiLogout,
   apiMe,
@@ -87,6 +88,7 @@ export const useAuth = () => {
     rememberRole(res.user);
     setCachedUser(res.user);
     rememberLogin(username.trim(), '');
+    addKnownLogin(username.trim());
     setKicked(false);
     setUser(res.user);
     return res.user;
