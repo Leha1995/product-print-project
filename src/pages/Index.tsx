@@ -423,9 +423,12 @@ const Index = () => {
         open={adminOpen}
         onOpenChange={setAdminOpen}
         user={user}
-        onLogout={() => {
-          logout();
-          toast({ title: 'Вы вышли из аккаунта' });
+        onLogout={(forget) => {
+          logout(forget);
+          toast({
+            title: 'Вы вышли из аккаунта',
+            description: forget ? 'Сохранённый вход на устройстве удалён' : undefined,
+          });
         }}
       />
       <UsersDialog open={usersOpen} onOpenChange={setUsersOpen} currentId={user?.id} />

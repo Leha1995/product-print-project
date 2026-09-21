@@ -8,7 +8,7 @@ interface AdminLoginDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   user: AuthUser | null;
-  onLogout: () => void;
+  onLogout: (forget?: boolean) => void;
 }
 
 const roleLabel: Record<string, string> = {
@@ -83,6 +83,16 @@ const AdminLoginDialog = ({ open, onOpenChange, user, onLogout }: AdminLoginDial
             >
               <Icon name="LogOut" size={18} strokeWidth={2.5} />
               Выйти
+            </button>
+            <button
+              onClick={() => {
+                onLogout(true);
+                onOpenChange(false);
+              }}
+              className="flex items-center justify-center gap-2 border-2 border-primary bg-card px-4 py-2 font-head text-[0.72rem] font-medium uppercase tracking-[0.06em] text-primary transition-colors hover:bg-muted"
+            >
+              <Icon name="UserRoundX" size={16} strokeWidth={2.5} />
+              Выйти и забыть устройство
             </button>
           </div>
         </div>

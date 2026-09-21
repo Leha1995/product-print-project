@@ -33,6 +33,48 @@ export const setToken = (token: string) => {
   }
 };
 
+const REMEMBER_KEY = 'asap-remember';
+
+export interface RememberedLogin {
+  username: string;
+  password: string;
+}
+
+export const getRemembered = (): RememberedLogin => {
+  try {
+    const raw = localStorage.getItem(REMEMBER_KEY);
+    if (!raw) return { username: '', password: '' };
+    const data = JSON.parse(decodeURIComponent(atob(raw))) as RememberedLogin;
+    return { username: data.username || '', password: data.password || '' };
+  } catch {
+    return { username: '', password: '' };
+  }
+};
+
+export const rememberLogin = (username: string, password: string) => {
+  try {
+    localStorage.setItem(
+      REMEMBER_KEY,
+      btoa(encodeURIComponent(JSON.stringify({ username, password }))),
+    );
+  } catch {
+    /* storage unavailable */
+  }
+};
+
+export const forgetLogin = (keepUsername = false) => {
+  try {
+    if (keepUsername) {
+      const { username } = getRemembered();
+      rememberLogin(username, '');
+    } else {
+      localStorage.removeItem(REMEMBER_KEY);
+    }
+  } catch {
+    /* storage unavailable */
+  }
+};
+
 const call = async <T>(body: Record<string, unknown>): Promise<T> => {
   const res = await fetch(API, {
     method: 'POST',

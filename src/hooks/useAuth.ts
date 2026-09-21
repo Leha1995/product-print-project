@@ -4,7 +4,9 @@ import {
   apiLogout,
   apiMe,
   AuthUser,
+  forgetLogin,
   getToken,
+  rememberLogin,
   setToken,
 } from '@/lib/authApi';
 
@@ -46,12 +48,15 @@ export const useAuth = () => {
     const res = await apiLogin(username.trim(), password);
     setToken(res.token);
     rememberRole(res.user);
+    if (res.user.role === 'user') rememberLogin(username.trim(), password);
+    else rememberLogin(username.trim(), '');
     setUser(res.user);
     return res.user;
   }, []);
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (forget = false) => {
     await apiLogout().catch(() => null);
+    if (forget) forgetLogin();
     setToken('');
     rememberRole(null);
     setUser(null);

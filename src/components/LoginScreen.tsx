@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import Icon from '@/components/ui/icon';
+import { forgetLogin, getRemembered } from '@/lib/authApi';
 
 interface LoginScreenProps {
   onLogin: (username: string, password: string) => Promise<unknown>;
 }
 
 const LoginScreen = ({ onLogin }: LoginScreenProps) => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const saved = getRemembered();
+  const [username, setUsername] = useState(saved.username);
+  const [password, setPassword] = useState(saved.password);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -88,6 +90,22 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
           <Icon name={busy ? 'Loader' : 'LogIn'} size={18} strokeWidth={2.5} />
           {busy ? 'Проверяем...' : 'Войти'}
         </button>
+
+        {(saved.username || saved.password) && (
+          <button
+            type="button"
+            onClick={() => {
+              forgetLogin();
+              setUsername('');
+              setPassword('');
+              setError('');
+            }}
+            className="mt-3 flex w-full items-center justify-center gap-2 border-2 border-primary bg-card px-4 py-2 font-head text-[0.72rem] font-medium uppercase tracking-[0.06em] text-primary transition-colors hover:bg-muted"
+          >
+            <Icon name="UserRoundX" size={16} strokeWidth={2.5} />
+            Забыть это устройство
+          </button>
+        )}
       </form>
     </div>
   );
