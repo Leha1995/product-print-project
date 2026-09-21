@@ -141,6 +141,8 @@ def handler(event: dict, context) -> dict:
             return done({'error': 'unauthorized'}, 401)
 
         if action == 'change_password':
+            if me['role'] != 'superadmin':
+                return done({'error': 'forbidden'}, 403)
             new_password = str(body.get('password', ''))
             if len(new_password) < 4:
                 return done({'error': 'weak_password'}, 400)

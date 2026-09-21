@@ -57,23 +57,27 @@ const AdminLoginDialog = ({ open, onOpenChange, user, onLogout }: AdminLoginDial
           </div>
 
           <div className="mt-5 grid gap-2">
-            <span className="font-head text-[0.72rem] font-medium uppercase tracking-[0.08em] text-primary">
-              Сменить пароль
-            </span>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Новый пароль"
-              className="w-full border-2 border-primary bg-card px-3 py-3 font-body text-[15px] text-primary outline-none"
-            />
-            <button
-              onClick={save}
-              className="flex items-center justify-center gap-2 border-2 border-primary bg-card px-4 py-3 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] text-primary transition-colors hover:bg-muted"
-            >
-              <Icon name="KeyRound" size={18} strokeWidth={2.5} />
-              Сохранить пароль
-            </button>
+            {user?.role === 'superadmin' && (
+              <>
+                <span className="font-head text-[0.72rem] font-medium uppercase tracking-[0.08em] text-primary">
+                  Сменить пароль
+                </span>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Новый пароль"
+                  className="w-full border-2 border-primary bg-card px-3 py-3 font-body text-[15px] text-primary outline-none"
+                />
+                <button
+                  onClick={save}
+                  className="flex items-center justify-center gap-2 border-2 border-primary bg-card px-4 py-3 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] text-primary transition-colors hover:bg-muted"
+                >
+                  <Icon name="KeyRound" size={18} strokeWidth={2.5} />
+                  Сохранить пароль
+                </button>
+              </>
+            )}
             <button
               onClick={() => {
                 onLogout();
