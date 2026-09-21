@@ -4,6 +4,7 @@ import ProductCard from '@/components/ProductCard';
 import CategoryEditor from '@/components/CategoryEditor';
 import VirtualKeyboard from '@/components/VirtualKeyboard';
 import { Category, CategoryId, Product, productCategories, UNCATEGORIZED } from '@/data/products';
+import { UserPrefs } from '@/lib/catalogApi';
 import { ExpiryStatus } from '@/hooks/usePrintHistory';
 
 const SHELF_STEPS = [3, 12, 48, 72, 120, 168, 720, 1440, 2160, 4320, 8760];
@@ -40,6 +41,8 @@ interface MenuSectionProps {
   onRequestAdmin: () => void;
   expiredIds?: Set<string>;
   getStatus?: (product: Product) => ExpiryStatus;
+  prefs?: UserPrefs;
+  onPrefsChange?: (prefs: UserPrefs) => void;
 }
 
 const MenuSection = ({
@@ -63,6 +66,8 @@ const MenuSection = ({
   onRequestAdmin,
   expiredIds,
   getStatus,
+  prefs,
+  onPrefsChange,
 }: MenuSectionProps) => {
   const [query, setQuery] = useState('');
   const [active, setActive] = useState<CategoryId | 'all'>('all');
@@ -72,6 +77,26 @@ const MenuSection = ({
   const [onlySoon, setOnlySoon] = useState(false);
   const [shelfFilter, setShelfFilter] = useState<number | 'all'>('all');
   const editMode = isAdmin && rawEditMode;
+
+  const prefsLoaded = useRef(false);
+
+  useEffect(() => {
+    if (prefsLoaded.current || !prefs) return;
+    prefsLoaded.current = true;
+    if (prefs.activeCategory) setActive(prefs.activeCategory);
+    if (prefs.shelfFilter !== undefined) setShelfFilter(prefs.shelfFilter);
+    if (prefs.onlyExpired !== undefined) setOnlyExpired(prefs.onlyExpired);
+    if (prefs.onlySoon !== undefined) setOnlySoon(prefs.onlySoon);
+  }, [prefs]);
+
+  useEffect(() => {
+    if (!prefsLoaded.current || !onPrefsChange) return;
+    const id = setTimeout(
+      () => onPrefsChange({ activeCategory: active, shelfFilter, onlyExpired, onlySoon }),
+      600,
+    );
+    return () => clearTimeout(id);
+  }, [active, shelfFilter, onlyExpired, onlySoon, onPrefsChange]);
 
   const knownCategoryIds = useMemo(() => new Set(categories.map((c) => c.id)), [categories]);
 

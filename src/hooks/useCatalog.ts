@@ -1,132 +1,117 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Product, products as seedProducts } from '@/data/products';
+import { useCallback, useEffect, useState } from 'react';
+import { Category, Product, categories as seedCategories, products as seedProducts } from '@/data/products';
 import {
-  IMG_PREFIX,
-  compressImage,
-  getAllImages,
-  putImage,
-  removeImage,
-} from '@/lib/imageStore';
+  UserPrefs,
+  deleteProduct,
+  fetchCatalog,
+  pushCategories,
+  pushPrefs,
+  pushProduct,
+  replaceAll,
+  seedCatalog,
+} from '@/lib/catalogApi';
 import { toast } from '@/hooks/use-toast';
 
-const STORAGE_KEY = 'asap-catalog-v1';
-
-const loadRaw = (): Product[] => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return seedProducts;
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || !parsed.length) return seedProducts;
-    const clean = (parsed as Product[]).filter((p) => p && p.id && p.name);
-    return Array.from(new Map(clean.map((p) => [p.id, p])).values());
-  } catch {
-    return seedProducts;
-  }
-};
-
-const write = (list: Product[]) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-  } catch {
-    toast({
-      title: 'Не удалось сохранить каталог',
-      description: 'Память браузера переполнена — выгрузите каталог в файл',
-    });
-  }
-};
-
-export const useCatalog = () => {
-  const [items, setItems] = useState<Product[]>(seedProducts);
-  const imagesRef = useRef<Record<string, string>>({});
-
-  const resolve = useCallback(
-    (list: Product[]) =>
-      list.map((p) =>
-        p.image?.startsWith(IMG_PREFIX)
-          ? { ...p, image: imagesRef.current[p.image.slice(IMG_PREFIX.length)] ?? '' }
-          : p,
-      ),
-    [],
-  );
+export const useCatalog = (userId?: number | null) => {
+  const [items, setItems] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [prefs, setPrefs] = useState<UserPrefs>({});
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let alive = true;
-    const boot = async () => {
-      const stored = loadRaw();
+    if (!userId) {
+      setItems([]);
+      setCategories([]);
+      setPrefs({});
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    (async () => {
       try {
-        imagesRef.current = await getAllImages();
+        let snap = await fetchCatalog();
+        if (!snap.seeded) {
+          const res = await seedCatalog(seedProducts, seedCategories);
+          snap = {
+            products: res.products ?? seedProducts,
+            categories: res.categories ?? seedCategories,
+            prefs: {},
+            seeded: true,
+          };
+        }
+        if (!alive) return;
+        setItems(snap.products);
+        setCategories(snap.categories.length ? snap.categories : seedCategories);
+        setPrefs(snap.prefs);
       } catch {
-        imagesRef.current = {};
+        if (alive) toast({ title: 'Не удалось загрузить ваш каталог' });
+      } finally {
+        if (alive) setLoading(false);
       }
-      if (!alive) return;
-      setItems(
-        stored.map((p) =>
-          p.image?.startsWith(IMG_PREFIX)
-            ? { ...p, image: imagesRef.current[p.image.slice(IMG_PREFIX.length)] ?? '' }
-            : p,
-        ),
-      );
-    };
-    boot();
+    })();
     return () => {
       alive = false;
     };
-  }, []);
+  }, [userId]);
 
-  const toStored = useCallback(async (product: Product): Promise<Product> => {
-    if (!product.image?.startsWith('data:')) return product;
-    const key = `img-${product.id}`;
-    const small = await compressImage(product.image);
-    imagesRef.current[key] = small;
+  const saveProduct = useCallback(async (product: Product) => {
     try {
-      await putImage(key, small);
-      return { ...product, image: `${IMG_PREFIX}${key}` };
+      const res = await pushProduct(product);
+      setItems(res.products ?? []);
     } catch {
-      return { ...product, image: small };
+      toast({ title: 'Не удалось сохранить продукт' });
     }
   }, []);
 
-  const persist = useCallback(
-    async (next: Product[]) => {
-      const stored = await Promise.all(next.map(toStored));
-      write(stored);
-      setItems(resolve(stored));
-    },
-    [resolve, toStored],
-  );
-
-  const saveProduct = useCallback(
-    async (product: Product) => {
-      const stored = await toStored(product);
-      const prev = loadRaw();
-      const exists = prev.some((p) => p.id === stored.id);
-      const next = exists
-        ? prev.map((p) => (p.id === stored.id ? stored : p))
-        : [stored, ...prev];
-      write(next);
-      setItems(resolve(next));
-    },
-    [resolve, toStored],
-  );
-
-  const removeProduct = useCallback(
-    (id: string) => {
-      const next = loadRaw().filter((p) => p.id !== id);
-      write(next);
-      setItems(resolve(next));
-      removeImage(`img-${id}`).catch(() => undefined);
-    },
-    [resolve],
-  );
-
-  const resetCatalog = useCallback(() => {
-    write(seedProducts);
-    setItems(seedProducts);
+  const removeProduct = useCallback(async (id: string) => {
+    try {
+      const res = await deleteProduct(id);
+      setItems(res.products ?? []);
+    } catch {
+      toast({ title: 'Не удалось удалить продукт' });
+    }
   }, []);
 
-  const replaceCatalog = useCallback((next: Product[]) => persist(next), [persist]);
+  const replaceCatalog = useCallback(async (next: Product[]) => {
+    try {
+      const res = await replaceAll(next);
+      setItems(res.products ?? next);
+    } catch {
+      toast({ title: 'Не удалось обновить каталог' });
+    }
+  }, []);
 
-  return { items, saveProduct, removeProduct, resetCatalog, replaceCatalog };
+  const resetCatalog = useCallback(async () => {
+    await replaceCatalog(seedProducts);
+  }, [replaceCatalog]);
+
+  const saveCategories = useCallback(async (next: Category[]) => {
+    setCategories(next);
+    try {
+      await pushCategories(next);
+    } catch {
+      toast({ title: 'Не удалось сохранить категории' });
+    }
+  }, []);
+
+  const savePrefs = useCallback((next: UserPrefs) => {
+    setPrefs(next);
+    pushPrefs(next).catch(() => undefined);
+  }, []);
+
+  return {
+    items,
+    categories,
+    prefs,
+    loading,
+    saveProduct,
+    removeProduct,
+    resetCatalog,
+    replaceCatalog,
+    saveCategories,
+    savePrefs,
+  };
 };
 
 export default useCatalog;

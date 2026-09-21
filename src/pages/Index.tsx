@@ -30,7 +30,17 @@ const Index = () => {
   const [jobs, setJobs] = useState<PrintJob[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  const { items, saveProduct, removeProduct, replaceCatalog } = useCatalog();
+  const { user, ready, login, logout, isAuthed, isAdmin, isSuperAdmin } = useAuth();
+  const {
+    items,
+    categories: catList,
+    prefs,
+    saveProduct,
+    removeProduct,
+    replaceCatalog,
+    saveCategories,
+    savePrefs,
+  } = useCatalog(user?.id);
   const {
     categories,
     addCategory,
@@ -38,8 +48,7 @@ const Index = () => {
     removeCategory,
     resetCategories,
     replaceCategories,
-  } = useCategories();
-  const { user, ready, login, logout, isAuthed, isAdmin, isSuperAdmin } = useAuth();
+  } = useCategories(catList, saveCategories);
   const [usersOpen, setUsersOpen] = useState(false);
   const { markPrinted, getExpiry, getStatus, now } = usePrintHistory();
   const [adminOpen, setAdminOpen] = useState(false);
@@ -345,6 +354,8 @@ const Index = () => {
             toast({ title: 'Продукт удалён', description: product.name });
           }}
           isAdmin={isAdmin}
+          prefs={prefs}
+          onPrefsChange={savePrefs}
           onRequestAdmin={() => setAdminOpen(true)}
           expiredIds={expiredIds}
           getStatus={getStatus}

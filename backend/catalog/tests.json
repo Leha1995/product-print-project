@@ -1,20 +1,20 @@
 {
   "tests": [
     {
-      "name": "Каталог загружается",
+      "name": "Без входа каталог недоступен",
       "method": "GET",
       "path": "/",
-      "expectedStatus": 200,
-      "expectedBody": {"seeded": false},
+      "expectedStatus": 401,
+      "expectedBody": {"error": "unauthorized"},
       "bodyMatcher": "partial"
     },
     {
-      "name": "Запись без пина запрещена",
+      "name": "Запись без входа запрещена",
       "method": "POST",
       "path": "/",
       "body": {"products": []},
-      "expectedStatus": 403,
-      "expectedBody": {"error": "forbidden"},
+      "expectedStatus": 401,
+      "expectedBody": {"error": "unauthorized"},
       "bodyMatcher": "partial"
     }
   ]

@@ -1,11 +1,19 @@
 import { Category, Product } from '@/data/products';
-import { getAdminPin } from '@/hooks/useAdmin';
+import { getToken } from '@/lib/authApi';
 
 const API = 'https://functions.poehali.dev/189bcae7-31a1-4023-9d91-07dee22dad90';
+
+export interface UserPrefs {
+  activeCategory?: string;
+  shelfFilter?: number | 'all';
+  onlyExpired?: boolean;
+  onlySoon?: boolean;
+}
 
 export interface CatalogSnapshot {
   products: Product[];
   categories: Category[];
+  prefs: UserPrefs;
   seeded: boolean;
 }
 
@@ -19,10 +27,15 @@ export const normalize = (list: unknown): Product[] =>
     } as Product;
   });
 
+const authHeaders = () => ({
+  'Content-Type': 'application/json',
+  'X-Auth-Token': getToken(),
+});
+
 const post = async (body: Record<string, unknown>, method = 'POST') => {
   const res = await fetch(API, {
     method,
-    headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': getAdminPin() },
+    headers: authHeaders(),
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(String(res.status));
@@ -32,12 +45,13 @@ const post = async (body: Record<string, unknown>, method = 'POST') => {
 };
 
 export const fetchCatalog = async (): Promise<CatalogSnapshot> => {
-  const res = await fetch(API);
+  const res = await fetch(API, { headers: authHeaders() });
   if (!res.ok) throw new Error(String(res.status));
   const data = await res.json();
   return {
     products: normalize(data.products),
     categories: Array.isArray(data.categories) ? data.categories : [],
+    prefs: (data.prefs || {}) as UserPrefs,
     seeded: Boolean(data.seeded),
   };
 };
@@ -53,6 +67,8 @@ export const deleteProduct = (id: string) => post({ id }, 'DELETE');
 
 export const pushCategories = (categories: Category[]) =>
   post({ action: 'categories', categories });
+
+export const pushPrefs = (prefs: UserPrefs) => post({ action: 'prefs', prefs });
 
 export const replaceAll = (products: Product[], categories?: Category[]) =>
   post({ action: 'replace', products, categories });
