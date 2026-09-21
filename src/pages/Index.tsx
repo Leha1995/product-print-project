@@ -6,7 +6,9 @@ import ProductFormDialog from '@/components/ProductFormDialog';
 import useCatalog from '@/hooks/useCatalog';
 import useCategories from '@/hooks/useCategories';
 import AdminLoginDialog from '@/components/AdminLoginDialog';
-import useAdmin from '@/hooks/useAdmin';
+import LoginScreen from '@/components/LoginScreen';
+import UsersDialog from '@/components/UsersDialog';
+import useAuth from '@/hooks/useAuth';
 import usePrintHistory from '@/hooks/usePrintHistory';
 import useLabelSettings from '@/hooks/useLabelSettings';
 import DirectPrintArea from '@/components/DirectPrintArea';
@@ -37,12 +39,8 @@ const Index = () => {
     resetCategories,
     replaceCategories,
   } = useCategories();
-  const { isAdmin, login, logout } = useAdmin(() =>
-    toast({
-      title: 'Режим администратора отключён',
-      description: '10 минут без действий — вход сброшен для безопасности',
-    }),
-  );
+  const { user, ready, login, logout, isAuthed, isAdmin, isSuperAdmin } = useAuth();
+  const [usersOpen, setUsersOpen] = useState(false);
   const { markPrinted, getExpiry, getStatus, now } = usePrintHistory();
   const [adminOpen, setAdminOpen] = useState(false);
   const { settings, update, reset } = useLabelSettings();
@@ -280,12 +278,27 @@ const Index = () => {
     });
   };
 
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background font-head uppercase text-primary">
+        Загрузка...
+      </div>
+    );
+  }
+
+  if (!isAuthed) {
+    return <LoginScreen onLogin={login} />;
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <TerminalHeader
         printedCount={jobs.length}
         onNavigate={scrollTo}
         isAdmin={isAdmin}
+        isSuperAdmin={isSuperAdmin}
+        userName={user?.fullName || user?.username || ''}
+        onUsersClick={() => setUsersOpen(true)}
         onAdminClick={() => setAdminOpen(true)}
       />
       <main>
@@ -409,17 +422,13 @@ const Index = () => {
       <AdminLoginDialog
         open={adminOpen}
         onOpenChange={setAdminOpen}
-        isAdmin={isAdmin}
-        onLogin={(pin) => {
-          const ok = login(pin);
-          if (ok) toast({ title: 'Вход выполнен', description: 'Редактирование каталога доступно' });
-          return ok;
-        }}
+        user={user}
         onLogout={() => {
           logout();
-          toast({ title: 'Вы вышли из режима администратора' });
+          toast({ title: 'Вы вышли из аккаунта' });
         }}
       />
+      <UsersDialog open={usersOpen} onOpenChange={setUsersOpen} currentId={user?.id} />
     </div>
   );
 };

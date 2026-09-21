@@ -7,6 +7,8 @@ const IDLE_MS = 10 * 60 * 1000;
 
 export const getAdminPin = () => {
   try {
+    const role = localStorage.getItem('asap-auth-role') || '';
+    if (role === 'admin' || role === 'superadmin') return ADMIN_PIN;
     return sessionStorage.getItem(SESSION_KEY) === '1' ? ADMIN_PIN : '';
   } catch {
     return '';

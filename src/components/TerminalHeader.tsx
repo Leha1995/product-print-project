@@ -4,6 +4,9 @@ interface TerminalHeaderProps {
   printedCount: number;
   onNavigate: (target: string) => void;
   isAdmin: boolean;
+  isSuperAdmin?: boolean;
+  userName?: string;
+  onUsersClick?: () => void;
   onAdminClick: () => void;
 }
 
@@ -15,6 +18,9 @@ const TerminalHeader = ({
   printedCount,
   onNavigate,
   isAdmin,
+  isSuperAdmin,
+  userName,
+  onUsersClick,
   onAdminClick,
 }: TerminalHeaderProps) => {
   return (
@@ -36,17 +42,29 @@ const TerminalHeader = ({
         Автосуши&nbsp;Автопицца
       </div>
 
-      <div className="flex items-center justify-end gap-4">
+      <div className="flex items-center justify-end gap-3">
+        {isSuperAdmin && (
+          <button
+            onClick={onUsersClick}
+            aria-label="Пользователи"
+            className="flex h-[34px] items-center gap-1.5 border-2 border-primary bg-primary px-2 text-primary-foreground transition-colors hover:bg-secondary"
+          >
+            <Icon name="Users" size={20} strokeWidth={2.5} />
+            <span className="hidden font-head text-[0.65rem] font-medium uppercase tracking-[0.06em] sm:inline">
+              Супер-админ
+            </span>
+          </button>
+        )}
         <button
           onClick={onAdminClick}
-          aria-label={isAdmin ? 'Режим администратора' : 'Вход администратора'}
-          className={`flex h-[34px] items-center gap-1.5 border-2 border-primary px-2 transition-colors ${
+          aria-label="Профиль"
+          className={`flex h-[34px] max-w-[190px] items-center gap-1.5 border-2 border-primary px-2 transition-colors ${
             isAdmin ? 'bg-accent text-accent-foreground' : 'bg-card text-primary hover:bg-muted'
           }`}
         >
           <Icon name={isAdmin ? 'ShieldCheck' : 'CircleUser'} size={20} strokeWidth={2.5} />
-          <span className="hidden font-head text-[0.65rem] font-medium uppercase tracking-[0.06em] sm:inline">
-            {isAdmin ? 'Админ' : 'Вход'}
+          <span className="hidden truncate font-head text-[0.65rem] font-medium uppercase tracking-[0.06em] sm:inline">
+            {userName || (isAdmin ? 'Админ' : 'Профиль')}
           </span>
         </button>
         <span className="relative inline-flex h-[30px] w-[34px] items-center justify-center">

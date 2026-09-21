@@ -1,0 +1,26 @@
+{
+  "tests": [
+    {
+      "name": "Проверка сессии без токена",
+      "method": "GET",
+      "path": "/?action=me",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Неверный логин",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "login", "username": "nobody", "password": "wrong"},
+      "expectedStatus": 401
+    },
+    {
+      "name": "Вход супер-админа",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "login", "username": "superadmin", "password": "15271527"},
+      "expectedStatus": 200,
+      "expectedBody": {"token": "string"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

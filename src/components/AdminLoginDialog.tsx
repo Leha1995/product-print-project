@@ -1,43 +1,40 @@
 import { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
-import NumericKeypad from '@/components/NumericKeypad';
+import { apiChangePassword, AuthUser } from '@/lib/authApi';
+import { toast } from '@/hooks/use-toast';
 
 interface AdminLoginDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onLogin: (pin: string) => boolean;
-  isAdmin: boolean;
+  user: AuthUser | null;
   onLogout: () => void;
 }
 
-const fieldClass =
-  'w-full select-none border-2 border-primary bg-card px-3 py-3 text-center font-head text-2xl leading-8 tracking-[0.4em] text-primary';
+const roleLabel: Record<string, string> = {
+  user: 'Сотрудник',
+  admin: 'Администратор',
+  superadmin: 'Супер-администратор',
+};
 
-const AdminLoginDialog = ({
-  open,
-  onOpenChange,
-  onLogin,
-  isAdmin,
-  onLogout,
-}: AdminLoginDialogProps) => {
-  const [value, setValue] = useState('');
-  const [error, setError] = useState('');
+const AdminLoginDialog = ({ open, onOpenChange, user, onLogout }: AdminLoginDialogProps) => {
+  const [password, setPassword] = useState('');
 
   useEffect(() => {
-    if (open) {
-      setValue('');
-      setError('');
-    }
+    if (open) setPassword('');
   }, [open]);
 
-  const submit = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (onLogin(value)) {
-      onOpenChange(false);
-    } else {
-      setError('Неверный пароль. Попробуйте ещё раз');
-      setValue('');
+  const save = async () => {
+    if (password.length < 4) {
+      toast({ title: 'Пароль от 4 символов' });
+      return;
+    }
+    try {
+      await apiChangePassword(password);
+      setPassword('');
+      toast({ title: 'Пароль обновлён' });
+    } catch {
+      toast({ title: 'Не удалось сменить пароль' });
     }
   };
 
@@ -47,49 +44,47 @@ const AdminLoginDialog = ({
         <div className="p-6">
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center border-2 border-primary bg-accent text-accent-foreground">
-              <Icon name={isAdmin ? 'ShieldCheck' : 'Lock'} size={22} strokeWidth={2.5} />
+              <Icon name="CircleUser" size={22} strokeWidth={2.5} />
             </span>
             <div>
               <h3 className="font-head text-xl font-bold uppercase leading-tight text-primary">
-                {isAdmin ? 'Режим администратора' : 'Вход администратора'}
+                {user?.fullName || user?.username || 'Профиль'}
               </h3>
               <p className="text-[13px] text-muted-foreground">
-                {isAdmin
-                  ? 'Можно менять фото, названия, сроки и температуру хранения'
-                  : 'Введите пароль, чтобы редактировать каталог'}
+                {roleLabel[user?.role || 'user']} · {user?.username}
               </p>
             </div>
           </div>
 
-          {!isAdmin ? (
-            <form onSubmit={submit} className="mt-5 grid gap-3">
-              <div className={fieldClass}>
-                {value ? '•'.repeat(value.length) : <span className="opacity-40">••••••••</span>}
-              </div>
-              {error && <p className="text-[13px] text-destructive">{error}</p>}
-              <NumericKeypad
-                value={value}
-                onChange={(v) => {
-                  setValue(v);
-                  setError('');
-                }}
-                onSubmit={() => submit()}
-              />
-            </form>
-          ) : (
-            <div className="mt-5 grid gap-3">
-              <button
-                onClick={() => {
-                  onLogout();
-                  onOpenChange(false);
-                }}
-                className="flex items-center justify-center gap-2 border-2 border-primary bg-accent px-4 py-3 font-head text-[0.85rem] font-medium uppercase tracking-[0.04em] text-accent-foreground transition-transform hover:-translate-y-0.5"
-              >
-                <Icon name="LogOut" size={18} strokeWidth={2.5} />
-                Выйти из режима
-              </button>
-            </div>
-          )}
+          <div className="mt-5 grid gap-2">
+            <span className="font-head text-[0.72rem] font-medium uppercase tracking-[0.08em] text-primary">
+              Сменить пароль
+            </span>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Новый пароль"
+              className="w-full border-2 border-primary bg-card px-3 py-3 font-body text-[15px] text-primary outline-none"
+            />
+            <button
+              onClick={save}
+              className="flex items-center justify-center gap-2 border-2 border-primary bg-card px-4 py-3 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] text-primary transition-colors hover:bg-muted"
+            >
+              <Icon name="KeyRound" size={18} strokeWidth={2.5} />
+              Сохранить пароль
+            </button>
+            <button
+              onClick={() => {
+                onLogout();
+                onOpenChange(false);
+              }}
+              className="flex items-center justify-center gap-2 border-2 border-primary bg-accent px-4 py-3 font-head text-[0.85rem] font-medium uppercase tracking-[0.04em] text-accent-foreground transition-transform hover:-translate-y-0.5"
+            >
+              <Icon name="LogOut" size={18} strokeWidth={2.5} />
+              Выйти
+            </button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
