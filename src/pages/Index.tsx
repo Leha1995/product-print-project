@@ -36,6 +36,7 @@ const Index = () => {
     categories: catList,
     prefs,
     saveProduct,
+    addProducts,
     removeProduct,
     replaceCatalog,
     saveCategories,
@@ -386,9 +387,11 @@ const Index = () => {
         open={sharedOpen}
         onOpenChange={setSharedOpen}
         localProducts={items}
-        onImport={(list) => {
-          list.forEach((p) => saveProduct(p));
-          toast({ title: 'Карточки добавлены', description: `${list.length} шт. из общей базы` });
+        onImport={async (list) => {
+          const added = await addProducts(list);
+          if (added) {
+            toast({ title: 'Карточки добавлены', description: `${added} шт. из общей базы` });
+          }
         }}
       />
       <DefrostDialog

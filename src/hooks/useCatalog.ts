@@ -7,6 +7,7 @@ import {
   pushCategories,
   pushPrefs,
   pushProduct,
+  pushProducts,
   replaceAll,
   seedCatalog,
 } from '@/lib/catalogApi';
@@ -73,6 +74,22 @@ export const useCatalog = (userId?: number | null) => {
     }
   }, []);
 
+  const addProducts = useCallback(async (list: Product[]) => {
+    if (!list.length) return 0;
+    try {
+      let last: Product[] = [];
+      for (let i = 0; i < list.length; i += 40) {
+        const res = await pushProducts(list.slice(i, i + 40));
+        last = res.products ?? last;
+      }
+      setItems(last);
+      return list.length;
+    } catch {
+      toast({ title: 'Не удалось добавить карточки' });
+      return 0;
+    }
+  }, []);
+
   const replaceCatalog = useCallback(async (next: Product[]) => {
     try {
       const res = await replaceAll(next);
@@ -106,6 +123,7 @@ export const useCatalog = (userId?: number | null) => {
     prefs,
     loading,
     saveProduct,
+    addProducts,
     removeProduct,
     resetCatalog,
     replaceCatalog,
