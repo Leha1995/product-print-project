@@ -32,7 +32,7 @@ const Index = () => {
   const [jobs, setJobs] = useState<PrintJob[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  const { user, ready, login, logout, isAuthed, isAdmin, isSuperAdmin } = useAuth();
+  const { user, ready, kicked, login, logout, isAuthed, isAdmin, isSuperAdmin } = useAuth();
   const { managed, refreshManaged } = useManagedUsers(isAdmin);
   const [targetId, setTargetId] = useState<number | null>(null);
   const activeTarget = targetId ?? user?.id ?? null;
@@ -302,7 +302,7 @@ const Index = () => {
   }
 
   if (!isAuthed) {
-    return <LoginScreen onLogin={login} />;
+    return <LoginScreen onLogin={login} kicked={kicked} />;
   }
 
   return (

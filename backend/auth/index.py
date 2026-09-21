@@ -140,6 +140,7 @@ def handler(event: dict, context) -> dict:
                 return done({'error': 'invalid_credentials'}, 401)
             new_token = secrets.token_hex(24)
             expires = datetime.utcnow() + timedelta(days=SESSION_DAYS)
+            cur.execute(f'DELETE FROM app_sessions WHERE user_id = {row[0]}')
             cur.execute(
                 'INSERT INTO app_sessions (token, user_id, expires_at) VALUES '
                 f"({q(new_token)}, {row[0]}, {q(expires.isoformat(sep=' ', timespec='seconds'))})"

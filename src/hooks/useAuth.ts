@@ -6,7 +6,6 @@ import {
   AuthUser,
   forgetLogin,
   getCachedUser,
-  getRemembered,
   getToken,
   rememberLogin,
   setCachedUser,
@@ -28,6 +27,7 @@ export const useAuth = () => {
   const hasToken = !!getToken();
   const [user, setUser] = useState<AuthUser | null>(hasToken ? getCachedUser() : null);
   const [ready, setReady] = useState(!hasToken);
+  const [kicked, setKicked] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -46,24 +46,9 @@ export const useAuth = () => {
         setCachedUser(res.user);
         setUser(res.user);
       } else if (res.status === 'invalid') {
-        const saved = getRemembered();
-        if (saved.username && saved.password) {
-          try {
-            const again = await apiLogin(saved.username, saved.password);
-            if (!alive) return;
-            setToken(again.token);
-            rememberRole(again.user);
-            setCachedUser(again.user);
-            setUser(again.user);
-            setReady(true);
-            return;
-          } catch {
-            /* сохранённые данные больше не подходят */
-          }
-        }
-        if (!alive) return;
         setToken('');
         setCachedUser(null);
+        forgetLogin(true);
         rememberRole(null);
         setUser(null);
       }
@@ -74,12 +59,35 @@ export const useAuth = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!user) return;
+    const check = async () => {
+      if (document.hidden || !getToken()) return;
+      const res = await apiMe();
+      if (res.status === 'invalid') {
+        setToken('');
+        setCachedUser(null);
+        forgetLogin(true);
+        rememberRole(null);
+        setUser(null);
+        setKicked(true);
+      }
+    };
+    const timer = window.setInterval(check, 30000);
+    document.addEventListener('visibilitychange', check);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', check);
+    };
+  }, [user]);
+
   const login = useCallback(async (username: string, password: string) => {
     const res = await apiLogin(username.trim(), password);
     setToken(res.token);
     rememberRole(res.user);
     setCachedUser(res.user);
-    rememberLogin(username.trim(), password);
+    rememberLogin(username.trim(), '');
+    setKicked(false);
     setUser(res.user);
     return res.user;
   }, []);
@@ -96,6 +104,7 @@ export const useAuth = () => {
   return {
     user,
     ready,
+    kicked,
     login,
     logout,
     isAuthed: !!user,

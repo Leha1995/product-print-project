@@ -5,9 +5,10 @@ import { forgetLogin, getRemembered } from '@/lib/authApi';
 
 interface LoginScreenProps {
   onLogin: (username: string, password: string) => Promise<unknown>;
+  kicked?: boolean;
 }
 
-const LoginScreen = ({ onLogin }: LoginScreenProps) => {
+const LoginScreen = ({ onLogin, kicked }: LoginScreenProps) => {
   const saved = getRemembered();
   const [username, setUsername] = useState(saved.username);
   const [password, setPassword] = useState(saved.password);
@@ -55,6 +56,15 @@ const LoginScreen = ({ onLogin }: LoginScreenProps) => {
             <p className="text-[13px] text-muted-foreground">Вход в терминал маркировки</p>
           </div>
         </div>
+
+        {kicked && (
+          <div className="mt-5 flex items-start gap-2 border-2 border-destructive bg-destructive/10 px-3 py-2.5">
+            <Icon name="TriangleAlert" size={18} className="mt-0.5 shrink-0 text-destructive" strokeWidth={2.5} />
+            <p className="text-[13px] text-destructive">
+              Под вашим логином вошли на другом устройстве — здесь сеанс завершён
+            </p>
+          </div>
+        )}
 
         <label className="mt-6 block">
           <span className="font-head text-[0.72rem] font-medium uppercase tracking-[0.08em] text-primary">
