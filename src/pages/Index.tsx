@@ -5,6 +5,8 @@ import PrintDialog from '@/components/PrintDialog';
 import ProductFormDialog from '@/components/ProductFormDialog';
 import useCatalog from '@/hooks/useCatalog';
 import useManagedUsers from '@/hooks/useManagedUsers';
+import StaffOverviewDialog from '@/components/StaffOverviewDialog';
+import { fetchOverview } from '@/lib/catalogApi';
 import WorkspaceSwitcher from '@/components/WorkspaceSwitcher';
 import useCategories from '@/hooks/useCategories';
 import AdminLoginDialog from '@/components/AdminLoginDialog';
@@ -58,7 +60,25 @@ const Index = () => {
     replaceCategories,
   } = useCategories(catList, saveCategories);
   const [usersOpen, setUsersOpen] = useState(false);
+  const [overviewOpen, setOverviewOpen] = useState(false);
+  const [alertCount, setAlertCount] = useState(0);
   const { markPrinted, getExpiry, getStatus, now } = usePrintHistory(history, saveHistory);
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setAlertCount(0);
+      return;
+    }
+    const load = () =>
+      fetchOverview()
+        .then((list) =>
+          setAlertCount(list.reduce((sum, s) => sum + s.expired.length + s.soon.length, 0)),
+        )
+        .catch(() => undefined);
+    load();
+    const timer = window.setInterval(load, 120000);
+    return () => window.clearInterval(timer);
+  }, [isAdmin, overviewOpen]);
   const [adminOpen, setAdminOpen] = useState(false);
   const { settings, update, reset } = useLabelSettings();
   const [quickPrint, setQuickPrint] = useState<Product | null>(null);
@@ -316,6 +336,8 @@ const Index = () => {
         isSuperAdmin={isSuperAdmin}
         userName={user?.fullName || user?.username || ''}
         onUsersClick={() => setUsersOpen(true)}
+        onOverviewClick={() => setOverviewOpen(true)}
+        alertCount={alertCount}
         onAdminClick={() => setAdminOpen(true)}
       />
       {isAdmin && user && (
@@ -458,6 +480,14 @@ const Index = () => {
             title: 'Вы вышли из аккаунта',
             description: forget ? 'Сохранённый вход на устройстве удалён' : undefined,
           });
+        }}
+      />
+      <StaffOverviewDialog
+        open={overviewOpen}
+        onOpenChange={setOverviewOpen}
+        onOpenStaff={(id) => {
+          setTargetId(id);
+          scrollTo('menu');
         }}
       />
       <UsersDialog

@@ -7,6 +7,8 @@ interface TerminalHeaderProps {
   isSuperAdmin?: boolean;
   userName?: string;
   onUsersClick?: () => void;
+  onOverviewClick?: () => void;
+  alertCount?: number;
   onAdminClick: () => void;
 }
 
@@ -21,6 +23,8 @@ const TerminalHeader = ({
   isSuperAdmin,
   userName,
   onUsersClick,
+  onOverviewClick,
+  alertCount = 0,
   onAdminClick,
 }: TerminalHeaderProps) => {
   return (
@@ -43,6 +47,22 @@ const TerminalHeader = ({
       </div>
 
       <div className="flex items-center justify-end gap-3">
+        {isAdmin && (
+          <button
+            onClick={onOverviewClick}
+            aria-label="Сводка по сотрудникам"
+            className={`relative flex h-[34px] items-center gap-1.5 border-2 border-primary px-2 transition-colors ${
+              alertCount
+                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/80'
+                : 'bg-card text-primary hover:bg-muted'
+            }`}
+          >
+            <Icon name="ClipboardList" size={20} strokeWidth={2.5} />
+            <span className="hidden font-head text-[0.65rem] font-medium uppercase tracking-[0.06em] sm:inline">
+              Сводка{alertCount ? ` · ${alertCount}` : ''}
+            </span>
+          </button>
+        )}
         {isAdmin && (
           <button
             onClick={onUsersClick}

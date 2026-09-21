@@ -73,6 +73,29 @@ export const fetchCatalog = async (): Promise<CatalogSnapshot> => {
 export const pushHistory = (history: PrintHistoryMap) =>
   post({ action: 'history', history });
 
+export interface OverviewItem {
+  id: string;
+  name: string;
+  expiresAt: number;
+  leftMs: number;
+}
+
+export interface StaffOverview {
+  id: number;
+  username: string;
+  fullName: string;
+  expired: OverviewItem[];
+  soon: OverviewItem[];
+  total: number;
+}
+
+export const fetchOverview = async (): Promise<StaffOverview[]> => {
+  const res = await fetch(`${API}?action=overview`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(String(res.status));
+  const data = await res.json();
+  return Array.isArray(data.staff) ? (data.staff as StaffOverview[]) : [];
+};
+
 export const seedCatalog = (products: Product[], categories: Category[]) =>
   post({ action: 'seed', products, categories });
 

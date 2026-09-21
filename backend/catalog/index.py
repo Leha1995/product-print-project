@@ -1,6 +1,7 @@
 import json
 import os
 import base64
+import time
 import uuid
 
 import boto3
@@ -57,6 +58,54 @@ def can_manage(cur, me, target_id: int) -> bool:
         row = cur.fetchone()
         return bool(row and row[0] == me['id'])
     return False
+
+
+def build_overview(cur, me, soon_ms: int = 3600000):
+    """Сводка по сотрудникам: что просрочено и что скоро истекает."""
+    if me['role'] == 'superadmin':
+        cur.execute(
+            'SELECT id, username, full_name FROM app_users WHERE active AND role = %s ORDER BY username'
+            % q('user')
+        )
+    else:
+        cur.execute(
+            'SELECT id, username, full_name FROM app_users WHERE active '
+            f"AND manager_id = {me['id']} ORDER BY username"
+        )
+    staff = [{'id': r[0], 'username': r[1], 'fullName': r[2]} for r in cur.fetchall()]
+    if not staff:
+        return []
+
+    now_ms = int(time.time() * 1000)
+    result = []
+    for person in staff:
+        uid = person['id']
+        history = read_pref_key(cur, uid, 'history') or {}
+        if not history:
+            result.append({**person, 'expired': [], 'soon': [], 'total': 0})
+            continue
+        cur.execute(
+            'SELECT id, name, shelf_life_hours FROM user_products '
+            f'WHERE user_id = {uid} AND shelf_life_hours IS NOT NULL'
+        )
+        expired, soon = [], []
+        for pid, name, hours in cur.fetchall():
+            stamp = history.get(pid)
+            if not stamp or not hours:
+                continue
+            expires_at = int(stamp) + int(hours) * 3600000
+            left = expires_at - now_ms
+            row = {'id': pid, 'name': name, 'expiresAt': expires_at, 'leftMs': left}
+            if left <= 0:
+                expired.append(row)
+            elif left <= soon_ms:
+                soon.append(row)
+        expired.sort(key=lambda x: x['leftMs'])
+        soon.sort(key=lambda x: x['leftMs'])
+        result.append({**person, 'expired': expired, 'soon': soon, 'total': len(expired) + len(soon)})
+
+    result.sort(key=lambda x: (-len(x['expired']), -len(x['soon']), x['username']))
+    return result
 
 
 def read_products(cur, uid: int):
@@ -181,6 +230,12 @@ def handler(event: dict, context) -> dict:
         if not can_manage(cur, me, target):
             return finish({'error': 'forbidden'}, 403)
         uid = target
+
+    params = event.get('queryStringParameters') or {}
+    if method == 'GET' and params.get('action') == 'overview':
+        if me['role'] not in ('admin', 'superadmin'):
+            return finish({'error': 'forbidden'}, 403)
+        return finish({'staff': build_overview(cur, me)})
 
     if method == 'GET':
         cur.execute(f'SELECT seeded FROM user_meta WHERE user_id = {uid}')
