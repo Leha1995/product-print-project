@@ -42,6 +42,10 @@ const UsersDialog = ({
   const [role, setRole] = useState<Role>('user');
   const [managerId, setManagerId] = useState<number | ''>('');
   const [busy, setBusy] = useState(false);
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editLogin, setEditLogin] = useState('');
+  const [editPass, setEditPass] = useState('');
 
   const admins = users.filter((u) => u.role === 'admin' || u.role === 'superadmin');
 
@@ -112,14 +116,46 @@ const UsersDialog = ({
     }
   };
 
-  const resetPassword = (u: ManagedUser) => {
-    const next = window.prompt(`Новый пароль для «${u.username}»`, '');
-    if (!next) return;
-    if (next.length < 4) {
+  const startEdit = (u: ManagedUser) => {
+    setEditId(u.id);
+    setEditName(u.fullName || '');
+    setEditLogin(u.username);
+    setEditPass('');
+  };
+
+  const cancelEdit = () => {
+    setEditId(null);
+    setEditPass('');
+  };
+
+  const saveEdit = async (u: ManagedUser) => {
+    const login = editLogin.trim().toLowerCase();
+    if (login.length < 3) {
+      toast({ title: 'Логин от 3 символов' });
+      return;
+    }
+    if (editPass && editPass.length < 4) {
       toast({ title: 'Пароль от 4 символов' });
       return;
     }
-    patch({ id: u.id, password: next }, 'Пароль обновлён');
+    setBusy(true);
+    try {
+      const r = await apiUpdateUser({
+        id: u.id,
+        username: login !== u.username ? login : undefined,
+        fullName: editName.trim(),
+        password: editPass || undefined,
+      });
+      apply(r.users);
+      cancelEdit();
+      toast({ title: 'Данные сохранены' });
+    } catch (e) {
+      toast({
+        title: String(e).includes('username_taken') ? 'Такой логин уже есть' : 'Не удалось сохранить',
+      });
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -204,6 +240,46 @@ const UsersDialog = ({
                 key={u.id}
                 className="flex flex-wrap items-center gap-2 border-2 border-primary bg-card px-3 py-2"
               >
+                {editId === u.id ? (
+                  <div className="grid w-full gap-2 md:grid-cols-2">
+                    <input
+                      value={editLogin}
+                      onChange={(e) => setEditLogin(e.target.value)}
+                      placeholder="Логин"
+                      className={inputClass}
+                    />
+                    <input
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder="Имя сотрудника"
+                      className={inputClass}
+                    />
+                    <input
+                      value={editPass}
+                      onChange={(e) => setEditPass(e.target.value)}
+                      placeholder="Новый пароль (не обязательно)"
+                      className={`${inputClass} md:col-span-2`}
+                    />
+                    <div className="flex gap-2 md:col-span-2">
+                      <button
+                        onClick={() => saveEdit(u)}
+                        disabled={busy}
+                        className="flex items-center gap-1.5 border-2 border-primary bg-accent px-4 py-2 font-head text-[0.75rem] font-bold uppercase text-accent-foreground transition-transform hover:-translate-y-0.5 disabled:opacity-60"
+                      >
+                        <Icon name="Check" size={15} strokeWidth={2.5} />
+                        Сохранить
+                      </button>
+                      <button
+                        onClick={cancelEdit}
+                        className="flex items-center gap-1.5 border-2 border-primary bg-background px-4 py-2 font-head text-[0.75rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
+                      >
+                        <Icon name="X" size={15} strokeWidth={2.5} />
+                        Отмена
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                <>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-head text-[0.85rem] font-bold uppercase text-primary">
                     {u.username}
@@ -254,11 +330,11 @@ const UsersDialog = ({
                   </select>
                 )}
                 <button
-                  onClick={() => resetPassword(u)}
+                  onClick={() => startEdit(u)}
                   className="flex items-center gap-1 border-2 border-primary bg-background px-2 py-1 font-head text-[0.7rem] uppercase text-primary transition-colors hover:bg-muted"
                 >
-                  <Icon name="KeyRound" size={14} strokeWidth={2.5} />
-                  Пароль
+                  <Icon name="Pencil" size={14} strokeWidth={2.5} />
+                  Изменить
                 </button>
                 <button
                   onClick={() => patch({ id: u.id, active: !u.active }, u.active ? 'Доступ закрыт' : 'Доступ открыт')}
@@ -281,6 +357,8 @@ const UsersDialog = ({
                     <Icon name="Trash2" size={14} strokeWidth={2.5} />
                     Удалить
                   </button>
+                )}
+                </>
                 )}
               </div>
             ))}

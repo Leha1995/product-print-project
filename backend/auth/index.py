@@ -250,6 +250,16 @@ def handler(event: dict, context) -> dict:
             if user_id == me['id'] and body.get('active') is False:
                 return done({'error': 'self_lock'}, 400)
             sets = []
+            if body.get('username'):
+                new_name = str(body['username']).strip().lower()
+                if len(new_name) < 3:
+                    return done({'error': 'invalid_input'}, 400)
+                cur.execute(
+                    f'SELECT 1 FROM app_users WHERE lower(username) = {q(new_name)} AND id <> {user_id}'
+                )
+                if cur.fetchone():
+                    return done({'error': 'username_taken'}, 409)
+                sets.append(f'username = {q(new_name)}')
             if body.get('password'):
                 sets.append(f'password_hash = {q(hash_password(str(body["password"])))}')
             if body.get('role') in ROLES:

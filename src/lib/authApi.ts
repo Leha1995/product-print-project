@@ -184,6 +184,7 @@ export const apiCreateUser = (payload: {
 
 export const apiUpdateUser = (payload: {
   id: number;
+  username?: string;
   password?: string;
   fullName?: string;
   role?: Role;
