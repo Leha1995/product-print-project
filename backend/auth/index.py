@@ -179,6 +179,8 @@ def handler(event: dict, context) -> dict:
             user_id = int(body.get('id') or 0)
             if not user_id:
                 return done({'error': 'invalid_input'}, 400)
+            if user_id == me['id'] and body.get('active') is False:
+                return done({'error': 'self_lock'}, 400)
             sets = []
             if body.get('password'):
                 sets.append(f'password_hash = {q(hash_password(str(body["password"])))}')
@@ -193,6 +195,24 @@ def handler(event: dict, context) -> dict:
             cur.execute(f'UPDATE app_users SET {", ".join(sets)} WHERE id = {user_id}')
             if body.get('active') is False:
                 cur.execute(f'UPDATE app_sessions SET expires_at = NOW() WHERE user_id = {user_id}')
+            return done({'users': list_users(cur)})
+
+        if action == 'delete_user':
+            user_id = int(body.get('id') or 0)
+            if not user_id:
+                return done({'error': 'invalid_input'}, 400)
+            if user_id == me['id']:
+                return done({'error': 'self_delete'}, 400)
+            cur.execute(f'SELECT role FROM app_users WHERE id = {user_id}')
+            row = cur.fetchone()
+            if not row:
+                return done({'error': 'not_found'}, 404)
+            if row[0] == 'superadmin':
+                cur.execute("SELECT COUNT(*) FROM app_users WHERE role = 'superadmin' AND active")
+                if cur.fetchone()[0] <= 1:
+                    return done({'error': 'last_superadmin'}, 400)
+            cur.execute(f'DELETE FROM app_sessions WHERE user_id = {user_id}')
+            cur.execute(f'DELETE FROM app_users WHERE id = {user_id}')
             return done({'users': list_users(cur)})
 
         return done({'error': 'unknown_action'}, 400)

@@ -117,5 +117,8 @@ export const apiUpdateUser = (payload: {
   active?: boolean;
 }) => call<{ users: ManagedUser[] }>({ action: 'update_user', ...payload });
 
+export const apiDeleteUser = (id: number) =>
+  call<{ users: ManagedUser[] }>({ action: 'delete_user', id });
+
 export const apiChangePassword = (password: string) =>
   call<{ ok: boolean }>({ action: 'change_password', password });

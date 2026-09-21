@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
-import { apiCreateUser, apiUpdateUser, apiUsers, ManagedUser, Role } from '@/lib/authApi';
+import {
+  apiCreateUser,
+  apiDeleteUser,
+  apiUpdateUser,
+  apiUsers,
+  ManagedUser,
+  Role,
+} from '@/lib/authApi';
 import { toast } from '@/hooks/use-toast';
 
 interface UsersDialogProps {
@@ -64,6 +71,21 @@ const UsersDialog = ({ open, onOpenChange, currentId }: UsersDialogProps) => {
       toast({ title: msg });
     } catch {
       toast({ title: 'Не удалось сохранить' });
+    }
+  };
+
+  const remove = async (u: ManagedUser) => {
+    if (!window.confirm(`Удалить пользователя «${u.username}»? Отменить это нельзя.`)) return;
+    try {
+      const r = await apiDeleteUser(u.id);
+      setUsers(r.users);
+      toast({ title: 'Пользователь удалён' });
+    } catch (e) {
+      toast({
+        title: String(e).includes('last_superadmin')
+          ? 'Нельзя удалить последнего супер-админа'
+          : 'Не удалось удалить',
+      });
     }
   };
 
@@ -176,6 +198,14 @@ const UsersDialog = ({ open, onOpenChange, currentId }: UsersDialogProps) => {
                 >
                   <Icon name={u.active ? 'UserX' : 'UserCheck'} size={14} strokeWidth={2.5} />
                   {u.active ? 'Отключить' : 'Включить'}
+                </button>
+                <button
+                  onClick={() => remove(u)}
+                  disabled={u.id === currentId}
+                  className="flex items-center gap-1 border-2 border-destructive bg-destructive px-2 py-1 font-head text-[0.7rem] uppercase text-destructive-foreground transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-40"
+                >
+                  <Icon name="Trash2" size={14} strokeWidth={2.5} />
+                  Удалить
                 </button>
               </div>
             ))}
