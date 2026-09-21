@@ -183,6 +183,45 @@ def save_product(cur, uid: int, p: dict):
     return 1
 
 
+def product_values(uid: int, p: dict):
+    pid = str(p.get('id') or '')
+    if not pid or not p.get('name'):
+        return None
+    image = p.get('image') or ''
+    if image.startswith('data:'):
+        image = upload_image(image, pid)
+    elif image.startswith('idb:'):
+        image = ''
+    cats = p.get('categories') or ([p['category']] if p.get('category') else [])
+    shelf = p.get('shelfLifeHours')
+    shelf_sql = str(int(shelf)) if isinstance(shelf, (int, float)) and shelf else 'NULL'
+    return (
+        f"({uid}, {q(pid)}, {q(p.get('name'))}, {q(p.get('category') or '')}, "
+        f"{q(json.dumps(cats))}::jsonb, {q(p.get('weight') or '')}, {q(p.get('composition') or '')}, "
+        f"{q(image)}, {q(p.get('barcode') or '')}, {'TRUE' if p.get('hit') else 'FALSE'}, {shelf_sql}, "
+        f"{q(p.get('storageText') or '')}, NOW())"
+    )
+
+
+def save_products_bulk(cur, uid: int, products: list, chunk: int = 60):
+    rows = [v for v in (product_values(uid, p) for p in products) if v]
+    saved = 0
+    for i in range(0, len(rows), chunk):
+        part = rows[i:i + chunk]
+        cur.execute(
+            'INSERT INTO user_products (user_id, id, name, category, categories, weight, composition, '
+            'image, barcode, hit, shelf_life_hours, storage_text, updated_at) VALUES '
+            + ', '.join(part)
+            + ' ON CONFLICT (user_id, id) DO UPDATE SET name = EXCLUDED.name, '
+            'category = EXCLUDED.category, categories = EXCLUDED.categories, weight = EXCLUDED.weight, '
+            'composition = EXCLUDED.composition, image = EXCLUDED.image, barcode = EXCLUDED.barcode, '
+            'hit = EXCLUDED.hit, shelf_life_hours = EXCLUDED.shelf_life_hours, '
+            'storage_text = EXCLUDED.storage_text, updated_at = NOW()'
+        )
+        saved += len(part)
+    return saved
+
+
 def save_categories(cur, uid: int, cats: list):
     keep = [str(c.get('id')) for c in cats if c.get('id')]
     if keep:
@@ -265,8 +304,7 @@ def handler(event: dict, context) -> dict:
                     'seeded': True,
                 }
             )
-        for p in body.get('products') or []:
-            save_product(cur, uid, p)
+        save_products_bulk(cur, uid, body.get('products') or [])
         cats = body.get('categories') or []
         if cats:
             save_categories(cur, uid, cats)
@@ -314,8 +352,7 @@ def handler(event: dict, context) -> dict:
 
     if action == 'replace':
         cur.execute(f'DELETE FROM user_products WHERE user_id = {uid}')
-        for p in body.get('products') or []:
-            save_product(cur, uid, p)
+        save_products_bulk(cur, uid, body.get('products') or [])
         if body.get('categories'):
             save_categories(cur, uid, body['categories'])
         cur.execute(
@@ -327,5 +364,5 @@ def handler(event: dict, context) -> dict:
         )
 
     items = body.get('products') or ([body['product']] if body.get('product') else [])
-    saved = sum(save_product(cur, uid, p) for p in items)
+    saved = save_products_bulk(cur, uid, items)
     return finish({'saved': saved, 'products': read_products(cur, uid)})
