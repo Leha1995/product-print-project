@@ -89,13 +89,43 @@ const call = async <T>(body: Record<string, unknown>): Promise<T> => {
 export const apiLogin = (username: string, password: string) =>
   call<{ token: string; user: AuthUser }>({ action: 'login', username, password });
 
-export const apiMe = async (): Promise<AuthUser | null> => {
+const USER_KEY = 'asap-auth-user';
+
+export const getCachedUser = (): AuthUser | null => {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    return raw ? (JSON.parse(raw) as AuthUser) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const setCachedUser = (user: AuthUser | null) => {
+  try {
+    if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+    else localStorage.removeItem(USER_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+};
+
+export type MeResult =
+  | { status: 'ok'; user: AuthUser }
+  | { status: 'invalid' }
+  | { status: 'offline' };
+
+export const apiMe = async (): Promise<MeResult> => {
   const token = getToken();
-  if (!token) return null;
-  const res = await fetch(`${API}?action=me`, { headers: { 'X-Auth-Token': token } });
-  if (!res.ok) return null;
-  const data = await res.json().catch(() => ({ user: null }));
-  return (data as { user: AuthUser | null }).user;
+  if (!token) return { status: 'invalid' };
+  try {
+    const res = await fetch(`${API}?action=me`, { headers: { 'X-Auth-Token': token } });
+    if (res.status >= 500) return { status: 'offline' };
+    const data = (await res.json().catch(() => ({ user: null }))) as { user: AuthUser | null };
+    if (!res.ok || !data.user) return { status: 'invalid' };
+    return { status: 'ok', user: data.user };
+  } catch {
+    return { status: 'offline' };
+  }
 };
 
 export const apiLogout = () => call<{ ok: boolean }>({ action: 'logout' });

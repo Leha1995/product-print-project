@@ -5,8 +5,10 @@ import {
   apiMe,
   AuthUser,
   forgetLogin,
+  getCachedUser,
   getToken,
   rememberLogin,
+  setCachedUser,
   setToken,
 } from '@/lib/authApi';
 
@@ -22,21 +24,32 @@ const rememberRole = (user: AuthUser | null) => {
 };
 
 export const useAuth = () => {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [ready, setReady] = useState(false);
+  const hasToken = !!getToken();
+  const [user, setUser] = useState<AuthUser | null>(hasToken ? getCachedUser() : null);
+  const [ready, setReady] = useState(!hasToken);
 
   useEffect(() => {
     let alive = true;
     (async () => {
       if (!getToken()) {
-        if (alive) setReady(true);
+        if (alive) {
+          setCachedUser(null);
+          setReady(true);
+        }
         return;
       }
-      const me = await apiMe().catch(() => null);
+      const res = await apiMe();
       if (!alive) return;
-      if (!me) setToken('');
-      rememberRole(me);
-      setUser(me);
+      if (res.status === 'ok') {
+        rememberRole(res.user);
+        setCachedUser(res.user);
+        setUser(res.user);
+      } else if (res.status === 'invalid') {
+        setToken('');
+        setCachedUser(null);
+        rememberRole(null);
+        setUser(null);
+      }
       setReady(true);
     })();
     return () => {
@@ -48,6 +61,7 @@ export const useAuth = () => {
     const res = await apiLogin(username.trim(), password);
     setToken(res.token);
     rememberRole(res.user);
+    setCachedUser(res.user);
     if (res.user.role === 'user') rememberLogin(username.trim(), password);
     else rememberLogin(username.trim(), '');
     setUser(res.user);
@@ -58,6 +72,7 @@ export const useAuth = () => {
     await apiLogout().catch(() => null);
     if (forget) forgetLogin();
     setToken('');
+    setCachedUser(null);
     rememberRole(null);
     setUser(null);
   }, []);

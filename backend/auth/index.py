@@ -14,7 +14,7 @@ CORS = {
     'Content-Type': 'application/json',
 }
 
-SESSION_DAYS = 30
+SESSION_DAYS = 365
 ROLES = ('user', 'admin', 'superadmin')
 
 
@@ -60,6 +60,10 @@ def session_user(cur, token: str):
     row = cur.fetchone()
     if not row or not row[4]:
         return None
+    cur.execute(
+        f"UPDATE app_sessions SET expires_at = NOW() + INTERVAL '{SESSION_DAYS} days' "
+        f'WHERE token = {q(token)}'
+    )
     return {'id': row[0], 'username': row[1], 'fullName': row[2], 'role': row[3]}
 
 
