@@ -28,6 +28,27 @@ const roleLabel: Record<Role, string> = {
 const inputClass =
   'w-full border-2 border-primary bg-background px-3 py-2 font-body text-[14px] text-primary outline-none';
 
+const accessOptions: { days: number | ''; label: string }[] = [
+  { days: '', label: 'Без ограничения' },
+  { days: 1, label: '1 день' },
+  { days: 7, label: '7 дней' },
+  { days: 14, label: '14 дней' },
+  { days: 30, label: '30 дней' },
+  { days: 90, label: '90 дней' },
+  { days: 180, label: '180 дней' },
+  { days: 365, label: '1 год' },
+];
+
+const accessInfo = (until: string | null) => {
+  if (!until) return { text: 'Доступ без срока', expired: false };
+  const end = new Date(until.endsWith('Z') ? until : `${until}Z`).getTime();
+  const left = end - Date.now();
+  const date = new Date(end).toLocaleDateString('ru-RU');
+  if (left <= 0) return { text: `Доступ истёк ${date}`, expired: true };
+  const days = Math.ceil(left / 86400000);
+  return { text: `Доступ до ${date} · осталось ${days} дн.`, expired: false };
+};
+
 const UsersDialog = ({
   open,
   onOpenChange,
@@ -46,6 +67,8 @@ const UsersDialog = ({
   const [editName, setEditName] = useState('');
   const [editLogin, setEditLogin] = useState('');
   const [editPass, setEditPass] = useState('');
+  const [accessDays, setAccessDays] = useState<number | ''>('');
+  const [editAccess, setEditAccess] = useState<number | '' | 'keep'>('keep');
 
   const admins = users.filter((u) => u.role === 'admin' || u.role === 'superadmin');
 
@@ -74,6 +97,7 @@ const UsersDialog = ({
         fullName,
         role,
         managerId: role === 'user' ? managerId || null : null,
+        accessDays: accessDays || null,
       });
       apply(r.users);
       setUsername('');
@@ -81,6 +105,7 @@ const UsersDialog = ({
       setPassword('');
       setRole('user');
       setManagerId('');
+      setAccessDays('');
       toast({ title: 'Пользователь добавлен' });
     } catch (e) {
       toast({
@@ -121,6 +146,7 @@ const UsersDialog = ({
     setEditName(u.fullName || '');
     setEditLogin(u.username);
     setEditPass('');
+    setEditAccess('keep');
   };
 
   const cancelEdit = () => {
@@ -145,6 +171,9 @@ const UsersDialog = ({
         username: login !== u.username ? login : undefined,
         fullName: editName.trim(),
         password: editPass || undefined,
+        ...(isSuperAdmin && editAccess !== 'keep'
+          ? { accessDays: editAccess === '' ? null : editAccess }
+          : {}),
       });
       apply(r.users);
       cancelEdit();
@@ -223,6 +252,17 @@ const UsersDialog = ({
                 ))}
               </select>
             )}
+            <select
+              value={accessDays}
+              onChange={(e) => setAccessDays(e.target.value ? Number(e.target.value) : '')}
+              className={`${inputClass} md:col-span-2`}
+            >
+              {accessOptions.map((o) => (
+                <option key={String(o.days)} value={o.days}>
+                  Срок доступа: {o.label}
+                </option>
+              ))}
+            </select>
             <button
               onClick={create}
               disabled={busy}
@@ -254,6 +294,17 @@ const UsersDialog = ({
                           '—'
                         }`
                       : ''}
+                  </p>
+                  <p
+                    className={`truncate text-[12px] font-bold ${
+                      accessInfo(u.accessUntil).expired
+                        ? 'text-destructive'
+                        : u.accessUntil
+                          ? 'text-primary'
+                          : 'text-muted-foreground'
+                    }`}
+                  >
+                    {accessInfo(u.accessUntil).text}
                   </p>
                 </div>
                 {isSuperAdmin && (
@@ -361,6 +412,31 @@ const UsersDialog = ({
                 className={inputClass}
               />
             </div>
+            {isSuperAdmin && (
+              <div>
+                <p className="mb-1 font-head text-[0.7rem] font-bold uppercase text-primary">
+                  Срок доступа
+                </p>
+                <select
+                  value={editAccess}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setEditAccess(v === 'keep' ? 'keep' : v === '' ? '' : Number(v));
+                  }}
+                  className={inputClass}
+                >
+                  <option value="keep">Не менять</option>
+                  {accessOptions.map((o) => (
+                    <option key={String(o.days)} value={o.days}>
+                      {o.days === '' ? 'Снять ограничение' : `Продлить на ${o.label}`}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[12px] text-muted-foreground">
+                  {accessInfo(users.find((x) => x.id === editId)?.accessUntil ?? null).text}
+                </p>
+              </div>
+            )}
             <div className="mt-1 flex gap-2">
               <button
                 onClick={() => {

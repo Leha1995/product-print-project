@@ -41,8 +41,12 @@ const LoginScreen = ({ onLogin, kicked }: LoginScreenProps) => {
     setError('');
     try {
       await onLogin(username, password);
-    } catch {
-      setError('Неверный логин или пароль');
+    } catch (err) {
+      setError(
+        String(err).includes('access_expired')
+          ? 'Срок доступа истёк — обратитесь к администратору'
+          : 'Неверный логин или пароль',
+      );
       setPassword('');
     } finally {
       setBusy(false);

@@ -13,6 +13,7 @@ export interface ManagedUser extends AuthUser {
   active: boolean;
   createdAt: string | null;
   managerId: number | null;
+  accessUntil: string | null;
 }
 
 export interface ManagedTarget {
@@ -180,6 +181,7 @@ export const apiCreateUser = (payload: {
   fullName: string;
   role: Role;
   managerId?: number | null;
+  accessDays?: number | null;
 }) => call<{ users: ManagedUser[] }>({ action: 'create_user', ...payload });
 
 export const apiUpdateUser = (payload: {
@@ -190,6 +192,7 @@ export const apiUpdateUser = (payload: {
   role?: Role;
   active?: boolean;
   managerId?: number | null;
+  accessDays?: number | null;
 }) => call<{ users: ManagedUser[] }>({ action: 'update_user', ...payload });
 
 export const apiDeleteUser = (id: number) =>

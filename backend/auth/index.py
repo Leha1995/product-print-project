@@ -53,12 +53,16 @@ def session_user(cur, token: str):
     if not token:
         return None
     cur.execute(
-        'SELECT u.id, u.username, u.full_name, u.role, u.active FROM app_sessions s '
+        'SELECT u.id, u.username, u.full_name, u.role, u.active, u.access_until FROM app_sessions s '
         f'JOIN app_users u ON u.id = s.user_id WHERE s.token = {q(token)} '
         'AND s.expires_at > NOW()'
     )
     row = cur.fetchone()
     if not row or not row[4]:
+        return None
+    if row[5] and row[5] <= datetime.utcnow():
+        cur.execute(f'UPDATE app_users SET active = FALSE WHERE id = {row[0]}')
+        cur.execute(f'UPDATE app_sessions SET expires_at = NOW() WHERE user_id = {row[0]}')
         return None
     cur.execute(
         f"UPDATE app_sessions SET expires_at = NOW() + INTERVAL '{SESSION_DAYS} days' "
@@ -72,7 +76,7 @@ def list_users(cur, me=None):
     if me and me['role'] == 'admin':
         where = f"WHERE manager_id = {me['id']} OR id = {me['id']}"
     cur.execute(
-        'SELECT id, username, full_name, role, active, created_at, manager_id '
+        'SELECT id, username, full_name, role, active, created_at, manager_id, access_until '
         f'FROM app_users {where} ORDER BY id'
     )
     return [
@@ -84,6 +88,7 @@ def list_users(cur, me=None):
             'active': r[4],
             'createdAt': r[5].isoformat() if r[5] else None,
             'managerId': r[6],
+            'accessUntil': r[7].isoformat() if r[7] else None,
         }
         for r in cur.fetchall()
     ]
@@ -132,12 +137,16 @@ def handler(event: dict, context) -> dict:
             username = str(body.get('username', '')).strip().lower()
             password = str(body.get('password', ''))
             cur.execute(
-                f'SELECT id, username, full_name, password_hash, role, active FROM app_users '
+                f'SELECT id, username, full_name, password_hash, role, active, access_until FROM app_users '
                 f'WHERE lower(username) = {q(username)}'
             )
             row = cur.fetchone()
             if not row or not row[5] or not check_password(password, row[3]):
                 return done({'error': 'invalid_credentials'}, 401)
+            if row[6] and row[6] <= datetime.utcnow():
+                cur.execute(f'UPDATE app_users SET active = FALSE WHERE id = {row[0]}')
+                cur.execute(f'UPDATE app_sessions SET expires_at = NOW() WHERE user_id = {row[0]}')
+                return done({'error': 'access_expired'}, 403)
             new_token = secrets.token_hex(24)
             expires = datetime.utcnow() + timedelta(days=SESSION_DAYS)
             cur.execute(f'DELETE FROM app_sessions WHERE user_id = {row[0]}')
@@ -237,9 +246,15 @@ def handler(event: dict, context) -> dict:
                 return done({'error': 'username_taken'}, 409)
             manager = body.get('managerId')
             manager_sql = str(int(manager)) if manager else 'NULL'
+            days = body.get('accessDays')
+            if days:
+                until = datetime.utcnow() + timedelta(days=int(days))
+                until_sql = q(until.isoformat(sep=' ', timespec='seconds'))
+            else:
+                until_sql = 'NULL'
             cur.execute(
-                'INSERT INTO app_users (username, full_name, password_hash, role, manager_id) VALUES '
-                f'({q(username)}, {q(full_name)}, {q(hash_password(password))}, {q(role)}, {manager_sql})'
+                'INSERT INTO app_users (username, full_name, password_hash, role, manager_id, access_until) VALUES '
+                f'({q(username)}, {q(full_name)}, {q(hash_password(password))}, {q(role)}, {manager_sql}, {until_sql})'
             )
             return done({'users': list_users(cur, me)})
 
@@ -271,6 +286,20 @@ def handler(event: dict, context) -> dict:
             if 'managerId' in body:
                 mid = body.get('managerId')
                 sets.append(f'manager_id = {str(int(mid)) if mid else "NULL"}')
+            if 'accessDays' in body:
+                days = body.get('accessDays')
+                if days in (None, '', 0):
+                    sets.append('access_until = NULL')
+                else:
+                    until = datetime.utcnow() + timedelta(days=int(days))
+                    sets.append(f"access_until = {q(until.isoformat(sep=' ', timespec='seconds'))}")
+                    sets.append('active = TRUE')
+            elif 'accessUntil' in body:
+                until_raw = body.get('accessUntil')
+                if not until_raw:
+                    sets.append('access_until = NULL')
+                else:
+                    sets.append(f'access_until = {q(str(until_raw))}')
             if not sets:
                 return done({'users': list_users(cur, me)})
             cur.execute(f'UPDATE app_users SET {", ".join(sets)} WHERE id = {user_id}')
