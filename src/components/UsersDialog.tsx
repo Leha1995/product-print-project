@@ -78,6 +78,18 @@ const UsersDialog = ({
 
   const admins = users.filter((u) => u.role === 'admin' || u.role === 'superadmin');
 
+  const tree = (() => {
+    const heads = users.filter((u) => u.role !== 'user');
+    const nodes = heads.map((head) => ({
+      head,
+      staff: users.filter((s) => s.role === 'user' && s.managerId === head.id),
+    }));
+    const orphans = users.filter(
+      (s) => s.role === 'user' && (!s.managerId || !heads.some((h) => h.id === s.managerId)),
+    );
+    return [...nodes, ...orphans.map((head) => ({ head, staff: [] as ManagedUser[] }))];
+  })();
+
   const apply = (list: ManagedUser[]) => {
     setUsers(list);
     onChanged?.();
@@ -195,7 +207,7 @@ const UsersDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-[720px] overflow-y-auto border-2 border-primary bg-background p-0">
+      <DialogContent className="max-h-[90vh] max-w-[900px] overflow-y-auto border-2 border-primary bg-background p-0">
         <div className="p-6">
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center border-2 border-primary bg-accent text-accent-foreground">
@@ -283,19 +295,36 @@ const UsersDialog = ({
           )}
 
           <div className="mt-5 grid gap-2">
-            {users.map((u) => (
+            {(isSuperAdmin ? tree : users.map((u) => ({ head: u, staff: [] }))).map((node) => (
+              <div key={node.head.id} className={node.staff.length ? 'grid gap-1' : ''}>
+            {[node.head, ...node.staff].map((u, idx) => (
               <div
                 key={u.id}
-                className="flex flex-wrap items-center gap-2 border-2 border-primary bg-card px-3 py-2"
+                className={`flex flex-wrap items-center gap-2 border-2 border-primary bg-card px-3 py-2 ${
+                  idx > 0 ? 'ml-4 border-l-8 md:ml-8' : ''
+                }`}
               >
+                {idx > 0 && (
+                  <Icon
+                    name="CornerDownRight"
+                    size={16}
+                    strokeWidth={2.5}
+                    className="shrink-0 text-muted-foreground"
+                  />
+                )}
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-head text-[0.85rem] font-bold uppercase text-primary">
                     {u.username}
                     {!u.active && <span className="ml-2 text-destructive">(отключён)</span>}
+                    {idx === 0 && node.staff.length > 0 && (
+                      <span className="ml-2 text-[11px] font-bold text-muted-foreground">
+                        · сотрудников: {node.staff.length}
+                      </span>
+                    )}
                   </p>
                   <p className="truncate text-[12px] text-muted-foreground">
                     {u.fullName || '—'} · {roleLabel[u.role]}
-                    {u.managerId
+                    {u.managerId && idx === 0
                       ? ` · руководитель: ${
                           users.find((a) => a.id === u.managerId)?.fullName ||
                           users.find((a) => a.id === u.managerId)?.username ||
@@ -373,6 +402,8 @@ const UsersDialog = ({
                     Удалить
                   </button>
                 )}
+              </div>
+            ))}
               </div>
             ))}
           </div>
