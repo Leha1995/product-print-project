@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Icon from '@/components/ui/icon';
 import VirtualKeyboard from '@/components/VirtualKeyboard';
+import LicenseContacts from '@/components/LicenseContacts';
 import { forgetLogin, getKnownLogins, getRemembered, removeKnownLogin } from '@/lib/authApi';
 
 interface LoginScreenProps {
@@ -55,8 +56,8 @@ const LoginScreen = ({ onLogin, kicked }: LoginScreenProps) => {
 
   return (
     <div
-      className={`flex min-h-screen items-center justify-center bg-background px-4 pt-8 ${
-        field ? 'items-start pb-[420px]' : 'pb-8'
+      className={`flex min-h-screen flex-col items-center justify-center gap-5 bg-background px-4 pt-8 ${
+        field ? 'justify-start pb-[420px]' : 'pb-8'
       }`}
     >
       <form
@@ -182,6 +183,10 @@ const LoginScreen = ({ onLogin, kicked }: LoginScreenProps) => {
           </button>
         )}
       </form>
+
+      {!field && (
+        <LicenseContacts className="w-full max-w-[420px] justify-center border-2 border-primary bg-card p-4" />
+      )}
 
       <VirtualKeyboard
         open={!!field}
