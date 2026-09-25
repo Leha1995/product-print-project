@@ -39,15 +39,16 @@ const accessOptions: { days: number | ''; label: string }[] = [
   { days: 365, label: '1 год' },
 ];
 
-const accessInfo = (until: string | null) => {
+const accessInfo = (until: string | null, inherited = false) => {
   if (!until) return { text: 'Доступ без срока', tone: 'muted' as const };
+  const prefix = inherited ? 'По руководителю: ' : '';
   const end = new Date(until.endsWith('Z') ? until : `${until}Z`).getTime();
   const left = end - Date.now();
   const date = new Date(end).toLocaleDateString('ru-RU');
-  if (left <= 0) return { text: `Доступ истёк ${date}`, tone: 'bad' as const };
+  if (left <= 0) return { text: `${prefix}доступ истёк ${date}`, tone: 'bad' as const };
   const days = Math.ceil(left / 86400000);
   return {
-    text: `Доступ до ${date} · осталось ${days} дн.`,
+    text: `${prefix}доступ до ${date} · осталось ${days} дн.`,
     tone: left < 7 * 86400000 ? ('bad' as const) : ('good' as const),
   };
 };
@@ -102,7 +103,7 @@ const UsersDialog = ({
         fullName,
         role,
         managerId: role === 'user' ? managerId || null : null,
-        accessDays: accessDays || null,
+        accessDays: role === 'admin' ? accessDays || null : null,
       });
       apply(r.users);
       setUsername('');
@@ -176,7 +177,7 @@ const UsersDialog = ({
         username: login !== u.username ? login : undefined,
         fullName: editName.trim(),
         password: editPass || undefined,
-        ...(isSuperAdmin && editAccess !== 'keep'
+        ...(isSuperAdmin && u.role === 'admin' && editAccess !== 'keep'
           ? { accessDays: editAccess === '' ? null : editAccess }
           : {}),
       });
@@ -257,17 +258,19 @@ const UsersDialog = ({
                 ))}
               </select>
             )}
-            <select
-              value={accessDays}
-              onChange={(e) => setAccessDays(e.target.value ? Number(e.target.value) : '')}
-              className={`${inputClass} md:col-span-2`}
-            >
-              {accessOptions.map((o) => (
-                <option key={String(o.days)} value={o.days}>
-                  Срок доступа: {o.label}
-                </option>
-              ))}
-            </select>
+            {role === 'admin' && (
+              <select
+                value={accessDays}
+                onChange={(e) => setAccessDays(e.target.value ? Number(e.target.value) : '')}
+                className={`${inputClass} md:col-span-2`}
+              >
+                {accessOptions.map((o) => (
+                  <option key={String(o.days)} value={o.days}>
+                    Срок доступа: {o.label}
+                  </option>
+                ))}
+              </select>
+            )}
             <button
               onClick={create}
               disabled={busy}
@@ -300,11 +303,13 @@ const UsersDialog = ({
                         }`
                       : ''}
                   </p>
-                  <p
-                    className={`truncate text-[12px] font-bold ${toneClass[accessInfo(u.accessUntil).tone]}`}
-                  >
-                    {accessInfo(u.accessUntil).text}
-                  </p>
+                  {u.role !== 'superadmin' && (
+                    <p
+                      className={`truncate text-[12px] font-bold ${toneClass[accessInfo(u.accessUntil, !u.accessOwn).tone]}`}
+                    >
+                      {accessInfo(u.accessUntil, !u.accessOwn).text}
+                    </p>
+                  )}
                 </div>
                 {isSuperAdmin && (
                   <select
@@ -411,10 +416,10 @@ const UsersDialog = ({
                 className={inputClass}
               />
             </div>
-            {isSuperAdmin && (
+            {isSuperAdmin && users.find((x) => x.id === editId)?.role === 'admin' && (
               <div>
                 <p className="mb-1 font-head text-[0.7rem] font-bold uppercase text-primary">
-                  Срок доступа
+                  Срок доступа админа и его сотрудников
                 </p>
                 <select
                   value={editAccess}

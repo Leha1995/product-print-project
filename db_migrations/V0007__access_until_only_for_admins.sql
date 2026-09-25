@@ -1,0 +1,1 @@
+UPDATE app_users SET access_until = NULL WHERE role <> 'admin';

@@ -49,20 +49,49 @@ def ensure_seed(cur) -> None:
     )
 
 
+def effective_access(cur, user_id: int, role: str, manager_id):
+    """Срок доступа: у админа собственный, у сотрудника — срок его руководителя."""
+    if role == 'superadmin':
+        return None, None
+    owner = user_id if role == 'admin' else manager_id
+    if not owner:
+        return None, None
+    cur.execute(f'SELECT access_until FROM app_users WHERE id = {int(owner)}')
+    row = cur.fetchone()
+    return (row[0] if row else None), owner
+
+
+def lock_branch(cur, admin_id: int) -> None:
+    """Отключает админа и всех его подчинённых, обрывая сессии."""
+    cur.execute(
+        f'UPDATE app_users SET active = FALSE WHERE id = {admin_id} OR manager_id = {admin_id}'
+    )
+    cur.execute(
+        'UPDATE app_sessions SET expires_at = NOW() WHERE user_id IN '
+        f'(SELECT id FROM app_users WHERE id = {admin_id} OR manager_id = {admin_id})'
+    )
+
+
+def unlock_branch(cur, admin_id: int) -> None:
+    cur.execute(
+        f'UPDATE app_users SET active = TRUE WHERE id = {admin_id} OR manager_id = {admin_id}'
+    )
+
+
 def session_user(cur, token: str):
     if not token:
         return None
     cur.execute(
-        'SELECT u.id, u.username, u.full_name, u.role, u.active, u.access_until FROM app_sessions s '
+        'SELECT u.id, u.username, u.full_name, u.role, u.active, u.manager_id FROM app_sessions s '
         f'JOIN app_users u ON u.id = s.user_id WHERE s.token = {q(token)} '
         'AND s.expires_at > NOW()'
     )
     row = cur.fetchone()
     if not row or not row[4]:
         return None
-    if row[5] and row[5] <= datetime.utcnow():
-        cur.execute(f'UPDATE app_users SET active = FALSE WHERE id = {row[0]}')
-        cur.execute(f'UPDATE app_sessions SET expires_at = NOW() WHERE user_id = {row[0]}')
+    until, owner = effective_access(cur, row[0], row[3], row[5])
+    if until and until <= datetime.utcnow():
+        lock_branch(cur, int(owner))
         return None
     cur.execute(
         f"UPDATE app_sessions SET expires_at = NOW() + INTERVAL '{SESSION_DAYS} days' "
@@ -73,7 +102,7 @@ def session_user(cur, token: str):
         'username': row[1],
         'fullName': row[2],
         'role': row[3],
-        'accessUntil': row[5].isoformat() if row[5] else None,
+        'accessUntil': until.isoformat() if until else None,
     }
 
 
@@ -85,19 +114,34 @@ def list_users(cur, me=None):
         'SELECT id, username, full_name, role, active, created_at, manager_id, access_until '
         f'FROM app_users {where} ORDER BY id'
     )
-    return [
-        {
-            'id': r[0],
-            'username': r[1],
-            'fullName': r[2],
-            'role': r[3],
-            'active': r[4],
-            'createdAt': r[5].isoformat() if r[5] else None,
-            'managerId': r[6],
-            'accessUntil': r[7].isoformat() if r[7] else None,
-        }
-        for r in cur.fetchall()
-    ]
+    rows = cur.fetchall()
+    own = {r[0]: r[7] for r in rows}
+    result = []
+    for r in rows:
+        if r[3] == 'superadmin':
+            until = None
+        elif r[3] == 'admin':
+            until = r[7]
+        else:
+            until = own.get(r[6])
+            if until is None and r[6]:
+                cur.execute(f'SELECT access_until FROM app_users WHERE id = {int(r[6])}')
+                got = cur.fetchone()
+                until = got[0] if got else None
+        result.append(
+            {
+                'id': r[0],
+                'username': r[1],
+                'fullName': r[2],
+                'role': r[3],
+                'active': r[4],
+                'createdAt': r[5].isoformat() if r[5] else None,
+                'managerId': r[6],
+                'accessUntil': until.isoformat() if until else None,
+                'accessOwn': r[3] == 'admin',
+            }
+        )
+    return result
 
 
 def managed_ids(cur, me):
@@ -143,15 +187,15 @@ def handler(event: dict, context) -> dict:
             username = str(body.get('username', '')).strip().lower()
             password = str(body.get('password', ''))
             cur.execute(
-                f'SELECT id, username, full_name, password_hash, role, active, access_until FROM app_users '
+                f'SELECT id, username, full_name, password_hash, role, active, manager_id FROM app_users '
                 f'WHERE lower(username) = {q(username)}'
             )
             row = cur.fetchone()
             if not row or not row[5] or not check_password(password, row[3]):
                 return done({'error': 'invalid_credentials'}, 401)
-            if row[6] and row[6] <= datetime.utcnow():
-                cur.execute(f'UPDATE app_users SET active = FALSE WHERE id = {row[0]}')
-                cur.execute(f'UPDATE app_sessions SET expires_at = NOW() WHERE user_id = {row[0]}')
+            until, owner = effective_access(cur, row[0], row[4], row[6])
+            if until and until <= datetime.utcnow():
+                lock_branch(cur, int(owner))
                 return done({'error': 'access_expired'}, 403)
             new_token = secrets.token_hex(24)
             expires = datetime.utcnow() + timedelta(days=SESSION_DAYS)
@@ -167,7 +211,7 @@ def handler(event: dict, context) -> dict:
                     'username': row[1],
                     'fullName': row[2],
                     'role': row[4],
-                    'accessUntil': row[6].isoformat() if row[6] else None,
+                    'accessUntil': until.isoformat() if until else None,
                 },
             })
 
@@ -259,7 +303,7 @@ def handler(event: dict, context) -> dict:
             manager = body.get('managerId')
             manager_sql = str(int(manager)) if manager else 'NULL'
             days = body.get('accessDays')
-            if days:
+            if days and role == 'admin':
                 until = datetime.utcnow() + timedelta(days=int(days))
                 until_sql = q(until.isoformat(sep=' ', timespec='seconds'))
             else:
@@ -298,25 +342,29 @@ def handler(event: dict, context) -> dict:
             if 'managerId' in body:
                 mid = body.get('managerId')
                 sets.append(f'manager_id = {str(int(mid)) if mid else "NULL"}')
+            renew_branch = False
             if 'accessDays' in body:
+                cur.execute(f'SELECT role FROM app_users WHERE id = {user_id}')
+                trow = cur.fetchone()
+                target_role = body.get('role') if body.get('role') in ROLES else (trow[0] if trow else 'user')
+                if target_role != 'admin':
+                    return done({'error': 'access_admin_only'}, 400)
                 days = body.get('accessDays')
                 if days in (None, '', 0):
                     sets.append('access_until = NULL')
                 else:
                     until = datetime.utcnow() + timedelta(days=int(days))
                     sets.append(f"access_until = {q(until.isoformat(sep=' ', timespec='seconds'))}")
-                    sets.append('active = TRUE')
-            elif 'accessUntil' in body:
-                until_raw = body.get('accessUntil')
-                if not until_raw:
-                    sets.append('access_until = NULL')
-                else:
-                    sets.append(f'access_until = {q(str(until_raw))}')
+                    renew_branch = True
             if not sets:
                 return done({'users': list_users(cur, me)})
             cur.execute(f'UPDATE app_users SET {", ".join(sets)} WHERE id = {user_id}')
+            if renew_branch:
+                unlock_branch(cur, user_id)
             if body.get('active') is False:
                 cur.execute(f'UPDATE app_sessions SET expires_at = NOW() WHERE user_id = {user_id}')
+            if body.get('role') in ROLES and body['role'] != 'admin':
+                cur.execute(f'UPDATE app_users SET access_until = NULL WHERE id = {user_id}')
             return done({'users': list_users(cur, me)})
 
         if action == 'delete_user':

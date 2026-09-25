@@ -15,6 +15,7 @@ export interface ManagedUser extends AuthUser {
   createdAt: string | null;
   managerId: number | null;
   accessUntil: string | null;
+  accessOwn?: boolean;
 }
 
 export interface ManagedTarget {
