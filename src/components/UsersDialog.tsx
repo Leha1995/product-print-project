@@ -75,6 +75,10 @@ const UsersDialog = ({
   const [editPass, setEditPass] = useState('');
   const [accessDays, setAccessDays] = useState<number | ''>('');
   const [editAccess, setEditAccess] = useState<number | '' | 'keep'>('keep');
+  const [collapsed, setCollapsed] = useState<number[]>([]);
+
+  const toggleGroup = (id: number) =>
+    setCollapsed((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const admins = users.filter((u) => u.role === 'admin' || u.role === 'superadmin');
 
@@ -294,10 +298,30 @@ const UsersDialog = ({
           </div>
           )}
 
-          <div className="mt-5 grid gap-2">
+          {isSuperAdmin && tree.some((n) => n.staff.length > 0) && (
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() =>
+                  setCollapsed((prev) =>
+                    prev.length ? [] : tree.filter((n) => n.staff.length).map((n) => n.head.id),
+                  )
+                }
+                className="flex items-center gap-1.5 border-2 border-primary bg-background px-3 py-1.5 font-head text-[0.7rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
+              >
+                <Icon
+                  name={collapsed.length ? 'ChevronsDownUp' : 'ChevronsUpDown'}
+                  size={14}
+                  strokeWidth={2.5}
+                />
+                {collapsed.length ? 'Развернуть все' : 'Свернуть все'}
+              </button>
+            </div>
+          )}
+
+          <div className="mt-3 grid gap-2">
             {(isSuperAdmin ? tree : users.map((u) => ({ head: u, staff: [] }))).map((node) => (
               <div key={node.head.id} className={node.staff.length ? 'grid gap-1' : ''}>
-            {[node.head, ...node.staff].map((u, idx) => (
+            {[node.head, ...(collapsed.includes(node.head.id) ? [] : node.staff)].map((u, idx) => (
               <div
                 key={u.id}
                 className={`flex flex-wrap items-center gap-2 border-2 border-primary bg-card px-3 py-2 ${
@@ -312,13 +336,36 @@ const UsersDialog = ({
                     className="shrink-0 text-muted-foreground"
                   />
                 )}
-                <div className="min-w-0 flex-1">
+                {idx === 0 && node.staff.length > 0 && (
+                  <button
+                    onClick={() => toggleGroup(node.head.id)}
+                    aria-label={
+                      collapsed.includes(node.head.id) ? 'Показать сотрудников' : 'Скрыть сотрудников'
+                    }
+                    className="flex h-7 w-7 shrink-0 items-center justify-center border-2 border-primary bg-background text-primary transition-colors hover:bg-muted"
+                  >
+                    <Icon
+                      name={collapsed.includes(node.head.id) ? 'ChevronRight' : 'ChevronDown'}
+                      size={16}
+                      strokeWidth={2.5}
+                    />
+                  </button>
+                )}
+                <div
+                  className={`min-w-0 flex-1 ${idx === 0 && node.staff.length > 0 ? 'cursor-pointer' : ''}`}
+                  onClick={
+                    idx === 0 && node.staff.length > 0
+                      ? () => toggleGroup(node.head.id)
+                      : undefined
+                  }
+                >
                   <p className="truncate font-head text-[0.85rem] font-bold uppercase text-primary">
                     {u.username}
                     {!u.active && <span className="ml-2 text-destructive">(отключён)</span>}
                     {idx === 0 && node.staff.length > 0 && (
                       <span className="ml-2 text-[11px] font-bold text-muted-foreground">
                         · сотрудников: {node.staff.length}
+                        {collapsed.includes(node.head.id) ? ' (свёрнуто)' : ''}
                       </span>
                     )}
                   </p>
