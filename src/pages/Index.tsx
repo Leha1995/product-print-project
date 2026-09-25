@@ -344,6 +344,7 @@ const Index = () => {
         onOverviewClick={() => setOverviewOpen(true)}
         alertCount={alertCount}
         onAdminClick={() => setAdminOpen(true)}
+        accessUntil={user?.accessUntil ?? null}
       />
       {isAdmin && user && (
         <WorkspaceSwitcher

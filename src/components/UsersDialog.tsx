@@ -40,14 +40,19 @@ const accessOptions: { days: number | ''; label: string }[] = [
 ];
 
 const accessInfo = (until: string | null) => {
-  if (!until) return { text: 'Доступ без срока', expired: false };
+  if (!until) return { text: 'Доступ без срока', tone: 'muted' as const };
   const end = new Date(until.endsWith('Z') ? until : `${until}Z`).getTime();
   const left = end - Date.now();
   const date = new Date(end).toLocaleDateString('ru-RU');
-  if (left <= 0) return { text: `Доступ истёк ${date}`, expired: true };
+  if (left <= 0) return { text: `Доступ истёк ${date}`, tone: 'bad' as const };
   const days = Math.ceil(left / 86400000);
-  return { text: `Доступ до ${date} · осталось ${days} дн.`, expired: false };
+  return {
+    text: `Доступ до ${date} · осталось ${days} дн.`,
+    tone: left < 7 * 86400000 ? ('bad' as const) : ('good' as const),
+  };
 };
+
+const toneClass = { good: 'text-success', bad: 'text-destructive', muted: 'text-muted-foreground' };
 
 const UsersDialog = ({
   open,
@@ -296,13 +301,7 @@ const UsersDialog = ({
                       : ''}
                   </p>
                   <p
-                    className={`truncate text-[12px] font-bold ${
-                      accessInfo(u.accessUntil).expired
-                        ? 'text-destructive'
-                        : u.accessUntil
-                          ? 'text-primary'
-                          : 'text-muted-foreground'
-                    }`}
+                    className={`truncate text-[12px] font-bold ${toneClass[accessInfo(u.accessUntil).tone]}`}
                   >
                     {accessInfo(u.accessUntil).text}
                   </p>

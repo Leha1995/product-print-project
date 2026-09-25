@@ -68,7 +68,13 @@ def session_user(cur, token: str):
         f"UPDATE app_sessions SET expires_at = NOW() + INTERVAL '{SESSION_DAYS} days' "
         f'WHERE token = {q(token)}'
     )
-    return {'id': row[0], 'username': row[1], 'fullName': row[2], 'role': row[3]}
+    return {
+        'id': row[0],
+        'username': row[1],
+        'fullName': row[2],
+        'role': row[3],
+        'accessUntil': row[5].isoformat() if row[5] else None,
+    }
 
 
 def list_users(cur, me=None):
@@ -156,7 +162,13 @@ def handler(event: dict, context) -> dict:
             )
             return done({
                 'token': new_token,
-                'user': {'id': row[0], 'username': row[1], 'fullName': row[2], 'role': row[4]},
+                'user': {
+                    'id': row[0],
+                    'username': row[1],
+                    'fullName': row[2],
+                    'role': row[4],
+                    'accessUntil': row[6].isoformat() if row[6] else None,
+                },
             })
 
         me = session_user(cur, token)

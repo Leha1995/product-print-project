@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import Icon from '@/components/ui/icon';
 
 interface TerminalHeaderProps {
@@ -10,7 +11,20 @@ interface TerminalHeaderProps {
   onOverviewClick?: () => void;
   alertCount?: number;
   onAdminClick: () => void;
+  accessUntil?: string | null;
 }
+
+const accessLeft = (until?: string | null) => {
+  if (!until) return null;
+  const end = new Date(until.endsWith('Z') ? until : `${until}Z`).getTime();
+  if (Number.isNaN(end)) return null;
+  const diff = end - Date.now();
+  if (diff <= 0) return { text: 'Доступ истёк', warn: true };
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const text = days > 0 ? `${days} дн. ${hours} ч.` : `${hours} ч.`;
+  return { text, warn: diff < 7 * 86400000 };
+};
 
 const links = [
   { label: 'Продукты', target: 'menu' },
@@ -26,7 +40,16 @@ const TerminalHeader = ({
   onOverviewClick,
   alertCount = 0,
   onAdminClick,
+  accessUntil,
 }: TerminalHeaderProps) => {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!accessUntil) return;
+    const id = setInterval(() => tick((v) => v + 1), 60000);
+    return () => clearInterval(id);
+  }, [accessUntil]);
+
+  const left = accessLeft(accessUntil);
   return (
     <header className="print-hide sticky top-0 z-40 grid h-[70px] grid-cols-[1fr_auto_1fr] items-center border-b-2 border-primary bg-background px-4 md:px-8">
       <ul className="flex gap-5 md:gap-8">
@@ -47,6 +70,19 @@ const TerminalHeader = ({
       </div>
 
       <div className="flex items-center justify-end gap-3">
+        {left && (
+          <span
+            aria-label="Осталось времени доступа"
+            className={`flex h-[34px] shrink-0 items-center gap-1.5 whitespace-nowrap border-2 px-2 font-head text-[0.65rem] font-bold uppercase tracking-[0.06em] ${
+              left.warn
+                ? 'border-destructive bg-destructive text-destructive-foreground'
+                : 'border-success bg-success text-success-foreground'
+            }`}
+          >
+            <Icon name="Clock" size={16} strokeWidth={2.5} />
+            {left.text}
+          </span>
+        )}
         {isAdmin && (
           <button
             onClick={onOverviewClick}

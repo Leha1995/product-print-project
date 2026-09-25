@@ -7,6 +7,7 @@ export interface AuthUser {
   username: string;
   fullName: string;
   role: Role;
+  accessUntil?: string | null;
 }
 
 export interface ManagedUser extends AuthUser {
