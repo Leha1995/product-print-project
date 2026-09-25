@@ -160,7 +160,7 @@ const UsersDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="relative max-h-[90vh] max-w-[720px] overflow-y-auto border-2 border-primary bg-background p-0">
+      <DialogContent className="max-h-[90vh] max-w-[720px] overflow-y-auto border-2 border-primary bg-background p-0">
         <div className="p-6">
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center border-2 border-primary bg-accent text-accent-foreground">
@@ -323,7 +323,7 @@ const UsersDialog = ({
           </div>
         </div>
         {editId !== null && (
-          <div className="absolute inset-0 z-50 flex items-start justify-center overflow-y-auto bg-primary/40 p-4">
+          <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-primary/40 p-6">
             <div className="w-full max-w-[420px] border-2 border-primary bg-background">
               <div className="border-b-2 border-primary bg-primary px-5 py-3">
                 <div className="flex items-center gap-2 font-head text-base font-black uppercase tracking-[0.08em] text-primary-foreground">
