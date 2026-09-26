@@ -48,11 +48,31 @@ def session_user(cur, token: str):
     return {'id': row[0], 'username': row[1], 'role': row[2]}
 
 
+def manager_branch_ids(cur, manager_id: int):
+    """Админы, закреплённые за управляющим, и сотрудники этих админов."""
+    cur.execute(
+        "SELECT id FROM app_users WHERE active AND role = 'admin' "
+        f'AND manager_id = {int(manager_id)} ORDER BY id'
+    )
+    admins = [r[0] for r in cur.fetchall()]
+    ids = list(admins)
+    if admins:
+        cur.execute(
+            "SELECT id FROM app_users WHERE active AND role = 'user' AND manager_id IN ("
+            + ', '.join(str(i) for i in admins)
+            + ') ORDER BY id'
+        )
+        ids.extend(r[0] for r in cur.fetchall())
+    return ids
+
+
 def can_manage(cur, me, target_id: int) -> bool:
     if target_id == me['id']:
         return True
-    if me['role'] in ('superadmin', 'manager'):
+    if me['role'] == 'superadmin':
         return True
+    if me['role'] == 'manager':
+        return target_id in manager_branch_ids(cur, me['id'])
     if me['role'] == 'admin':
         cur.execute(f'SELECT manager_id FROM app_users WHERE id = {target_id}')
         row = cur.fetchone()
@@ -62,7 +82,16 @@ def can_manage(cur, me, target_id: int) -> bool:
 
 def build_overview(cur, me, soon_ms: int = 3600000):
     """Сводка по сотрудникам: что просрочено и что скоро истекает."""
-    if me['role'] in ('superadmin', 'manager'):
+    if me['role'] == 'manager':
+        branch = manager_branch_ids(cur, me['id'])
+        if not branch:
+            return []
+        cur.execute(
+            'SELECT id, username, full_name FROM app_users WHERE active AND id IN ('
+            + ', '.join(str(i) for i in branch)
+            + ') ORDER BY role DESC, username'
+        )
+    elif me['role'] == 'superadmin':
         cur.execute(
             "SELECT id, username, full_name FROM app_users WHERE active "
             "AND role IN ('user', 'admin') ORDER BY role DESC, username"

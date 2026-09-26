@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Icon from '@/components/ui/icon';
 import TerminalHeader from '@/components/TerminalHeader';
 import MenuSection from '@/components/MenuSection';
 import PrintDialog from '@/components/PrintDialog';
@@ -36,11 +37,27 @@ const Index = () => {
   const [jobs, setJobs] = useState<PrintJob[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  const { user, ready, kicked, login, logout, isAuthed, isAdmin, isSuperAdmin, canInventory } =
+  const {
+    user,
+    ready,
+    kicked,
+    login,
+    logout,
+    isAuthed,
+    isAdmin,
+    isSuperAdmin,
+    canInventory,
+    inventoryOnly,
+  } =
     useAuth();
   const { managed, refreshManaged } = useManagedUsers(isAdmin);
   const [targetId, setTargetId] = useState<number | null>(null);
-  const activeTarget = targetId ?? user?.id ?? null;
+  const activeTarget = targetId ?? (inventoryOnly ? null : (user?.id ?? null));
+  const managerPicked = inventoryOnly && targetId !== null;
+  const viewingName = (() => {
+    const found = managed.find((m) => m.id === targetId);
+    return found ? found.fullName || found.username : '';
+  })();
   const {
     items,
     categories: catList,
@@ -349,19 +366,38 @@ const Index = () => {
         onAdminClick={() => setAdminOpen(true)}
         accessUntil={user?.accessUntil ?? null}
         section={section}
-        onSectionChange={canInventory ? setSection : undefined}
-        showSections={canInventory}
+        onSectionChange={canInventory && (!inventoryOnly || managerPicked) ? setSection : undefined}
+        showSections={canInventory && (!inventoryOnly || managerPicked)}
+        inventoryOnly={inventoryOnly && !managerPicked}
       />
       {isAdmin && user && (
         <WorkspaceSwitcher
           managed={managed}
           currentId={user.id}
           targetId={activeTarget ?? user.id}
-          onChange={setTargetId}
+          onChange={(id) => {
+            setTargetId(id);
+            if (inventoryOnly) setSection('equipment');
+          }}
+          label={inventoryOnly ? 'Точка' : 'Каталог сотрудника'}
+          minCount={inventoryOnly ? 1 : 2}
+          placeholder={inventoryOnly ? 'Выбери сотрудника' : undefined}
+          allowEmpty={inventoryOnly}
+          viewingName={viewingName}
         />
       )}
       <main>
-        {section === 'equipment' && canInventory ? (
+        {inventoryOnly && !managerPicked && !activeTarget ? (
+          <div className="mx-auto flex max-w-[520px] flex-col items-center gap-2 px-4 py-16 text-center">
+            <Icon name="Store" size={34} strokeWidth={2} className="text-primary" />
+            <p className="font-head text-base font-black uppercase text-primary">
+              Выбери сотрудника
+            </p>
+            <p className="text-[13px] text-muted-foreground">
+              В строке выше укажи точку — откроется её оборудование и маркировка.
+            </p>
+          </div>
+        ) : (section === 'equipment' || (inventoryOnly && !managerPicked)) && canInventory ? (
           <EquipmentSection userId={user?.id} targetId={activeTarget} isAdmin={isAdmin} />
         ) : (
         <MenuSection
@@ -414,7 +450,7 @@ const Index = () => {
           getStatus={getStatus}
         />
         )}
-        {(section === 'labels' || !canInventory) && (
+        {(!inventoryOnly || managerPicked) && (section === 'labels' || !canInventory) && (
           <PrintLog jobs={jobs} onClear={() => setJobs([])} />
         )}
       </main>
