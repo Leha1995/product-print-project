@@ -17,7 +17,7 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
   const controlsRef = useRef<{ stop: () => void } | null>(null);
   const [scanned, setScanned] = useState<string[]>([]);
   const [error, setError] = useState('');
-  const [status, setStatus] = useState<'asking' | 'on' | 'off'>('asking');
+  const [status, setStatus] = useState<'idle' | 'asking' | 'on' | 'off'>('idle');
   const [last, setLast] = useState<{ name: string; ok: boolean } | null>(null);
   const [manual, setManual] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -43,10 +43,16 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
     if (!open) return;
     setScanned([]);
     setLast(null);
+    setError('');
+    setFramed(false);
+    setStatus('idle');
+    setAttempt(0);
+    setHasTorch(false);
+    setTorch(false);
   }, [open]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !attempt) return;
     setError('');
     setFramed(false);
     setStatus('asking');
@@ -133,10 +139,9 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
       }
     };
 
-    const timer = window.setTimeout(start, 350);
+    start();
 
     return () => {
-      window.clearTimeout(timer);
       stopped = true;
       controlsRef.current?.stop();
       controlsRef.current = null;
@@ -160,13 +165,30 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
             Сканирование
           </h3>
           <p className="mt-0.5 text-[13px] text-muted-foreground">
-            {status === 'off'
-              ? `Камера недоступна — вводи коды вручную. Отмечено ${scanned.length} из ${total}`
-              : `Наведи камеру на QR-код. Отмечено ${scanned.length} из ${total}`}
+            {status === 'idle'
+              ? `Включи камеру или вводи коды вручную. Отмечено ${scanned.length} из ${total}`
+              : status === 'off'
+                ? `Камера недоступна — вводи коды вручную. Отмечено ${scanned.length} из ${total}`
+                : `Наведи камеру на QR-код. Отмечено ${scanned.length} из ${total}`}
           </p>
         </div>
 
-        {status === 'off' ? (
+        {status === 'idle' ? (
+          <div className="mx-3 flex flex-1 flex-col items-center justify-center gap-3 overflow-y-auto border-2 border-dashed border-primary bg-card px-4 py-6 text-center sm:mx-0 sm:mt-3 sm:flex-none">
+            <Icon name="ScanLine" size={32} strokeWidth={2} className="text-primary" />
+            <p className="max-w-[320px] text-[13px] text-muted-foreground">
+              Нажми кнопку — браузер спросит разрешение на камеру. Подтверди его, и сканирование
+              начнётся.
+            </p>
+            <button
+              onClick={() => setAttempt((n) => n + 1)}
+              className="flex items-center gap-2 border-2 border-primary bg-accent px-5 py-3 font-head text-[0.78rem] font-bold uppercase text-accent-foreground transition-transform hover:-translate-y-0.5"
+            >
+              <Icon name="Camera" size={18} strokeWidth={2.5} />
+              Включить камеру
+            </button>
+          </div>
+        ) : status === 'off' ? (
           <div className="mx-3 flex flex-1 flex-col items-center justify-center gap-2 overflow-y-auto border-2 border-dashed border-primary bg-card px-4 py-5 text-center sm:mx-0 sm:mt-3 sm:flex-none">
             <Icon name="CameraOff" size={28} strokeWidth={2} className="text-muted-foreground" />
             <p className="max-w-[340px] text-[13px] text-muted-foreground">{error}</p>

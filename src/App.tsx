@@ -7,22 +7,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ErrorBoundary from "./components/ErrorBoundary";
-import { useEffect } from "react";
-import { requestCameraAccess } from "@/lib/cameraPermission";
 
 const queryClient = new QueryClient();
 
 const App = () => {
-  useEffect(() => {
-    if (window.self !== window.top) return;
-    const onFirstTouch = () => {
-      window.removeEventListener('pointerdown', onFirstTouch);
-      requestCameraAccess();
-    };
-    window.addEventListener('pointerdown', onFirstTouch, { once: true });
-    return () => window.removeEventListener('pointerdown', onFirstTouch);
-  }, []);
-
   return (
   <ErrorBoundary>
   <QueryClientProvider client={queryClient}>

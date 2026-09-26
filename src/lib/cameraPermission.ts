@@ -53,15 +53,4 @@ export const openCamera = (): Promise<MediaStream> => {
   return pending;
 };
 
-export const requestCameraAccess = async () => {
-  if (granted || pending || !cameraSupported()) return;
-  const state = await cameraState();
-  if (state === 'denied' || state === 'granted') return;
-
-  try {
-    const stream = await openCamera();
-    stream?.getTracks().forEach((track) => track.stop());
-  } catch {
-    // пользователь отказал или камеры нет — подсказку покажет сканер
-  }
-};
+export const cameraGranted = () => granted;
