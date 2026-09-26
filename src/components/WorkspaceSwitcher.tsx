@@ -5,12 +5,9 @@ interface WorkspaceSwitcherProps {
   managed: ManagedTarget[];
   currentId: number;
   targetId: number;
-  onChange: (id: number | null) => void;
+  onChange: (id: number) => void;
   label?: string;
   minCount?: number;
-  placeholder?: string;
-  allowEmpty?: boolean;
-  viewingName?: string;
 }
 
 const roleShort: Record<string, string> = {
@@ -27,16 +24,12 @@ const WorkspaceSwitcher = ({
   onChange,
   label = 'Каталог сотрудника',
   minCount = 2,
-  placeholder,
-  allowEmpty = false,
-  viewingName,
 }: WorkspaceSwitcherProps) => {
   if (managed.length < minCount) return null;
 
-  const picked = allowEmpty ? Boolean(viewingName) : true;
   const viewing = managed.find((m) => m.id === targetId);
   const self = managed.some((m) => m.id === currentId);
-  const foreign = allowEmpty ? picked : self && targetId !== currentId;
+  const foreign = self && targetId !== currentId;
 
   return (
     <div
@@ -55,11 +48,10 @@ const WorkspaceSwitcher = ({
         </span>
 
         <select
-          value={allowEmpty && !picked ? '' : targetId}
-          onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
+          value={targetId}
+          onChange={(e) => onChange(Number(e.target.value))}
           className="min-w-[220px] border-2 border-primary bg-background px-3 py-2 font-body text-[14px] text-primary outline-none"
         >
-          {allowEmpty && <option value="">{placeholder || 'Выбери сотрудника'}</option>}
           {managed.map((m) => (
             <option key={m.id} value={m.id}>
               {(m.fullName || m.username) + (m.id === currentId ? ' — мой' : '')} ·{' '}
@@ -71,16 +63,14 @@ const WorkspaceSwitcher = ({
         {foreign && (
           <>
             <span className="font-head text-[0.7rem] font-bold uppercase tracking-[0.06em] text-accent-foreground">
-              {allowEmpty
-                ? `Смотришь маркировку «${viewingName}»`
-                : `Изменения сохранятся в каталог «${viewing?.fullName || viewing?.username}»`}
+              Изменения сохранятся в каталог «{viewing?.fullName || viewing?.username}»
             </span>
             <button
-              onClick={() => onChange(allowEmpty ? null : currentId)}
+              onClick={() => onChange(currentId)}
               className="ml-auto flex items-center gap-2 border-2 border-primary bg-background px-3 py-2 font-head text-[0.7rem] font-bold uppercase tracking-[0.06em] text-primary transition-colors hover:bg-muted"
             >
               <Icon name="Undo2" size={15} strokeWidth={2.5} />
-              {allowEmpty ? 'К оборудованию' : 'Вернуться к своему'}
+              Вернуться к своему
             </button>
           </>
         )}
