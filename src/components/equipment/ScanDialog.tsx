@@ -21,6 +21,9 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
   const [manual, setManual] = useState('');
   const [attempt, setAttempt] = useState(0);
   const [framed, setFramed] = useState(false);
+  const trackRef = useRef<MediaStreamTrack | null>(null);
+  const [hasTorch, setHasTorch] = useState(false);
+  const [torch, setTorch] = useState(false);
 
   const active = items.filter((i) => i.active);
   const codeMap = new Map(active.map((i) => [i.code, i]));
@@ -49,6 +52,8 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
     setError('');
     setFramed(false);
     setStatus('asking');
+    setHasTorch(false);
+    setTorch(false);
     let stopped = false;
     let stream: MediaStream | null = null;
     const reader = new BrowserMultiFormatReader();
@@ -67,7 +72,15 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
 
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } },
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            frameRate: { ideal: 30 },
+            // @ts-expect-error нестандартные, но поддерживаемые подсказки автофокуса
+            focusMode: { ideal: 'continuous' },
+            advanced: [{ focusMode: 'continuous' }],
+          },
           audio: false,
         });
       } catch (err) {
@@ -98,6 +111,19 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
         return;
       }
 
+      const track = stream.getVideoTracks()[0];
+      trackRef.current = track || null;
+      const caps = (track?.getCapabilities?.() || {}) as Record<string, unknown>;
+      setHasTorch(Boolean(caps.torch));
+      if (track && Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) {
+        track
+          .applyConstraints({
+            // @ts-expect-error нестандартная, но поддерживаемая настройка
+            advanced: [{ focusMode: 'continuous' }],
+          })
+          .catch(() => undefined);
+      }
+
       try {
         const controls = await reader.decodeFromStream(
           stream,
@@ -126,6 +152,7 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
       stopped = true;
       controlsRef.current?.stop();
       controlsRef.current = null;
+      trackRef.current = null;
       stream?.getTracks().forEach((t) => t.stop());
     };
   }, [open, accept, attempt]);
@@ -135,7 +162,7 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[94vh] max-w-[520px] overflow-y-auto border-2 border-primary bg-background p-4">
+      <DialogContent className="h-[100dvh] max-h-[100dvh] w-full max-w-full overflow-y-auto rounded-none border-2 border-primary bg-background p-3 sm:h-auto sm:max-h-[94vh] sm:max-w-[520px] sm:p-4">
         <h3 className="font-head text-lg font-black uppercase text-primary">Сканирование</h3>
         <p className="mt-1 text-[13px] text-muted-foreground">
           {status === 'off'
@@ -169,8 +196,49 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
             </button>
           </div>
         ) : (
-          <div className="relative mt-3 overflow-hidden border-2 border-primary bg-black">
-            <video ref={videoRef} playsInline muted className="h-[46vh] w-full object-cover" />
+          <div className="relative mt-3 aspect-square w-full overflow-hidden border-2 border-primary bg-black sm:aspect-[4/3]">
+            <video
+              ref={videoRef}
+              playsInline
+              muted
+              autoPlay
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+
+            {status === 'on' && (
+              <>
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <div className="relative h-[62%] w-[62%]">
+                    <span className="absolute left-0 top-0 h-8 w-8 border-l-4 border-t-4 border-accent" />
+                    <span className="absolute right-0 top-0 h-8 w-8 border-r-4 border-t-4 border-accent" />
+                    <span className="absolute bottom-0 left-0 h-8 w-8 border-b-4 border-l-4 border-accent" />
+                    <span className="absolute bottom-0 right-0 h-8 w-8 border-b-4 border-r-4 border-accent" />
+                  </div>
+                </div>
+                {hasTorch && (
+                  <button
+                    onClick={async () => {
+                      const next = !torch;
+                      try {
+                        await trackRef.current?.applyConstraints({
+                          // @ts-expect-error нестандартная, но поддерживаемая настройка
+                          advanced: [{ torch: next }],
+                        });
+                        setTorch(next);
+                      } catch {
+                        setHasTorch(false);
+                      }
+                    }}
+                    className={`absolute bottom-2 right-2 flex h-11 w-11 items-center justify-center border-2 border-primary transition-colors ${
+                      torch ? 'bg-accent text-accent-foreground' : 'bg-black/60 text-white'
+                    }`}
+                  >
+                    <Icon name={torch ? 'Flashlight' : 'FlashlightOff'} size={20} strokeWidth={2.5} />
+                  </button>
+                )}
+              </>
+            )}
+
             {status === 'asking' && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/70 px-4 text-center">
                 <Icon name="Camera" size={26} strokeWidth={2} className="text-white/80" />
