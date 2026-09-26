@@ -3,6 +3,7 @@ import { BrowserMultiFormatReader } from '@zxing/browser';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
 import { Equipment } from '@/lib/equipmentApi';
+import { cameraSupported, openCamera } from '@/lib/cameraPermission';
 
 interface ScanDialogProps {
   open: boolean;
@@ -26,20 +27,17 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
   const [torch, setTorch] = useState(false);
 
   const active = items.filter((i) => i.active);
-  const codeMap = new Map(active.map((i) => [i.code, i]));
+  const codeMapRef = useRef(new Map<string, Equipment>());
+  codeMapRef.current = new Map(active.map((i) => [i.code, i]));
 
-  const accept = useCallback(
-    (raw: string) => {
-      const code = raw.trim();
-      if (!code) return;
-      const found = codeMap.get(code);
-      setLast({ name: found ? found.name : `Чужой код: ${code}`, ok: Boolean(found) });
-      if (!found) return;
-      setScanned((prev) => (prev.includes(code) ? prev : [...prev, code]));
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [items],
-  );
+  const accept = useCallback((raw: string) => {
+    const code = raw.trim();
+    if (!code) return;
+    const found = codeMapRef.current.get(code);
+    setLast({ name: found ? found.name : `Чужой код: ${code}`, ok: Boolean(found) });
+    if (!found) return;
+    setScanned((prev) => (prev.includes(code) ? prev : [...prev, code]));
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -64,25 +62,24 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
         setError('Камера работает только по защищённому соединению (https). Вводи коды вручную.');
         return;
       }
-      if (!navigator.mediaDevices?.getUserMedia) {
+      if (!cameraSupported()) {
         setStatus('off');
         setError('Браузер не умеет работать с камерой. Вводи коды вручную.');
         return;
       }
 
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
+        stream = await openCamera({
           video: {
             facingMode: { ideal: 'environment' },
             width: { ideal: 1920 },
             height: { ideal: 1080 },
             frameRate: { ideal: 30 },
-            // @ts-expect-error нестандартные, но поддерживаемые подсказки автофокуса
-            focusMode: { ideal: 'continuous' },
             advanced: [{ focusMode: 'continuous' }],
-          },
+          } as unknown as MediaTrackConstraints,
           audio: false,
         });
+        if (!stream) throw new DOMException('no stream', 'NotFoundError');
       } catch (err) {
         const name = (err as DOMException)?.name || '';
         console.error('camera error', name, err);
