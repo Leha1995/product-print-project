@@ -20,6 +20,7 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
   const [last, setLast] = useState<{ name: string; ok: boolean } | null>(null);
   const [manual, setManual] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const [framed, setFramed] = useState(false);
 
   const active = items.filter((i) => i.active);
   const codeMap = new Map(active.map((i) => [i.code, i]));
@@ -46,6 +47,7 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
   useEffect(() => {
     if (!open) return;
     setError('');
+    setFramed(false);
     setStatus('asking');
     let stopped = false;
     let stream: MediaStream | null = null;
@@ -70,13 +72,23 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
         });
       } catch (err) {
         const name = (err as DOMException)?.name || '';
+        console.error('camera error', name, err);
         setStatus('off');
+        if (name === 'NotAllowedError' && window.self !== window.top) {
+          setFramed(true);
+          setError(
+            'Окно предпросмотра не пропускает камеру. Открой приложение в отдельной вкладке — там камера заработает.',
+          );
+          return;
+        }
         setError(
           name === 'NotAllowedError'
-            ? 'Доступ к камере запрещён. Нажми на значок замка в адресной строке и разреши камеру, затем «Включить камеру».'
-            : name === 'NotFoundError'
+            ? 'Браузер заблокировал камеру. Проверь значок камеры в адресной строке и в настройках системы, затем нажми «Включить камеру».'
+            : name === 'NotFoundError' || name === 'OverconstrainedError'
               ? 'Камера не найдена. Подключи камеру или вводи коды вручную.'
-              : 'Камера занята другим приложением. Закрой его и попробуй снова.',
+              : name === 'NotReadableError'
+                ? 'Камера занята другим приложением. Закрой его и попробуй снова.'
+                : 'Не удалось включить камеру. Попробуй снова или вводи коды вручную.',
         );
         return;
       }
@@ -85,12 +97,10 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
         stream.getTracks().forEach((t) => t.stop());
         return;
       }
-      stream.getTracks().forEach((t) => t.stop());
-      stream = null;
 
       try {
-        const controls = await reader.decodeFromVideoDevice(
-          undefined,
+        const controls = await reader.decodeFromStream(
+          stream,
           videoRef.current ?? undefined,
           (result) => {
             if (result) accept(result.getText());
@@ -102,10 +112,11 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
         }
         controlsRef.current = controls;
         setStatus('on');
-      } catch {
+      } catch (err) {
+        console.error('scanner start error', err);
         if (stopped) return;
         setStatus('off');
-        setError('Не удалось запустить камеру. Попробуй снова или вводи коды вручную.');
+        setError('Не удалось запустить распознавание. Попробуй снова или вводи коды вручную.');
       }
     };
 
@@ -113,9 +124,9 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
 
     return () => {
       stopped = true;
-      stream?.getTracks().forEach((t) => t.stop());
       controlsRef.current?.stop();
       controlsRef.current = null;
+      stream?.getTracks().forEach((t) => t.stop());
     };
   }, [open, accept, attempt]);
 
@@ -136,9 +147,22 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
           <div className="mt-3 flex flex-col items-center gap-2 border-2 border-dashed border-primary bg-card px-4 py-6 text-center">
             <Icon name="CameraOff" size={28} strokeWidth={2} className="text-muted-foreground" />
             <p className="max-w-[340px] text-[13px] text-muted-foreground">{error}</p>
+            {framed && (
+              <a
+                href={window.location.href}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 flex items-center gap-1.5 border-2 border-primary bg-accent px-3 py-2 font-head text-[0.7rem] font-bold uppercase text-accent-foreground transition-transform hover:-translate-y-0.5"
+              >
+                <Icon name="ExternalLink" size={15} strokeWidth={2.5} />
+                Открыть в новой вкладке
+              </a>
+            )}
             <button
               onClick={() => setAttempt((n) => n + 1)}
-              className="mt-1 flex items-center gap-1.5 border-2 border-primary bg-accent px-3 py-2 font-head text-[0.7rem] font-bold uppercase text-accent-foreground transition-transform hover:-translate-y-0.5"
+              className={`mt-1 flex items-center gap-1.5 border-2 border-primary px-3 py-2 font-head text-[0.7rem] font-bold uppercase transition-transform hover:-translate-y-0.5 ${
+                framed ? 'bg-background text-primary' : 'bg-accent text-accent-foreground'
+              }`}
             >
               <Icon name="Camera" size={15} strokeWidth={2.5} />
               Включить камеру
