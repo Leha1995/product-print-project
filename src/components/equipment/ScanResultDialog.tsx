@@ -1,6 +1,7 @@
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
 import { FinishResult } from '@/lib/equipmentApi';
+import { exportInventory } from '@/lib/inventoryExport';
 
 interface ScanResultDialogProps {
   result: FinishResult | null;
@@ -88,7 +89,15 @@ const ScanResultDialog = ({ result, open, onOpenChange, onRescan }: ScanResultDi
           {`Стоимость всего оборудования: ${money(result.totalPrice)}`}
         </p>
 
-        <div className="mt-4 flex gap-2">
+        <button
+          onClick={() => exportInventory(result)}
+          className="mt-4 flex w-full items-center justify-center gap-2 border-2 border-primary bg-card px-4 py-3 font-head text-[0.78rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
+        >
+          <Icon name="FileSpreadsheet" size={18} strokeWidth={2.5} />
+          Выгрузить в Excel
+        </button>
+
+        <div className="mt-2 flex gap-2">
           <button
             onClick={() => onOpenChange(false)}
             className="flex-1 border-2 border-primary bg-card px-4 py-3 font-head text-[0.78rem] font-bold uppercase text-primary transition-colors hover:bg-muted"

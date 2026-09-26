@@ -7,6 +7,7 @@ import ScanResultDialog from '@/components/equipment/ScanResultDialog';
 import useEquipment from '@/hooks/useEquipment';
 import { Equipment, FinishResult, finishInventory } from '@/lib/equipmentApi';
 import { toast } from '@/hooks/use-toast';
+import { exportEquipmentList, exportInventory } from '@/lib/inventoryExport';
 
 interface EquipmentSectionProps {
   userId?: number;
@@ -76,6 +77,32 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
             >
               <Icon name="Plus" size={16} strokeWidth={2.5} />
               Добавить
+            </button>
+          )}
+          {items.length > 0 && (
+            <button
+              onClick={() => {
+                if (lastSession?.finishedAt) {
+                  const byId = new Map(items.map((i) => [i.id, i]));
+                  const pick = (ids: string[]) =>
+                    ids.map((id) => byId.get(id)).filter(Boolean) as Equipment[];
+                  exportInventory({
+                    sessionId: lastSession.id,
+                    found: pick(lastSession.scanned),
+                    missing: pick(lastSession.missing),
+                    total: lastSession.total,
+                    totalPrice: lastSession.totalPrice,
+                    missingPrice: lastSession.missingPrice,
+                    sessions,
+                  });
+                  return;
+                }
+                exportEquipmentList(items);
+              }}
+              className="flex items-center gap-2 border-2 border-primary bg-card px-3 py-2.5 font-head text-[0.75rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
+            >
+              <Icon name="FileSpreadsheet" size={16} strokeWidth={2.5} />
+              Excel
             </button>
           )}
           {isAdmin && items.length > 0 && (
