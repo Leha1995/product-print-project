@@ -24,6 +24,7 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
   const trackRef = useRef<MediaStreamTrack | null>(null);
   const [hasTorch, setHasTorch] = useState(false);
   const [torch, setTorch] = useState(false);
+  const [shotBusy, setShotBusy] = useState(false);
 
   const active = items.filter((i) => i.active);
   const codeMap = new Map(active.map((i) => [i.code, i]));
@@ -90,7 +91,7 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
         if (name === 'NotAllowedError' && window.self !== window.top) {
           setFramed(true);
           setError(
-            'Окно предпросмотра не пропускает камеру. Открой приложение в отдельной вкладке — там камера заработает.',
+            'Окно предпросмотра не пускает камеру внутрь. Нажми «Снять код камерой» — откроется камера телефона, снимок распознается автоматически.',
           );
           return;
         }
@@ -157,6 +158,24 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
     };
   }, [open, accept, attempt]);
 
+  const decodeShot = useCallback(
+    async (file: File) => {
+      setShotBusy(true);
+      const url = URL.createObjectURL(file);
+      try {
+        const reader = new BrowserMultiFormatReader();
+        const result = await reader.decodeFromImageUrl(url);
+        accept(result.getText());
+      } catch {
+        setLast({ name: 'Код на снимке не распознан — сними ближе', ok: false });
+      } finally {
+        URL.revokeObjectURL(url);
+        setShotBusy(false);
+      }
+    },
+    [accept],
+  );
+
   const total = active.length;
   const left = total - scanned.length;
 
@@ -178,24 +197,32 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
           <div className="mx-3 flex flex-1 flex-col items-center justify-center gap-2 overflow-y-auto border-2 border-dashed border-primary bg-card px-4 py-5 text-center sm:mx-0 sm:mt-3 sm:flex-none">
             <Icon name="CameraOff" size={28} strokeWidth={2} className="text-muted-foreground" />
             <p className="max-w-[340px] text-[13px] text-muted-foreground">{error}</p>
-            {framed && (
-              <a
-                href={window.location.href}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-1 flex items-center gap-1.5 border-2 border-primary bg-accent px-3 py-2 font-head text-[0.7rem] font-bold uppercase text-accent-foreground transition-transform hover:-translate-y-0.5"
-              >
-                <Icon name="ExternalLink" size={15} strokeWidth={2.5} />
-                Открыть в новой вкладке
-              </a>
-            )}
+            <label
+              className={`mt-1 flex cursor-pointer items-center gap-1.5 border-2 border-primary px-3 py-2 font-head text-[0.7rem] font-bold uppercase transition-transform hover:-translate-y-0.5 ${
+                framed ? 'bg-accent text-accent-foreground' : 'bg-background text-primary'
+              } ${shotBusy ? 'opacity-60' : ''}`}
+            >
+              <Icon name={shotBusy ? 'Loader' : 'Camera'} size={15} strokeWidth={2.5} />
+              {shotBusy ? 'Распознаю…' : 'Снять код камерой'}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (file) decodeShot(file);
+                }}
+              />
+            </label>
             <button
               onClick={() => setAttempt((n) => n + 1)}
-              className={`mt-1 flex items-center gap-1.5 border-2 border-primary px-3 py-2 font-head text-[0.7rem] font-bold uppercase transition-transform hover:-translate-y-0.5 ${
+              className={`flex items-center gap-1.5 border-2 border-primary px-3 py-2 font-head text-[0.7rem] font-bold uppercase transition-transform hover:-translate-y-0.5 ${
                 framed ? 'bg-background text-primary' : 'bg-accent text-accent-foreground'
               }`}
             >
-              <Icon name="Camera" size={15} strokeWidth={2.5} />
+              <Icon name="RefreshCw" size={15} strokeWidth={2.5} />
               Включить камеру
             </button>
           </div>
