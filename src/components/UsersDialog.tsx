@@ -321,12 +321,13 @@ const UsersDialog = ({
           <div className="mt-3 grid gap-2">
             {(isSuperAdmin ? tree : users.map((u) => ({ head: u, staff: [] }))).map((node) => (
               <div key={node.head.id} className={node.staff.length ? 'grid gap-1' : ''}>
-            {[node.head, ...(collapsed.includes(node.head.id) ? [] : node.staff)].map((u, idx) => (
+            {[node.head, ...node.staff].map((u, idx) => (
               <div
                 key={u.id}
+                hidden={idx > 0 && collapsed.includes(node.head.id)}
                 className={`flex flex-wrap items-center gap-2 border-2 border-primary bg-card px-3 py-2 ${
                   idx > 0 ? 'ml-4 border-l-8 md:ml-8' : ''
-                }`}
+                } ${idx > 0 && collapsed.includes(node.head.id) ? 'hidden' : ''}`}
               >
                 {idx > 0 && (
                   <Icon
