@@ -69,25 +69,15 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
       }
 
       try {
-        stream = await openCamera({
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 },
-            frameRate: { ideal: 30 },
-            advanced: [{ focusMode: 'continuous' }],
-          } as unknown as MediaTrackConstraints,
-          audio: false,
-        });
-        if (!stream) throw new DOMException('no stream', 'NotFoundError');
+        stream = await openCamera();
       } catch (err) {
         const name = (err as DOMException)?.name || '';
         console.error('camera error', name, err);
         setStatus('off');
-        if (name === 'NotAllowedError' && window.self !== window.top) {
+        if (window.self !== window.top) {
           setFramed(true);
           setError(
-            'Окно предпросмотра не пропускает камеру. Открой приложение в отдельной вкладке — там камера заработает.',
+            'Окно предпросмотра не пропускает камеру внутрь. Открой сайт в отдельной вкладке — там камера включится сразу.',
           );
           return;
         }

@@ -14,9 +14,10 @@ const queryClient = new QueryClient();
 
 const App = () => {
   useEffect(() => {
+    if (window.self !== window.top) return;
     const id = window.setTimeout(() => {
       requestCameraAccess();
-    }, 800);
+    }, 1200);
     return () => window.clearTimeout(id);
   }, []);
 
