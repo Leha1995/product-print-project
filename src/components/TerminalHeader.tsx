@@ -70,17 +70,6 @@ const TerminalHeader = ({
       </div>
 
       <div className="flex items-center justify-end gap-3">
-        <button
-          onClick={() => window.location.reload()}
-          aria-label="Обновить страницу"
-          title="Обновить страницу"
-          className="flex h-[34px] items-center gap-1.5 border-2 border-primary bg-card px-2 text-primary transition-colors hover:bg-muted"
-        >
-          <Icon name="RefreshCw" size={20} strokeWidth={2.5} />
-          <span className="hidden font-head text-[0.65rem] font-medium uppercase tracking-[0.06em] lg:inline">
-            Обновить
-          </span>
-        </button>
         {left && (
           <span
             aria-label="Осталось времени доступа"
