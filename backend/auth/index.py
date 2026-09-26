@@ -111,10 +111,6 @@ def list_users(cur, me=None):
     where = ''
     if me and me['role'] == 'admin':
         where = f"WHERE manager_id = {me['id']} OR id = {me['id']}"
-    elif me and me['role'] == 'manager':
-        branch = manager_branch_ids(cur, me['id'])
-        ids = ', '.join(str(i) for i in branch) if branch else '0'
-        where = f'WHERE id IN ({ids})'
     cur.execute(
         'SELECT id, username, full_name, role, active, created_at, manager_id, access_until '
         f'FROM app_users {where} ORDER BY id'
@@ -149,28 +145,8 @@ def list_users(cur, me=None):
     return result
 
 
-def manager_branch_ids(cur, manager_id: int):
-    """Управляющий видит закреплённых за ним админов и сотрудников этих админов."""
-    cur.execute(
-        'SELECT id FROM app_users WHERE active AND role = \'admin\' '
-        f'AND manager_id = {int(manager_id)} ORDER BY id'
-    )
-    admins = [r[0] for r in cur.fetchall()]
-    ids = list(admins)
-    if admins:
-        cur.execute(
-            'SELECT id FROM app_users WHERE active AND role = \'user\' AND manager_id IN ('
-            + ', '.join(str(i) for i in admins)
-            + ') ORDER BY id'
-        )
-        ids.extend(r[0] for r in cur.fetchall())
-    return ids
-
-
 def managed_ids(cur, me):
     """Список id пользователей, чьим каталогом может управлять текущий аккаунт."""
-    if me['role'] == 'manager':
-        return manager_branch_ids(cur, me['id'])
     if me['role'] in GLOBAL_ROLES:
         cur.execute('SELECT id FROM app_users WHERE active ORDER BY id')
     elif me['role'] == 'admin':

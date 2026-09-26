@@ -36,23 +36,11 @@ const Index = () => {
   const [jobs, setJobs] = useState<PrintJob[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  const {
-    user,
-    ready,
-    kicked,
-    login,
-    logout,
-    isAuthed,
-    isAdmin,
-    isSuperAdmin,
-    canInventory,
-    inventoryOnly,
-  } =
+  const { user, ready, kicked, login, logout, isAuthed, isAdmin, isSuperAdmin, canInventory } =
     useAuth();
   const { managed, refreshManaged } = useManagedUsers(isAdmin);
   const [targetId, setTargetId] = useState<number | null>(null);
-  const activeTarget =
-    targetId ?? (inventoryOnly ? (managed[0]?.id ?? null) : (user?.id ?? null));
+  const activeTarget = targetId ?? user?.id ?? null;
   const {
     items,
     categories: catList,
@@ -361,9 +349,8 @@ const Index = () => {
         onAdminClick={() => setAdminOpen(true)}
         accessUntil={user?.accessUntil ?? null}
         section={section}
-        onSectionChange={canInventory && !inventoryOnly ? setSection : undefined}
-        showSections={canInventory && !inventoryOnly}
-        inventoryOnly={inventoryOnly}
+        onSectionChange={canInventory ? setSection : undefined}
+        showSections={canInventory}
       />
       {isAdmin && user && (
         <WorkspaceSwitcher
@@ -371,12 +358,10 @@ const Index = () => {
           currentId={user.id}
           targetId={activeTarget ?? user.id}
           onChange={setTargetId}
-          label={inventoryOnly ? 'Точка' : 'Каталог сотрудника'}
-          minCount={inventoryOnly ? 1 : 2}
         />
       )}
       <main>
-        {(section === 'equipment' || inventoryOnly) && canInventory ? (
+        {section === 'equipment' && canInventory ? (
           <EquipmentSection userId={user?.id} targetId={activeTarget} isAdmin={isAdmin} />
         ) : (
         <MenuSection
@@ -429,7 +414,7 @@ const Index = () => {
           getStatus={getStatus}
         />
         )}
-        {!inventoryOnly && (section === 'labels' || !canInventory) && (
+        {(section === 'labels' || !canInventory) && (
           <PrintLog jobs={jobs} onClear={() => setJobs([])} />
         )}
       </main>

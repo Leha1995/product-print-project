@@ -55,26 +55,8 @@ def session_user(cur, token: str):
 
 
 def can_manage(cur, me, target_id: int) -> bool:
-    if target_id == me['id'] or me['role'] == 'superadmin':
+    if target_id == me['id'] or me['role'] in ('superadmin', 'manager'):
         return True
-    if me['role'] == 'manager':
-        cur.execute(
-            'SELECT role, manager_id FROM app_users WHERE id = ' + str(int(target_id))
-        )
-        row = cur.fetchone()
-        if not row:
-            return False
-        if row[0] == 'admin':
-            return row[1] == me['id']
-        if row[0] == 'user' and row[1]:
-            cur.execute(
-                'SELECT manager_id FROM app_users WHERE id = '
-                + str(int(row[1]))
-                + " AND role = 'admin'"
-            )
-            head = cur.fetchone()
-            return bool(head and head[0] == me['id'])
-        return False
     return False
 
 

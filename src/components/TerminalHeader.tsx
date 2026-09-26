@@ -15,7 +15,6 @@ interface TerminalHeaderProps {
   section?: 'labels' | 'equipment';
   onSectionChange?: (section: 'labels' | 'equipment') => void;
   showSections?: boolean;
-  inventoryOnly?: boolean;
 }
 
 const accessLeft = (until?: string | null) => {
@@ -48,7 +47,6 @@ const TerminalHeader = ({
   section = 'labels',
   onSectionChange,
   showSections = false,
-  inventoryOnly = false,
 }: TerminalHeaderProps) => {
   const [, tick] = useState(0);
   useEffect(() => {
@@ -61,13 +59,7 @@ const TerminalHeader = ({
   return (
     <header className="print-hide sticky top-0 z-40 grid h-[70px] grid-cols-[1fr_auto_1fr] items-center border-b-2 border-primary bg-background px-4 md:px-8">
       <div className="flex items-center gap-1.5">
-        {inventoryOnly && (
-          <span className="flex h-[34px] items-center gap-1.5 border-2 border-primary bg-accent px-2 font-head text-[0.7rem] font-bold uppercase tracking-[0.04em] text-accent-foreground">
-            <Icon name="Wrench" size={16} strokeWidth={2.5} />
-            <span className="hidden sm:inline">Оборудование</span>
-          </span>
-        )}
-        {!showSections && !inventoryOnly && (
+        {!showSections && (
           <button
             onClick={() => onNavigate(links[0].target)}
             className="font-head text-[0.8rem] font-medium uppercase tracking-[0.04em] text-primary transition-colors hover:text-secondary md:text-[0.95rem]"
@@ -175,14 +167,12 @@ const TerminalHeader = ({
             {userName || (isAdmin ? 'Админ' : 'Профиль')}
           </span>
         </button>
-        {!inventoryOnly && (
-          <span className="relative inline-flex h-[30px] w-[34px] items-center justify-center">
-            <Icon name="Printer" size={28} className="text-primary" strokeWidth={2} />
-            <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-sm border-2 border-primary bg-accent px-1 font-head text-[0.65rem] font-bold text-accent-foreground">
-              {printedCount}
-            </span>
+        <span className="relative inline-flex h-[30px] w-[34px] items-center justify-center">
+          <Icon name="Printer" size={28} className="text-primary" strokeWidth={2} />
+          <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-sm border-2 border-primary bg-accent px-1 font-head text-[0.65rem] font-bold text-accent-foreground">
+            {printedCount}
           </span>
-        )}
+        </span>
       </div>
     </header>
   );

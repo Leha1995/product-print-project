@@ -6,8 +6,6 @@ interface WorkspaceSwitcherProps {
   currentId: number;
   targetId: number;
   onChange: (id: number) => void;
-  label?: string;
-  minCount?: number;
 }
 
 const roleShort: Record<string, string> = {
@@ -22,14 +20,11 @@ const WorkspaceSwitcher = ({
   currentId,
   targetId,
   onChange,
-  label = 'Каталог сотрудника',
-  minCount = 2,
 }: WorkspaceSwitcherProps) => {
-  if (managed.length < minCount) return null;
+  if (managed.length < 2) return null;
 
   const viewing = managed.find((m) => m.id === targetId);
-  const self = managed.some((m) => m.id === currentId);
-  const foreign = self && targetId !== currentId;
+  const foreign = targetId !== currentId;
 
   return (
     <div
@@ -44,7 +39,7 @@ const WorkspaceSwitcher = ({
           }`}
         >
           <Icon name="UserCog" size={18} strokeWidth={2.5} />
-          {label}
+          Каталог сотрудника
         </span>
 
         <select
