@@ -1,0 +1,188 @@
+import json
+import os
+import time
+import uuid
+
+import psycopg2
+
+CORS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Auth-Token, X-Target-User',
+    'Access-Control-Max-Age': '86400',
+    'Content-Type': 'application/json',
+}
+
+
+def q(value) -> str:
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def num(value) -> str:
+    try:
+        return str(round(float(value), 2))
+    except (TypeError, ValueError):
+        return '0'
+
+
+def session_user(cur, token: str):
+    if not token:
+        return None
+    cur.execute(
+        'SELECT u.id, u.username, u.role, u.active FROM app_sessions s '
+        f'JOIN app_users u ON u.id = s.user_id WHERE s.token = {q(token)} '
+        'AND s.expires_at > NOW()'
+    )
+    row = cur.fetchone()
+    if not row or not row[3]:
+        return None
+    return {'id': row[0], 'username': row[1], 'role': row[2]}
+
+
+def can_manage(cur, me, target_id: int) -> bool:
+    if target_id == me['id'] or me['role'] == 'superadmin':
+        return True
+    if me['role'] == 'admin':
+        cur.execute(f'SELECT manager_id FROM app_users WHERE id = {target_id}')
+        row = cur.fetchone()
+        return bool(row and row[0] == me['id'])
+    return False
+
+
+def read_items(cur, uid: int):
+    cur.execute(
+        'SELECT id, name, code, price, location, note, image, serial, active, created_at '
+        f'FROM equipment WHERE user_id = {uid} ORDER BY location, name'
+    )
+    return [
+        {
+            'id': r[0],
+            'name': r[1],
+            'code': r[2],
+            'price': float(r[3] or 0),
+            'location': r[4],
+            'note': r[5],
+            'image': r[6],
+            'serial': r[7],
+            'active': bool(r[8]),
+            'createdAt': r[9].isoformat() if r[9] else None,
+        }
+        for r in cur.fetchall()
+    ]
+
+
+def read_sessions(cur, uid: int, limit: int = 20):
+    cur.execute(
+        'SELECT id, started_at, finished_at, scanned, missing, total, total_price, missing_price '
+        f'FROM inventory_sessions WHERE user_id = {uid} ORDER BY started_at DESC LIMIT {int(limit)}'
+    )
+    return [
+        {
+            'id': r[0],
+            'startedAt': r[1].isoformat() if r[1] else None,
+            'finishedAt': r[2].isoformat() if r[2] else None,
+            'scanned': r[3] or [],
+            'missing': r[4] or [],
+            'total': r[5],
+            'totalPrice': float(r[6] or 0),
+            'missingPrice': float(r[7] or 0),
+        }
+        for r in cur.fetchall()
+    ]
+
+
+def make_code(uid: int) -> str:
+    return f"EQ-{uid}-{uuid.uuid4().hex[:8].upper()}"
+
+
+def save_item(cur, uid: int, item: dict) -> int:
+    name = (item.get('name') or '').strip()
+    if not name:
+        return 0
+    eid = str(item.get('id') or f"eq-{uuid.uuid4().hex[:10]}")
+    code = (item.get('code') or '').strip() or make_code(uid)
+    cur.execute(
+        'INSERT INTO equipment (user_id, id, name, code, price, location, note, image, serial, active, updated_at) '
+        f"VALUES ({uid}, {q(eid)}, {q(name)}, {q(code)}, {num(item.get('price'))}, "
+        f"{q(item.get('location') or '')}, {q(item.get('note') or '')}, {q(item.get('image') or '')}, "
+        f"{q(item.get('serial') or '')}, {'FALSE' if item.get('active') is False else 'TRUE'}, NOW()) "
+        'ON CONFLICT (user_id, id) DO UPDATE SET name = EXCLUDED.name, code = EXCLUDED.code, '
+        'price = EXCLUDED.price, location = EXCLUDED.location, note = EXCLUDED.note, '
+        'image = EXCLUDED.image, serial = EXCLUDED.serial, active = EXCLUDED.active, updated_at = NOW()'
+    )
+    return 1
+
+
+def handler(event: dict, context) -> dict:
+    """Инвентаризация оборудования кухни: карточки с QR-кодом и стоимостью, сессии сканирования."""
+    method = event.get('httpMethod', 'GET')
+    if method == 'OPTIONS':
+        return {'statusCode': 200, 'headers': CORS, 'body': ''}
+
+    headers = event.get('headers') or {}
+    token = headers.get('X-Auth-Token') or headers.get('x-auth-token') or ''
+
+    conn = psycopg2.connect(os.environ['DATABASE_URL'])
+    conn.autocommit = True
+    cur = conn.cursor()
+
+    def finish(payload: dict, status: int = 200):
+        cur.close()
+        conn.close()
+        return {'statusCode': status, 'headers': CORS, 'body': json.dumps(payload)}
+
+    me = session_user(cur, token)
+    if not me:
+        return finish({'error': 'unauthorized'}, 401)
+
+    raw_target = headers.get('X-Target-User') or headers.get('x-target-user') or ''
+    uid = me['id']
+    if raw_target and str(raw_target).isdigit():
+        target = int(raw_target)
+        if not can_manage(cur, me, target):
+            return finish({'error': 'forbidden'}, 403)
+        uid = target
+
+    if method == 'GET':
+        return finish({'items': read_items(cur, uid), 'sessions': read_sessions(cur, uid)})
+
+    body = json.loads(event.get('body') or '{}')
+    action = body.get('action', '')
+
+    if method == 'DELETE':
+        cur.execute(f"DELETE FROM equipment WHERE user_id = {uid} AND id = {q(body.get('id', ''))}")
+        return finish({'ok': True, 'items': read_items(cur, uid)})
+
+    if action == 'finish':
+        scanned = [str(c) for c in (body.get('scanned') or [])]
+        items = read_items(cur, uid)
+        active = [i for i in items if i['active']]
+        found = [i for i in active if i['code'] in scanned]
+        missing = [i for i in active if i['code'] not in scanned]
+        total_price = sum(i['price'] for i in active)
+        missing_price = sum(i['price'] for i in missing)
+        cur.execute(
+            'INSERT INTO inventory_sessions (user_id, started_by, finished_at, scanned, missing, '
+            f"total, total_price, missing_price) VALUES ({uid}, {me['id']}, NOW(), "
+            f"{q(json.dumps([i['id'] for i in found]))}::jsonb, {q(json.dumps([i['id'] for i in missing]))}::jsonb, "
+            f"{len(active)}, {num(total_price)}, {num(missing_price)}) RETURNING id"
+        )
+        row = cur.fetchone()
+        return finish(
+            {
+                'ok': True,
+                'sessionId': row[0] if row else None,
+                'found': found,
+                'missing': missing,
+                'total': len(active),
+                'totalPrice': total_price,
+                'missingPrice': missing_price,
+                'sessions': read_sessions(cur, uid),
+            }
+        )
+
+    items = body.get('items') or ([body['item']] if body.get('item') else [])
+    saved = 0
+    for item in items:
+        saved += save_item(cur, uid, item)
+    return finish({'saved': saved, 'items': read_items(cur, uid)})

@@ -12,6 +12,8 @@ interface TerminalHeaderProps {
   alertCount?: number;
   onAdminClick: () => void;
   accessUntil?: string | null;
+  section?: 'labels' | 'equipment';
+  onSectionChange?: (section: 'labels' | 'equipment') => void;
 }
 
 const accessLeft = (until?: string | null) => {
@@ -41,6 +43,8 @@ const TerminalHeader = ({
   alertCount = 0,
   onAdminClick,
   accessUntil,
+  section = 'labels',
+  onSectionChange,
 }: TerminalHeaderProps) => {
   const [, tick] = useState(0);
   useEffect(() => {
@@ -52,18 +56,33 @@ const TerminalHeader = ({
   const left = accessLeft(accessUntil);
   return (
     <header className="print-hide sticky top-0 z-40 grid h-[70px] grid-cols-[1fr_auto_1fr] items-center border-b-2 border-primary bg-background px-4 md:px-8">
-      <ul className="flex gap-5 md:gap-8">
-        {links.map((link) => (
-          <li key={link.target}>
-            <button
-              onClick={() => onNavigate(link.target)}
-              className="font-head text-[0.8rem] font-medium uppercase tracking-[0.04em] text-primary transition-colors hover:text-secondary md:text-[0.95rem]"
-            >
-              {link.label}
-            </button>
-          </li>
-        ))}
-      </ul>
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={() => {
+            onSectionChange?.('labels');
+            onNavigate(links[0].target);
+          }}
+          className={`flex h-[34px] items-center gap-1.5 border-2 border-primary px-2 font-head text-[0.7rem] font-bold uppercase tracking-[0.04em] transition-colors ${
+            section === 'labels'
+              ? 'bg-accent text-accent-foreground'
+              : 'bg-card text-primary hover:bg-muted'
+          }`}
+        >
+          <Icon name="Tags" size={16} strokeWidth={2.5} />
+          <span className="hidden sm:inline">Маркировка</span>
+        </button>
+        <button
+          onClick={() => onSectionChange?.('equipment')}
+          className={`flex h-[34px] items-center gap-1.5 border-2 border-primary px-2 font-head text-[0.7rem] font-bold uppercase tracking-[0.04em] transition-colors ${
+            section === 'equipment'
+              ? 'bg-accent text-accent-foreground'
+              : 'bg-card text-primary hover:bg-muted'
+          }`}
+        >
+          <Icon name="Wrench" size={16} strokeWidth={2.5} />
+          <span className="hidden sm:inline">Оборудование</span>
+        </button>
+      </div>
 
       <div className="brand-squeeze font-head text-lg font-black uppercase tracking-[-0.02em] text-primary md:text-2xl">
         Автосуши&nbsp;Автопицца

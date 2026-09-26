@@ -24,12 +24,14 @@ import SharedCatalogDialog from '@/components/SharedCatalogDialog';
 import DefrostPrintArea from '@/components/DefrostPrintArea';
 import { DefrostInfo } from '@/components/DefrostLabel';
 import Footer from '@/components/Footer';
+import EquipmentSection from '@/components/equipment/EquipmentSection';
 import { Product, productCategories } from '@/data/products';
 import { toast } from '@/hooks/use-toast';
 import { playAlertTune, playFuneralTune, unlockAudio } from '@/lib/chiptune';
 
 const Index = () => {
   const [selected, setSelected] = useState<Product | null>(null);
+  const [section, setSection] = useState<'labels' | 'equipment'>('labels');
   const [open, setOpen] = useState(false);
   const [jobs, setJobs] = useState<PrintJob[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
@@ -345,6 +347,8 @@ const Index = () => {
         alertCount={alertCount}
         onAdminClick={() => setAdminOpen(true)}
         accessUntil={user?.accessUntil ?? null}
+        section={section}
+        onSectionChange={setSection}
       />
       {isAdmin && user && (
         <WorkspaceSwitcher
@@ -355,6 +359,9 @@ const Index = () => {
         />
       )}
       <main>
+        {section === 'equipment' ? (
+          <EquipmentSection userId={user?.id} targetId={activeTarget} isAdmin={isAdmin} />
+        ) : (
         <MenuSection
           products={items}
           categories={categories}
@@ -404,7 +411,8 @@ const Index = () => {
           expiredIds={expiredIds}
           getStatus={getStatus}
         />
-        <PrintLog jobs={jobs} onClear={() => setJobs([])} />
+        )}
+        {section === 'labels' && <PrintLog jobs={jobs} onClear={() => setJobs([])} />}
       </main>
       <Footer />
       <PrintDialog
