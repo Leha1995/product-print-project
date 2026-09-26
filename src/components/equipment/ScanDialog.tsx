@@ -16,8 +16,10 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
   const controlsRef = useRef<{ stop: () => void } | null>(null);
   const [scanned, setScanned] = useState<string[]>([]);
   const [error, setError] = useState('');
+  const [status, setStatus] = useState<'asking' | 'on' | 'off'>('asking');
   const [last, setLast] = useState<{ name: string; ok: boolean } | null>(null);
   const [manual, setManual] = useState('');
+  const [attempt, setAttempt] = useState(0);
 
   const active = items.filter((i) => i.active);
   const codeMap = new Map(active.map((i) => [i.code, i]));
@@ -39,26 +41,83 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
     if (!open) return;
     setScanned([]);
     setLast(null);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
     setError('');
+    setStatus('asking');
     let stopped = false;
+    let stream: MediaStream | null = null;
     const reader = new BrowserMultiFormatReader();
 
-    reader
-      .decodeFromVideoDevice(undefined, videoRef.current ?? undefined, (result) => {
-        if (result) accept(result.getText());
-      })
-      .then((controls) => {
-        if (stopped) controls.stop();
-        else controlsRef.current = controls;
-      })
-      .catch(() => setError('Нет доступа к камере — разреши её в браузере или вводи коды вручную'));
+    const start = async () => {
+      if (!window.isSecureContext) {
+        setStatus('off');
+        setError('Камера работает только по защищённому соединению (https). Вводи коды вручную.');
+        return;
+      }
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setStatus('off');
+        setError('Браузер не умеет работать с камерой. Вводи коды вручную.');
+        return;
+      }
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false,
+        });
+      } catch (err) {
+        const name = (err as DOMException)?.name || '';
+        setStatus('off');
+        setError(
+          name === 'NotAllowedError'
+            ? 'Доступ к камере запрещён. Нажми на значок замка в адресной строке и разреши камеру, затем «Включить камеру».'
+            : name === 'NotFoundError'
+              ? 'Камера не найдена. Подключи камеру или вводи коды вручную.'
+              : 'Камера занята другим приложением. Закрой его и попробуй снова.',
+        );
+        return;
+      }
+
+      if (stopped) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      stream.getTracks().forEach((t) => t.stop());
+      stream = null;
+
+      try {
+        const controls = await reader.decodeFromVideoDevice(
+          undefined,
+          videoRef.current ?? undefined,
+          (result) => {
+            if (result) accept(result.getText());
+          },
+        );
+        if (stopped) {
+          controls.stop();
+          return;
+        }
+        controlsRef.current = controls;
+        setStatus('on');
+      } catch {
+        if (stopped) return;
+        setStatus('off');
+        setError('Не удалось запустить камеру. Попробуй снова или вводи коды вручную.');
+      }
+    };
+
+    start();
 
     return () => {
       stopped = true;
+      stream?.getTracks().forEach((t) => t.stop());
       controlsRef.current?.stop();
       controlsRef.current = null;
     };
-  }, [open, accept]);
+  }, [open, accept, attempt]);
 
   const total = active.length;
   const left = total - scanned.length;
@@ -68,17 +127,36 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
       <DialogContent className="max-h-[94vh] max-w-[520px] overflow-y-auto border-2 border-primary bg-background p-4">
         <h3 className="font-head text-lg font-black uppercase text-primary">Сканирование</h3>
         <p className="mt-1 text-[13px] text-muted-foreground">
-          {`Наведи камеру на QR-код. Отмечено ${scanned.length} из ${total}`}
+          {status === 'off'
+            ? `Камера недоступна — вводи коды вручную. Отмечено ${scanned.length} из ${total}`
+            : `Наведи камеру на QR-код. Отмечено ${scanned.length} из ${total}`}
         </p>
 
-        <div className="mt-3 overflow-hidden border-2 border-primary bg-black">
-          <video ref={videoRef} playsInline muted className="h-[46vh] w-full object-cover" />
-        </div>
-
-        {error && (
-          <p className="mt-2 border-2 border-destructive bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
-            {error}
-          </p>
+        {status === 'off' ? (
+          <div className="mt-3 flex flex-col items-center gap-2 border-2 border-dashed border-primary bg-card px-4 py-6 text-center">
+            <Icon name="CameraOff" size={28} strokeWidth={2} className="text-muted-foreground" />
+            <p className="max-w-[340px] text-[13px] text-muted-foreground">{error}</p>
+            <button
+              onClick={() => setAttempt((n) => n + 1)}
+              className="mt-1 flex items-center gap-1.5 border-2 border-primary bg-accent px-3 py-2 font-head text-[0.7rem] font-bold uppercase text-accent-foreground transition-transform hover:-translate-y-0.5"
+            >
+              <Icon name="Camera" size={15} strokeWidth={2.5} />
+              Включить камеру
+            </button>
+          </div>
+        ) : (
+          <div className="relative mt-3 overflow-hidden border-2 border-primary bg-black">
+            <video ref={videoRef} playsInline muted className="h-[46vh] w-full object-cover" />
+            {status === 'asking' && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/70 px-4 text-center">
+                <Icon name="Camera" size={26} strokeWidth={2} className="text-white/80" />
+                <p className="font-head text-[0.72rem] font-bold uppercase text-white/90">
+                  Запрашиваю доступ к камере
+                </p>
+                <p className="text-[12px] text-white/60">Нажми «Разрешить» в окне браузера</p>
+              </div>
+            )}
+          </div>
         )}
 
         {last && (
@@ -98,6 +176,12 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
           <input
             value={manual}
             onChange={(e) => setManual(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return;
+              accept(manual);
+              setManual('');
+            }}
+            autoFocus={status === 'off'}
             placeholder="Ввести код вручную"
             className="flex-1 border-2 border-primary bg-background px-3 py-2.5 font-body text-[14px] text-primary outline-none"
           />
