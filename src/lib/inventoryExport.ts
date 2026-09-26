@@ -1,8 +1,8 @@
 import * as XLSX from 'xlsx';
 import { Equipment, FinishResult } from '@/lib/equipmentApi';
 
-const stamp = () => {
-  const d = new Date();
+const stamp = (iso?: string | null) => {
+  const d = iso ? new Date(iso) : new Date();
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}_${pad(d.getHours())}-${pad(
     d.getMinutes(),
@@ -25,7 +25,7 @@ const row = (item: Equipment, found: boolean) => ({
   Заметка: item.note || '',
 });
 
-export const exportInventory = (result: FinishResult) => {
+export const exportInventory = (result: FinishResult, finishedAt?: string | null) => {
   const rows = [
     ...result.missing.map((i) => row(i, false)),
     ...result.found.map((i) => row(i, true)),
@@ -43,7 +43,10 @@ export const exportInventory = (result: FinishResult) => {
   ];
 
   const summary = XLSX.utils.json_to_sheet([
-    { Показатель: 'Дата проверки', Значение: new Date().toLocaleString('ru-RU') },
+    {
+      Показатель: 'Дата проверки',
+      Значение: (finishedAt ? new Date(finishedAt) : new Date()).toLocaleString('ru-RU'),
+    },
     { Показатель: 'Всего позиций', Значение: result.total },
     { Показатель: 'Найдено', Значение: result.found.length },
     { Показатель: 'Не найдено', Значение: result.missing.length },
@@ -55,7 +58,7 @@ export const exportInventory = (result: FinishResult) => {
   const book = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(book, summary, 'Итоги');
   XLSX.utils.book_append_sheet(book, sheet, 'Оборудование');
-  XLSX.writeFile(book, `Инвентаризация_${stamp()}.xlsx`);
+  XLSX.writeFile(book, `Инвентаризация_${stamp(finishedAt)}.xlsx`);
 };
 
 export const exportEquipmentList = (items: Equipment[]) => {

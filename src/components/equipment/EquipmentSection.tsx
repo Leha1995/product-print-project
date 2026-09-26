@@ -4,6 +4,7 @@ import EquipmentFormDialog from '@/components/equipment/EquipmentFormDialog';
 import QrPrintDialog from '@/components/equipment/QrPrintDialog';
 import ScanDialog from '@/components/equipment/ScanDialog';
 import ScanResultDialog from '@/components/equipment/ScanResultDialog';
+import InventoryHistoryDialog from '@/components/equipment/InventoryHistoryDialog';
 import useEquipment from '@/hooks/useEquipment';
 import {
   Equipment,
@@ -36,6 +37,7 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
   const [scanOpen, setScanOpen] = useState(false);
   const [result, setResult] = useState<FinishResult | null>(null);
   const [resultOpen, setResultOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [query, setQuery] = useState('');
 
   const filtered = useMemo(() => {
@@ -120,6 +122,15 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
               Добавить
             </button>
           )}
+          {sessions.some((s) => s.finishedAt) && (
+            <button
+              onClick={() => setHistoryOpen(true)}
+              className="flex items-center gap-2 border-2 border-primary bg-card px-3 py-2.5 font-head text-[0.75rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
+            >
+              <Icon name="History" size={16} strokeWidth={2.5} />
+              История
+            </button>
+          )}
           {items.length > 0 && (
             <button
               onClick={() => {
@@ -135,7 +146,7 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
                     totalPrice: lastSession.totalPrice,
                     missingPrice: lastSession.missingPrice,
                     sessions,
-                  });
+                  }, lastSession.finishedAt);
                   return;
                 }
                 exportEquipmentList(items);
@@ -175,14 +186,20 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
       </div>
 
       {lastSession?.finishedAt && (
-        <p className="mt-3 border-2 border-dashed border-primary px-3 py-2 text-[12px] text-muted-foreground">
-          {`Последняя проверка: ${new Date(lastSession.finishedAt).toLocaleString('ru-RU', {
-            day: '2-digit',
-            month: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-          })} · не найдено ${lastSession.missing.length} из ${lastSession.total}`}
-        </p>
+        <button
+          onClick={() => setHistoryOpen(true)}
+          className="mt-3 flex w-full items-center justify-between gap-2 border-2 border-dashed border-primary px-3 py-2 text-left text-[12px] text-muted-foreground transition-colors hover:bg-muted"
+        >
+          <span>
+            {`Последняя проверка: ${new Date(lastSession.finishedAt).toLocaleString('ru-RU', {
+              day: '2-digit',
+              month: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+            })} · не найдено ${lastSession.missing.length} из ${lastSession.total}`}
+          </span>
+          <Icon name="ChevronRight" size={16} strokeWidth={2.5} className="shrink-0 text-primary" />
+        </button>
       )}
 
       {items.length > 4 && (
@@ -353,6 +370,12 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
           setScanOpen(true);
         }}
         onResolve={handleResolve}
+      />
+      <InventoryHistoryDialog
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        sessions={sessions}
+        items={items}
       />
     </section>
   );

@@ -86,7 +86,7 @@ def read_items(cur, uid: int):
     ]
 
 
-def read_sessions(cur, uid: int, limit: int = 20):
+def read_sessions(cur, uid: int, limit: int = 100):
     cur.execute(
         'SELECT id, started_at, finished_at, scanned, missing, total, total_price, missing_price '
         f'FROM inventory_sessions WHERE user_id = {uid} ORDER BY started_at DESC LIMIT {int(limit)}'
