@@ -15,10 +15,12 @@ const queryClient = new QueryClient();
 const App = () => {
   useEffect(() => {
     if (window.self !== window.top) return;
-    const id = window.setTimeout(() => {
+    const onFirstTouch = () => {
+      window.removeEventListener('pointerdown', onFirstTouch);
       requestCameraAccess();
-    }, 1200);
-    return () => window.clearTimeout(id);
+    };
+    window.addEventListener('pointerdown', onFirstTouch, { once: true });
+    return () => window.removeEventListener('pointerdown', onFirstTouch);
   }, []);
 
   return (
