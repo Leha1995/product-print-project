@@ -84,6 +84,7 @@ const UsersDialog = ({
     setCollapsed((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const admins = users.filter((u) => u.role === 'admin' || u.role === 'superadmin');
+  const managers = users.filter((u) => u.role === 'manager');
 
   const tree = (() => {
     const heads = users.filter((u) => u.role !== 'user');
@@ -121,7 +122,7 @@ const UsersDialog = ({
         password,
         fullName,
         role,
-        managerId: role === 'user' ? managerId || null : null,
+        managerId: role === 'user' || role === 'admin' ? managerId || null : null,
         accessDays: role === 'admin' ? accessDays || null : null,
       });
       apply(r.users);
@@ -280,6 +281,20 @@ const UsersDialog = ({
                 ))}
               </select>
             )}
+            {isSuperAdmin && role === 'admin' && (
+              <select
+                value={managerId}
+                onChange={(e) => setManagerId(e.target.value ? Number(e.target.value) : '')}
+                className={`${inputClass} md:col-span-2`}
+              >
+                <option value="">Без управляющего</option>
+                {managers.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    Управляющий: {m.fullName || m.username}
+                  </option>
+                ))}
+              </select>
+            )}
             {role === 'admin' && (
               <select
                 value={accessDays}
@@ -426,6 +441,25 @@ const UsersDialog = ({
                     {admins.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.fullName || a.username}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {isSuperAdmin && u.role === 'admin' && (
+                  <select
+                    value={u.managerId ?? ''}
+                    onChange={(e) =>
+                      patch(
+                        { id: u.id, managerId: e.target.value ? Number(e.target.value) : null },
+                        'Управляющий обновлён',
+                      )
+                    }
+                    className="border-2 border-primary bg-background px-2 py-1 font-body text-[13px] text-primary outline-none"
+                  >
+                    <option value="">Без управляющего</option>
+                    {managers.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.fullName || m.username}
                       </option>
                     ))}
                   </select>

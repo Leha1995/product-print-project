@@ -51,7 +51,8 @@ const Index = () => {
     useAuth();
   const { managed, refreshManaged } = useManagedUsers(isAdmin);
   const [targetId, setTargetId] = useState<number | null>(null);
-  const activeTarget = targetId ?? user?.id ?? null;
+  const activeTarget =
+    targetId ?? (inventoryOnly ? (managed[0]?.id ?? null) : (user?.id ?? null));
   const {
     items,
     categories: catList,
@@ -370,6 +371,8 @@ const Index = () => {
           currentId={user.id}
           targetId={activeTarget ?? user.id}
           onChange={setTargetId}
+          label={inventoryOnly ? 'Точка' : 'Каталог сотрудника'}
+          minCount={inventoryOnly ? 1 : 2}
         />
       )}
       <main>
