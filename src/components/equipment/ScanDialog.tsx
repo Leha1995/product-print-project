@@ -77,10 +77,8 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
             width: { ideal: 1920 },
             height: { ideal: 1080 },
             frameRate: { ideal: 30 },
-            // @ts-expect-error нестандартные, но поддерживаемые подсказки автофокуса
-            focusMode: { ideal: 'continuous' },
             advanced: [{ focusMode: 'continuous' }],
-          },
+          } as unknown as MediaTrackConstraints,
           audio: false,
         });
       } catch (err) {
