@@ -43,7 +43,7 @@ const useEquipment = (userId?: number, targetId?: number | null) => {
     if (res?.items) setItems(res.items);
   }, []);
 
-  return { items, sessions, loading, reload, save, remove, setSessions };
+  return { items, sessions, loading, reload, save, remove, setItems, setSessions };
 };
 
 export default useEquipment;

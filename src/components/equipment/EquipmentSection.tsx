@@ -5,7 +5,14 @@ import QrPrintDialog from '@/components/equipment/QrPrintDialog';
 import ScanDialog from '@/components/equipment/ScanDialog';
 import ScanResultDialog from '@/components/equipment/ScanResultDialog';
 import useEquipment from '@/hooks/useEquipment';
-import { Equipment, FinishResult, finishInventory } from '@/lib/equipmentApi';
+import {
+  Equipment,
+  FinishResult,
+  finishInventory,
+  markQrFixed,
+  resolveMissing,
+  restoreEquipment,
+} from '@/lib/equipmentApi';
 import { toast } from '@/hooks/use-toast';
 import { exportEquipmentList, exportInventory } from '@/lib/inventoryExport';
 
@@ -18,7 +25,10 @@ interface EquipmentSectionProps {
 const money = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`;
 
 const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) => {
-  const { items, sessions, loading, save, remove, setSessions } = useEquipment(userId, targetId);
+  const { items, sessions, loading, save, remove, setItems, setSessions } = useEquipment(
+    userId,
+    targetId,
+  );
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Equipment | null>(null);
   const [qrItems, setQrItems] = useState<Equipment[]>([]);
@@ -54,6 +64,35 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
     }
   };
 
+  const handleResolve = async (item: Equipment, mode: 'qr_broken' | 'write_off') => {
+    if (!result) return;
+    try {
+      const res = await resolveMissing(item.id, mode, result.sessionId);
+      setItems(res.items);
+      setSessions(res.sessions);
+      const missing = result.missing.filter((m) => m.id !== item.id);
+      setResult({
+        ...result,
+        missing,
+        found:
+          mode === 'qr_broken'
+            ? [...result.found, { ...item, qrBroken: true }]
+            : result.found,
+        total: mode === 'write_off' ? Math.max(0, result.total - 1) : result.total,
+        totalPrice:
+          mode === 'write_off' ? Math.max(0, result.totalPrice - item.price) : result.totalPrice,
+        missingPrice: missing.reduce((sum, m) => sum + m.price, 0),
+        sessions: res.sessions,
+      });
+      toast({
+        title: mode === 'qr_broken' ? 'Отмечено: нужен новый QR' : 'Оборудование списано',
+        description: item.name,
+      });
+    } catch {
+      toast({ title: 'Не удалось сохранить', description: 'Проверь интернет и повтори' });
+    }
+  };
+
   return (
     <section id="equipment" className="px-4 py-6 md:px-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -62,7 +101,9 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
             Инвентаризация
           </h2>
           <p className="mt-1 text-[13px] text-muted-foreground">
-            {`Оборудование кухни · ${items.length} позиций · ${money(totalPrice)}`}
+            {`Оборудование кухни · ${items.filter((i) => i.active).length} в работе · ${money(
+              totalPrice,
+            )}`}
           </p>
         </div>
 
@@ -186,10 +227,53 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
               {item.note && (
                 <p className="mt-1 text-[12px] text-muted-foreground">{item.note}</p>
               )}
+              {item.qrBroken && item.active && (
+                <p className="mt-1.5 inline-flex items-center gap-1 border-2 border-warning bg-warning px-1.5 py-0.5 font-head text-[0.6rem] font-bold uppercase text-warning-foreground">
+                  <Icon name="TriangleAlert" size={12} strokeWidth={2.5} />
+                  Заменить QR
+                </p>
+              )}
+              {!item.active && (
+                <p className="mt-1.5 inline-flex items-center gap-1 border-2 border-destructive bg-destructive px-1.5 py-0.5 font-head text-[0.6rem] font-bold uppercase text-destructive-foreground">
+                  <Icon name="Archive" size={12} strokeWidth={2.5} />
+                  Списано
+                </p>
+              )}
               </div>
             </div>
 
-            <div className="flex gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
+              {item.qrBroken && item.active && isAdmin && (
+                <button
+                  onClick={async () => {
+                    const res = await markQrFixed(item.id);
+                    setItems(res.items);
+                    const fresh = res.items.find((i) => i.id === item.id);
+                    if (fresh) {
+                      setQrItems([fresh]);
+                      setQrOpen(true);
+                    }
+                    toast({ title: 'Создан новый QR-код', description: 'Распечатай наклейку' });
+                  }}
+                  className="flex w-full items-center justify-center gap-1.5 border-2 border-warning bg-warning px-2 py-2 font-head text-[0.68rem] font-bold uppercase text-warning-foreground transition-transform hover:-translate-y-0.5"
+                >
+                  <Icon name="RefreshCw" size={14} strokeWidth={2.5} />
+                  Новый QR и печать
+                </button>
+              )}
+              {!item.active && isAdmin && (
+                <button
+                  onClick={async () => {
+                    const res = await restoreEquipment(item.id);
+                    setItems(res.items);
+                    toast({ title: 'Возвращено в работу', description: item.name });
+                  }}
+                  className="flex w-full items-center justify-center gap-1.5 border-2 border-primary bg-card px-2 py-2 font-head text-[0.68rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
+                >
+                  <Icon name="Undo2" size={14} strokeWidth={2.5} />
+                  Вернуть в работу
+                </button>
+              )}
               <button
                 onClick={() => {
                   setQrItems([item]);
@@ -268,6 +352,7 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
           setResultOpen(false);
           setScanOpen(true);
         }}
+        onResolve={handleResolve}
       />
     </section>
   );

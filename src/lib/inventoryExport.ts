@@ -9,9 +9,15 @@ const stamp = () => {
   )}`;
 };
 
+const statusText = (item: Equipment, found: boolean) => {
+  if (!item.active) return 'Списано';
+  if (found && item.qrBroken) return 'Найдено, QR повреждён';
+  return found ? 'Найдено' : 'Не найдено';
+};
+
 const row = (item: Equipment, found: boolean) => ({
   Наименование: item.name,
-  Статус: found ? 'Найдено' : 'Не найдено',
+  Статус: statusText(item, found),
   Место: item.location || '',
   'Стоимость, ₽': item.price || 0,
   'Серийный номер': item.serial || '',
@@ -59,11 +65,21 @@ export const exportEquipmentList = (items: Equipment[]) => {
     'Стоимость, ₽': item.price || 0,
     'Серийный номер': item.serial || '',
     'QR-код': item.code,
-    Статус: item.active ? 'В работе' : 'Списано',
+    Статус: item.active ? (item.qrBroken ? 'В работе, заменить QR' : 'В работе') : 'Списано',
+    'Причина списания': item.writeOffReason || '',
     Заметка: item.note || '',
   }));
   const sheet = XLSX.utils.json_to_sheet(rows);
-  sheet['!cols'] = [{ wch: 34 }, { wch: 20 }, { wch: 14 }, { wch: 18 }, { wch: 20 }, { wch: 12 }, { wch: 28 }];
+  sheet['!cols'] = [
+    { wch: 34 },
+    { wch: 20 },
+    { wch: 14 },
+    { wch: 18 },
+    { wch: 20 },
+    { wch: 20 },
+    { wch: 24 },
+    { wch: 28 },
+  ];
   const book = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(book, sheet, 'Оборудование');
   XLSX.writeFile(book, `Оборудование_${stamp()}.xlsx`);

@@ -62,8 +62,9 @@ def can_manage(cur, me, target_id: int) -> bool:
 
 def read_items(cur, uid: int):
     cur.execute(
-        'SELECT id, name, code, price, location, note, image, serial, active, created_at '
-        f'FROM equipment WHERE user_id = {uid} ORDER BY location, name'
+        'SELECT id, name, code, price, location, note, image, serial, active, created_at, '
+        'qr_broken, written_off_at, write_off_reason '
+        f'FROM equipment WHERE user_id = {uid} ORDER BY active DESC, location, name'
     )
     return [
         {
@@ -77,6 +78,9 @@ def read_items(cur, uid: int):
             'serial': r[7],
             'active': bool(r[8]),
             'createdAt': r[9].isoformat() if r[9] else None,
+            'qrBroken': bool(r[10]),
+            'writtenOffAt': r[11].isoformat() if r[11] else None,
+            'writeOffReason': r[12] or '',
         }
         for r in cur.fetchall()
     ]
@@ -167,6 +171,86 @@ def handler(event: dict, context) -> dict:
 
     if method == 'DELETE':
         cur.execute(f"DELETE FROM equipment WHERE user_id = {uid} AND id = {q(body.get('id', ''))}")
+        return finish({'ok': True, 'items': read_items(cur, uid)})
+
+    if action == 'resolve':
+        eid = str(body.get('id') or '')
+        mode = body.get('mode') or ''
+        session_id = body.get('sessionId')
+        if mode == 'qr_broken':
+            cur.execute(
+                'UPDATE equipment SET qr_broken = TRUE, updated_at = NOW() '
+                f'WHERE user_id = {uid} AND id = {q(eid)}'
+            )
+        elif mode == 'write_off':
+            cur.execute(
+                'UPDATE equipment SET active = FALSE, written_off_at = NOW(), '
+                f"write_off_reason = {q(body.get('reason') or 'Списано при инвентаризации')}, "
+                f'updated_at = NOW() WHERE user_id = {uid} AND id = {q(eid)}'
+            )
+        else:
+            return finish({'error': 'bad_mode'}, 400)
+
+        if session_id:
+            cur.execute(
+                'SELECT scanned, missing, total, total_price FROM inventory_sessions '
+                f'WHERE user_id = {uid} AND id = {int(session_id)}'
+            )
+            row = cur.fetchone()
+            if row:
+                scanned_ids = list(row[0] or [])
+                missing_ids = [m for m in (row[1] or []) if m != eid]
+                total = int(row[2] or 0)
+                total_price = float(row[3] or 0)
+                cur.execute(
+                    f'SELECT price FROM equipment WHERE user_id = {uid} AND id = {q(eid)}'
+                )
+                prow = cur.fetchone()
+                price = float(prow[0] or 0) if prow else 0.0
+                if mode == 'qr_broken':
+                    if eid not in scanned_ids:
+                        scanned_ids.append(eid)
+                else:
+                    total = max(0, total - 1)
+                    total_price = max(0.0, total_price - price)
+                cur.execute(
+                    'SELECT COALESCE(SUM(price), 0) FROM equipment WHERE user_id = '
+                    f"{uid} AND id IN ({', '.join(q(m) for m in missing_ids)})"
+                    if missing_ids
+                    else 'SELECT 0'
+                )
+                missing_price = float(cur.fetchone()[0] or 0)
+                cur.execute(
+                    f'UPDATE inventory_sessions SET scanned = {q(json.dumps(scanned_ids))}::jsonb, '
+                    f'missing = {q(json.dumps(missing_ids))}::jsonb, total = {total}, '
+                    f'total_price = {num(total_price)}, missing_price = {num(missing_price)} '
+                    f'WHERE user_id = {uid} AND id = {int(session_id)}'
+                )
+
+        return finish({'ok': True, 'items': read_items(cur, uid), 'sessions': read_sessions(cur, uid)})
+
+    if action == 'qr_fixed':
+        new_code = make_code(uid)
+        cur.execute(
+            f"UPDATE equipment SET qr_broken = FALSE, code = {q(new_code)}, updated_at = NOW() "
+            f"WHERE user_id = {uid} AND id = {q(body.get('id', ''))}"
+        )
+        return finish({'ok': True, 'code': new_code, 'items': read_items(cur, uid)})
+
+    if action == 'write_off':
+        cur.execute(
+            'UPDATE equipment SET active = FALSE, written_off_at = NOW(), '
+            f"write_off_reason = {q(body.get('reason') or 'Списано при инвентаризации')}, updated_at = NOW() "
+            f"WHERE user_id = {uid} AND id = {q(body.get('id', ''))}"
+        )
+        return finish({'ok': True, 'items': read_items(cur, uid)})
+
+    if action == 'restore':
+        cur.execute(
+            'UPDATE equipment SET active = TRUE, written_off_at = NULL, '
+            f"write_off_reason = '', updated_at = NOW() "
+            f"WHERE user_id = {uid} AND id = {q(body.get('id', ''))}"
+        )
         return finish({'ok': True, 'items': read_items(cur, uid)})
 
     if action == 'finish':

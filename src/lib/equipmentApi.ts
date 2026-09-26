@@ -13,6 +13,9 @@ export interface Equipment {
   serial: string;
   active: boolean;
   createdAt?: string | null;
+  qrBroken?: boolean;
+  writtenOffAt?: string | null;
+  writeOffReason?: string;
 }
 
 export interface InventorySession {
@@ -78,3 +81,20 @@ export const deleteEquipment = (id: string) =>
 
 export const finishInventory = (scanned: string[]) =>
   send({ action: 'finish', scanned }) as Promise<FinishResult>;
+
+export const resolveMissing = (
+  id: string,
+  mode: 'qr_broken' | 'write_off',
+  sessionId?: number | null,
+  reason?: string,
+) =>
+  send({ action: 'resolve', id, mode, sessionId, reason }) as Promise<{
+    items: Equipment[];
+    sessions: InventorySession[];
+  }>;
+
+export const markQrFixed = (id: string) =>
+  send({ action: 'qr_fixed', id }) as Promise<{ code: string; items: Equipment[] }>;
+
+export const restoreEquipment = (id: string) =>
+  send({ action: 'restore', id }) as Promise<{ items: Equipment[] }>;
