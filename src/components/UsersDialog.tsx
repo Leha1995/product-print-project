@@ -365,20 +365,22 @@ const UsersDialog = ({
                     {!u.active && <span className="ml-2 text-destructive">(отключён)</span>}
                     {idx === 0 && node.staff.length > 0 && (
                       <span className="ml-2 text-[11px] font-bold text-muted-foreground">
-                        · сотрудников: {node.staff.length}
-                        {collapsed.includes(node.head.id) ? ' (свёрнуто)' : ''}
+                        {`· сотрудников: ${node.staff.length}${
+                          collapsed.includes(node.head.id) ? ' (свёрнуто)' : ''
+                        }`}
                       </span>
                     )}
                   </p>
                   <p className="truncate text-[12px] text-muted-foreground">
-                    {u.fullName || '—'} · {roleLabel[u.role]}
-                    {u.managerId && idx === 0
-                      ? ` · руководитель: ${
-                          users.find((a) => a.id === u.managerId)?.fullName ||
-                          users.find((a) => a.id === u.managerId)?.username ||
-                          '—'
-                        }`
-                      : ''}
+                    {`${u.fullName || '—'} · ${roleLabel[u.role]}${
+                      u.managerId && idx === 0
+                        ? ` · руководитель: ${
+                            users.find((a) => a.id === u.managerId)?.fullName ||
+                            users.find((a) => a.id === u.managerId)?.username ||
+                            '—'
+                          }`
+                        : ''
+                    }`}
                   </p>
                   {u.role !== 'superadmin' && (
                     <p
