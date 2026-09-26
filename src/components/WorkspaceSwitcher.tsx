@@ -11,6 +11,7 @@ interface WorkspaceSwitcherProps {
 const roleShort: Record<string, string> = {
   user: 'Сотрудник',
   admin: 'Админ',
+  manager: 'Управляющий',
   superadmin: 'Супер-админ',
 };
 

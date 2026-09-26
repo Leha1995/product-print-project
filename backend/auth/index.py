@@ -15,7 +15,8 @@ CORS = {
 }
 
 SESSION_DAYS = 365
-ROLES = ('user', 'admin', 'superadmin')
+ROLES = ('user', 'admin', 'manager', 'superadmin')
+GLOBAL_ROLES = ('manager', 'superadmin')
 
 
 def q(value) -> str:
@@ -51,7 +52,7 @@ def ensure_seed(cur) -> None:
 
 def effective_access(cur, user_id: int, role: str, manager_id):
     """Срок доступа: у админа собственный, у сотрудника — срок его руководителя."""
-    if role == 'superadmin':
+    if role in GLOBAL_ROLES:
         return None, None
     owner = user_id if role == 'admin' else manager_id
     if not owner:
@@ -118,7 +119,7 @@ def list_users(cur, me=None):
     own = {r[0]: r[7] for r in rows}
     result = []
     for r in rows:
-        if r[3] == 'superadmin':
+        if r[3] in GLOBAL_ROLES:
             until = None
         elif r[3] == 'admin':
             until = r[7]
@@ -146,7 +147,7 @@ def list_users(cur, me=None):
 
 def managed_ids(cur, me):
     """Список id пользователей, чьим каталогом может управлять текущий аккаунт."""
-    if me['role'] == 'superadmin':
+    if me['role'] in GLOBAL_ROLES:
         cur.execute('SELECT id FROM app_users WHERE active ORDER BY id')
     elif me['role'] == 'admin':
         cur.execute(
@@ -254,11 +255,14 @@ def handler(event: dict, context) -> dict:
                 ]
             })
 
-        if me['role'] not in ('superadmin', 'admin'):
+        if me['role'] not in ('superadmin', 'admin', 'manager'):
             return done({'error': 'forbidden'}, 403)
 
         if action == 'users':
             return done({'users': list_users(cur, me)})
+
+        if me['role'] == 'manager':
+            return done({'error': 'forbidden'}, 403)
 
         if me['role'] == 'admin':
             target = int(body.get('id') or 0)

@@ -110,8 +110,11 @@ export const useAuth = () => {
     login,
     logout,
     isAuthed: !!user,
-    isAdmin: user?.role === 'admin' || user?.role === 'superadmin',
+    isAdmin:
+      user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'manager',
     isSuperAdmin: user?.role === 'superadmin',
+    isManager: user?.role === 'manager',
+    canInventory: user?.role === 'manager' || user?.role === 'superadmin',
   };
 };
 

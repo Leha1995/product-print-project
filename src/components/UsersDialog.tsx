@@ -16,12 +16,14 @@ interface UsersDialogProps {
   onOpenChange: (open: boolean) => void;
   currentId?: number;
   isSuperAdmin?: boolean;
+  readOnly?: boolean;
   onChanged?: () => void;
 }
 
 const roleLabel: Record<Role, string> = {
   user: 'Сотрудник',
   admin: 'Админ',
+  manager: 'Управляющий',
   superadmin: 'Супер-админ',
 };
 
@@ -60,6 +62,7 @@ const UsersDialog = ({
   onOpenChange,
   currentId,
   isSuperAdmin = false,
+  readOnly = false,
   onChanged,
 }: UsersDialogProps) => {
   const [users, setUsers] = useState<ManagedUser[]>([]);
@@ -224,7 +227,9 @@ const UsersDialog = ({
               <p className="text-[13px] text-muted-foreground">
                 {isSuperAdmin
                   ? 'Добавляйте сотрудников и управляйте доступом'
-                  : 'Ваши сотрудники: смена пароля и доступа'}
+                  : readOnly
+                    ? 'Все админы и их сотрудники — только просмотр'
+                    : 'Ваши сотрудники: смена пароля и доступа'}
               </p>
             </div>
           </div>
@@ -257,6 +262,7 @@ const UsersDialog = ({
               >
                 <option value="user">Сотрудник</option>
                 <option value="admin">Админ</option>
+                <option value="manager">Управляющий</option>
                 <option value="superadmin">Супер-админ</option>
               </select>
             )}
@@ -298,7 +304,7 @@ const UsersDialog = ({
           </div>
           )}
 
-          {isSuperAdmin && tree.some((n) => n.staff.length > 0) && (
+          {(isSuperAdmin || readOnly) && tree.some((n) => n.staff.length > 0) && (
             <div className="mt-4 flex justify-end">
               <button
                 onClick={() =>
@@ -319,7 +325,7 @@ const UsersDialog = ({
           )}
 
           <div className="mt-3 grid gap-2">
-            {(isSuperAdmin ? tree : users.map((u) => ({ head: u, staff: [] }))).map((node) => (
+            {(isSuperAdmin || readOnly ? tree : users.map((u) => ({ head: u, staff: [] }))).map((node) => (
               <div key={node.head.id} className={node.staff.length ? 'grid gap-1' : ''}>
             {[node.head, ...node.staff].map((u, idx) => (
               <div
@@ -401,6 +407,7 @@ const UsersDialog = ({
                   >
                     <option value="user">Сотрудник</option>
                     <option value="admin">Админ</option>
+                    <option value="manager">Управляющий</option>
                     <option value="superadmin">Супер-админ</option>
                   </select>
                 )}
@@ -423,6 +430,7 @@ const UsersDialog = ({
                     ))}
                   </select>
                 )}
+                {!readOnly && (
                 <button
                   onClick={() => startEdit(u)}
                   className="flex items-center gap-1 border-2 border-primary bg-background px-2 py-1 font-head text-[0.7rem] uppercase text-primary transition-colors hover:bg-muted"
@@ -430,6 +438,8 @@ const UsersDialog = ({
                   <Icon name="Pencil" size={14} strokeWidth={2.5} />
                   Изменить
                 </button>
+                )}
+                {!readOnly && (
                 <button
                   onClick={() => patch({ id: u.id, active: !u.active }, u.active ? 'Доступ закрыт' : 'Доступ открыт')}
                   disabled={u.id === currentId}
@@ -442,6 +452,7 @@ const UsersDialog = ({
                   <Icon name={u.active ? 'UserX' : 'UserCheck'} size={14} strokeWidth={2.5} />
                   {u.active ? 'Отключить' : 'Включить'}
                 </button>
+                )}
                 {isSuperAdmin && (
                   <button
                     onClick={() => remove(u)}

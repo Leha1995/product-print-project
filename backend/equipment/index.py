@@ -40,12 +40,8 @@ def session_user(cur, token: str):
 
 
 def can_manage(cur, me, target_id: int) -> bool:
-    if target_id == me['id'] or me['role'] == 'superadmin':
+    if target_id == me['id'] or me['role'] in ('superadmin', 'manager'):
         return True
-    if me['role'] == 'admin':
-        cur.execute(f'SELECT manager_id FROM app_users WHERE id = {target_id}')
-        row = cur.fetchone()
-        return bool(row and row[0] == me['id'])
     return False
 
 
@@ -134,6 +130,8 @@ def handler(event: dict, context) -> dict:
     me = session_user(cur, token)
     if not me:
         return finish({'error': 'unauthorized'}, 401)
+    if me['role'] not in ('superadmin', 'manager'):
+        return finish({'error': 'forbidden'}, 403)
 
     raw_target = headers.get('X-Target-User') or headers.get('x-target-user') or ''
     uid = me['id']

@@ -1,6 +1,6 @@
 const API = 'https://functions.poehali.dev/e2f238d3-01a0-409f-973c-33e38bfdbb57';
 
-export type Role = 'user' | 'admin' | 'superadmin';
+export type Role = 'user' | 'admin' | 'manager' | 'superadmin';
 
 export interface AuthUser {
   id: number;

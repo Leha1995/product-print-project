@@ -14,6 +14,7 @@ interface TerminalHeaderProps {
   accessUntil?: string | null;
   section?: 'labels' | 'equipment';
   onSectionChange?: (section: 'labels' | 'equipment') => void;
+  showSections?: boolean;
 }
 
 const accessLeft = (until?: string | null) => {
@@ -45,6 +46,7 @@ const TerminalHeader = ({
   accessUntil,
   section = 'labels',
   onSectionChange,
+  showSections = false,
 }: TerminalHeaderProps) => {
   const [, tick] = useState(0);
   useEffect(() => {
@@ -57,6 +59,15 @@ const TerminalHeader = ({
   return (
     <header className="print-hide sticky top-0 z-40 grid h-[70px] grid-cols-[1fr_auto_1fr] items-center border-b-2 border-primary bg-background px-4 md:px-8">
       <div className="flex items-center gap-1.5">
+        {!showSections && (
+          <button
+            onClick={() => onNavigate(links[0].target)}
+            className="font-head text-[0.8rem] font-medium uppercase tracking-[0.04em] text-primary transition-colors hover:text-secondary md:text-[0.95rem]"
+          >
+            {links[0].label}
+          </button>
+        )}
+        {showSections && (
         <button
           onClick={() => {
             onSectionChange?.('labels');
@@ -71,6 +82,8 @@ const TerminalHeader = ({
           <Icon name="Tags" size={16} strokeWidth={2.5} />
           <span className="hidden sm:inline">Маркировка</span>
         </button>
+        )}
+        {showSections && (
         <button
           onClick={() => onSectionChange?.('equipment')}
           className={`flex h-[34px] items-center gap-1.5 border-2 border-primary px-2 font-head text-[0.7rem] font-bold uppercase tracking-[0.04em] transition-colors ${
@@ -82,6 +95,7 @@ const TerminalHeader = ({
           <Icon name="Wrench" size={16} strokeWidth={2.5} />
           <span className="hidden sm:inline">Оборудование</span>
         </button>
+        )}
       </div>
 
       <div className="brand-squeeze font-head text-lg font-black uppercase tracking-[-0.02em] text-primary md:text-2xl">

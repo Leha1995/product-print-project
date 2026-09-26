@@ -51,7 +51,7 @@ def session_user(cur, token: str):
 def can_manage(cur, me, target_id: int) -> bool:
     if target_id == me['id']:
         return True
-    if me['role'] == 'superadmin':
+    if me['role'] in ('superadmin', 'manager'):
         return True
     if me['role'] == 'admin':
         cur.execute(f'SELECT manager_id FROM app_users WHERE id = {target_id}')
@@ -62,10 +62,10 @@ def can_manage(cur, me, target_id: int) -> bool:
 
 def build_overview(cur, me, soon_ms: int = 3600000):
     """Сводка по сотрудникам: что просрочено и что скоро истекает."""
-    if me['role'] == 'superadmin':
+    if me['role'] in ('superadmin', 'manager'):
         cur.execute(
-            'SELECT id, username, full_name FROM app_users WHERE active AND role = %s ORDER BY username'
-            % q('user')
+            "SELECT id, username, full_name FROM app_users WHERE active "
+            "AND role IN ('user', 'admin') ORDER BY role DESC, username"
         )
     else:
         cur.execute(
@@ -272,7 +272,7 @@ def handler(event: dict, context) -> dict:
 
     params = event.get('queryStringParameters') or {}
     if method == 'GET' and params.get('action') == 'overview':
-        if me['role'] not in ('admin', 'superadmin'):
+        if me['role'] not in ('admin', 'superadmin', 'manager'):
             return finish({'error': 'forbidden'}, 403)
         return finish({'staff': build_overview(cur, me)})
 
