@@ -115,6 +115,7 @@ export const useAuth = () => {
     isSuperAdmin: user?.role === 'superadmin',
     isManager: user?.role === 'manager',
     canInventory: user?.role === 'manager' || user?.role === 'superadmin',
+    inventoryOnly: user?.role === 'manager',
   };
 };
 

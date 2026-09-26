@@ -36,7 +36,18 @@ const Index = () => {
   const [jobs, setJobs] = useState<PrintJob[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  const { user, ready, kicked, login, logout, isAuthed, isAdmin, isSuperAdmin, canInventory } =
+  const {
+    user,
+    ready,
+    kicked,
+    login,
+    logout,
+    isAuthed,
+    isAdmin,
+    isSuperAdmin,
+    canInventory,
+    inventoryOnly,
+  } =
     useAuth();
   const { managed, refreshManaged } = useManagedUsers(isAdmin);
   const [targetId, setTargetId] = useState<number | null>(null);
@@ -349,8 +360,9 @@ const Index = () => {
         onAdminClick={() => setAdminOpen(true)}
         accessUntil={user?.accessUntil ?? null}
         section={section}
-        onSectionChange={canInventory ? setSection : undefined}
-        showSections={canInventory}
+        onSectionChange={canInventory && !inventoryOnly ? setSection : undefined}
+        showSections={canInventory && !inventoryOnly}
+        inventoryOnly={inventoryOnly}
       />
       {isAdmin && user && (
         <WorkspaceSwitcher
@@ -361,7 +373,7 @@ const Index = () => {
         />
       )}
       <main>
-        {section === 'equipment' && canInventory ? (
+        {(section === 'equipment' || inventoryOnly) && canInventory ? (
           <EquipmentSection userId={user?.id} targetId={activeTarget} isAdmin={isAdmin} />
         ) : (
         <MenuSection
@@ -414,7 +426,7 @@ const Index = () => {
           getStatus={getStatus}
         />
         )}
-        {(section === 'labels' || !canInventory) && (
+        {!inventoryOnly && (section === 'labels' || !canInventory) && (
           <PrintLog jobs={jobs} onClear={() => setJobs([])} />
         )}
       </main>
