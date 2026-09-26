@@ -7,10 +7,20 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { useEffect } from "react";
+import { requestCameraAccess } from "@/lib/cameraPermission";
 
 const queryClient = new QueryClient();
 
-const App = () => (
+const App = () => {
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      requestCameraAccess();
+    }, 800);
+    return () => window.clearTimeout(id);
+  }, []);
+
+  return (
   <ErrorBoundary>
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -26,6 +36,7 @@ const App = () => (
     </TooltipProvider>
   </QueryClientProvider>
   </ErrorBoundary>
-);
+  );
+};
 
 export default App;
