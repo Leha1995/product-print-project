@@ -15,10 +15,9 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<{ stop: () => void } | null>(null);
   const [scanned, setScanned] = useState<string[]>([]);
-  const [camera, setCamera] = useState<'starting' | 'on' | 'off'>('starting');
+  const [error, setError] = useState('');
   const [last, setLast] = useState<{ name: string; ok: boolean } | null>(null);
   const [manual, setManual] = useState('');
-  const [attempt, setAttempt] = useState(0);
 
   const active = items.filter((i) => i.active);
   const codeMap = new Map(active.map((i) => [i.code, i]));
@@ -40,11 +39,7 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
     if (!open) return;
     setScanned([]);
     setLast(null);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    setCamera('starting');
+    setError('');
     let stopped = false;
     const reader = new BrowserMultiFormatReader();
 
@@ -53,23 +48,17 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
         if (result) accept(result.getText());
       })
       .then((controls) => {
-        if (stopped) {
-          controls.stop();
-          return;
-        }
-        controlsRef.current = controls;
-        setCamera('on');
+        if (stopped) controls.stop();
+        else controlsRef.current = controls;
       })
-      .catch(() => {
-        if (!stopped) setCamera('off');
-      });
+      .catch(() => setError('Нет доступа к камере — разреши её в браузере или вводи коды вручную'));
 
     return () => {
       stopped = true;
       controlsRef.current?.stop();
       controlsRef.current = null;
     };
-  }, [open, accept, attempt]);
+  }, [open, accept]);
 
   const total = active.length;
   const left = total - scanned.length;
@@ -79,37 +68,17 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
       <DialogContent className="max-h-[94vh] max-w-[520px] overflow-y-auto border-2 border-primary bg-background p-4">
         <h3 className="font-head text-lg font-black uppercase text-primary">Сканирование</h3>
         <p className="mt-1 text-[13px] text-muted-foreground">
-          {camera === 'off'
-            ? `Камера недоступна — вводи коды вручную. Отмечено ${scanned.length} из ${total}`
-            : `Наведи камеру на QR-код. Отмечено ${scanned.length} из ${total}`}
+          {`Наведи камеру на QR-код. Отмечено ${scanned.length} из ${total}`}
         </p>
 
-        {camera === 'off' ? (
-          <div className="mt-3 flex flex-col items-center justify-center gap-2 border-2 border-dashed border-primary bg-card px-4 py-6 text-center">
-            <Icon name="CameraOff" size={28} strokeWidth={2} className="text-muted-foreground" />
-            <p className="font-head text-[0.75rem] font-bold uppercase text-primary">
-              Камера не подключилась
-            </p>
-            <p className="max-w-[320px] text-[12px] text-muted-foreground">
-              Инвентаризацию можно провести полностью вручную — вводи коды в поле ниже
-            </p>
-            <button
-              onClick={() => setAttempt((n) => n + 1)}
-              className="mt-1 flex items-center gap-1.5 border-2 border-primary bg-background px-3 py-1.5 font-head text-[0.68rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
-            >
-              <Icon name="RefreshCw" size={14} strokeWidth={2.5} />
-              Попробовать снова
-            </button>
-          </div>
-        ) : (
-          <div className="relative mt-3 overflow-hidden border-2 border-primary bg-black">
-            <video ref={videoRef} playsInline muted className="h-[46vh] w-full object-cover" />
-            {camera === 'starting' && (
-              <p className="absolute inset-0 flex items-center justify-center font-head text-[0.72rem] font-bold uppercase text-white/80">
-                Включаю камеру…
-              </p>
-            )}
-          </div>
+        <div className="mt-3 overflow-hidden border-2 border-primary bg-black">
+          <video ref={videoRef} playsInline muted className="h-[46vh] w-full object-cover" />
+        </div>
+
+        {error && (
+          <p className="mt-2 border-2 border-destructive bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
+            {error}
+          </p>
         )}
 
         {last && (
@@ -129,12 +98,6 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
           <input
             value={manual}
             onChange={(e) => setManual(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== 'Enter') return;
-              accept(manual);
-              setManual('');
-            }}
-            autoFocus={camera === 'off'}
             placeholder="Ввести код вручную"
             className="flex-1 border-2 border-primary bg-background px-3 py-2.5 font-body text-[14px] text-primary outline-none"
           />
