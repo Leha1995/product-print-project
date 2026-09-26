@@ -162,18 +162,20 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[100dvh] max-h-[100dvh] w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-2 border-primary bg-background p-3 sm:h-auto sm:max-h-[94vh] sm:max-w-[520px] sm:p-4">
-        <h3 className="shrink-0 pr-8 font-head text-base font-black uppercase text-primary sm:text-lg">
-          Сканирование
-        </h3>
-        <p className="mt-1 shrink-0 text-[13px] text-muted-foreground">
-          {status === 'off'
-            ? `Камера недоступна — вводи коды вручную. Отмечено ${scanned.length} из ${total}`
-            : `Наведи камеру на QR-код. Отмечено ${scanned.length} из ${total}`}
-        </p>
+      <DialogContent className="left-0 top-0 flex h-[100dvh] max-h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-none border-0 bg-background p-0 sm:left-[50%] sm:top-[50%] sm:h-auto sm:max-h-[94vh] sm:w-full sm:max-w-[520px] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:border-2 sm:border-primary sm:p-4">
+        <div className="shrink-0 px-3 pb-2 pt-3 sm:p-0">
+          <h3 className="pr-10 font-head text-base font-black uppercase text-primary sm:text-lg">
+            Сканирование
+          </h3>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
+            {status === 'off'
+              ? `Камера недоступна — вводи коды вручную. Отмечено ${scanned.length} из ${total}`
+              : `Наведи камеру на QR-код. Отмечено ${scanned.length} из ${total}`}
+          </p>
+        </div>
 
         {status === 'off' ? (
-          <div className="mt-2 flex flex-1 flex-col items-center justify-center gap-2 overflow-y-auto border-2 border-dashed border-primary bg-card px-4 py-5 text-center sm:flex-none">
+          <div className="mx-3 flex flex-1 flex-col items-center justify-center gap-2 overflow-y-auto border-2 border-dashed border-primary bg-card px-4 py-5 text-center sm:mx-0 sm:mt-3 sm:flex-none">
             <Icon name="CameraOff" size={28} strokeWidth={2} className="text-muted-foreground" />
             <p className="max-w-[340px] text-[13px] text-muted-foreground">{error}</p>
             {framed && (
@@ -198,7 +200,7 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
             </button>
           </div>
         ) : (
-          <div className="relative mt-2 min-h-[180px] w-full flex-1 overflow-hidden border-2 border-primary bg-black sm:mt-3 sm:aspect-[4/3] sm:flex-none">
+          <div className="relative min-h-[160px] w-full flex-1 overflow-hidden border-y-2 border-primary bg-black sm:mt-3 sm:aspect-[4/3] sm:flex-none sm:border-2">
             <video
               ref={videoRef}
               playsInline
@@ -253,10 +255,10 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
           </div>
         )}
 
-        <div className="shrink-0">
+        <div className="shrink-0 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 sm:p-0">
           {last && (
             <p
-              className={`mt-2 flex items-center gap-2 border-2 px-3 py-1.5 font-head text-[0.72rem] font-bold uppercase ${
+              className={`flex items-center gap-2 border-2 px-3 py-1.5 font-head text-[0.72rem] font-bold uppercase ${
                 last.ok
                   ? 'border-success bg-success text-success-foreground'
                   : 'border-destructive bg-destructive text-destructive-foreground'
