@@ -1,13 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Icon from '@/components/ui/icon';
+import ProductCard from '@/components/ProductCard';
 import CategoryEditor from '@/components/CategoryEditor';
 import VirtualKeyboard from '@/components/VirtualKeyboard';
-import MenuToolbar from '@/components/menu/MenuToolbar';
-import MenuFilters from '@/components/menu/MenuFilters';
-import MenuProductGrid from '@/components/menu/MenuProductGrid';
-import { SHELF_STEPS, shelfLabel } from '@/components/menu/shelfOptions';
 import { Category, CategoryId, Product, productCategories, UNCATEGORIZED } from '@/data/products';
 import { UserPrefs } from '@/lib/catalogApi';
 import { ExpiryStatus } from '@/hooks/usePrintHistory';
+
+const SHELF_STEPS = [3, 12, 48, 72, 120, 168, 720, 1440, 2160, 4320, 8760];
+
+const round = (n: number) => Math.round(n * 10) / 10;
+
+const shelfLabel = (hours: number) => {
+  if (hours < 24) return `${round(hours)} ч`;
+  const days = hours / 24;
+  if (days < 30) return `${round(days)} сут`;
+  if (days < 365) return `${round(days / 30)} мес`;
+  const years = round(days / 365);
+  return `${years} ${years === 1 ? 'год' : years < 5 ? 'года' : 'лет'}`;
+};
 
 interface MenuSectionProps {
   products: Product[];
@@ -232,48 +243,253 @@ const MenuSection = ({
   return (
     <section id="menu" className="print-hide border-t-2 border-primary bg-background">
       <div className="mx-auto w-full max-w-[1400px] px-4 py-10 md:px-8 md:py-14">
-        <MenuToolbar
-          searchRef={searchRef}
-          query={query}
-          setQuery={setQuery}
-          setKeyboardOpen={setKeyboardOpen}
-          editMode={editMode}
-          isAdmin={isAdmin}
-          onRequestAdmin={onRequestAdmin}
-          setEditMode={setEditMode}
-          onDefrost={onDefrost}
-          onlyExpired={onlyExpired}
-          setOnlyExpired={setOnlyExpired}
-          onlySoon={onlySoon}
-          setOnlySoon={setOnlySoon}
-          expiredCount={expiredCount}
-          soonCount={soonCount}
-          visibleCount={visible.length}
-          onPrintBatchClick={() => {
-            setKeyboardOpen(false);
-            onPrintBatch(
-              visible,
-              onlyExpired ? 'Просроченные' : onlySoon ? 'Скоро истекает' : activeLabel,
-            );
-          }}
-        />
+        <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <div>
+            {editMode && (
+              <h2 className="mt-3 font-head text-[34px] font-medium uppercase leading-[1.04] text-primary md:text-[52px]">
+                Редактирование и добавление позиций
+              </h2>
+            )}
+          </div>
 
-        <MenuFilters
-          tabsRef={tabsRef}
-          scrollTabs={scrollTabs}
-          categories={categories}
-          hasUncategorized={hasUncategorized}
-          active={active}
-          setActive={setActive}
-          editMode={editMode}
-          onAdd={onAdd}
-          onSharedBase={onSharedBase}
-          onExport={onExport}
-          onImport={onImport}
-          shelfFilter={shelfFilter}
-          setShelfFilter={setShelfFilter}
-          shelfOptions={shelfOptions}
-        />
+          <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center">
+            <label
+              ref={searchRef}
+              className="flex w-full items-center gap-3 border-2 border-primary bg-card px-3 py-3 md:w-[340px]"
+            >
+              <Icon name="Search" size={20} className="text-primary" strokeWidth={2.5} />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onFocus={() => setKeyboardOpen(true)}
+                onClick={() => setKeyboardOpen(true)}
+                placeholder="Поиск по названию"
+                className="w-full bg-transparent font-body text-[15px] text-primary outline-none placeholder:text-muted-foreground"
+              />
+              {query && (
+                <button
+                  onClick={() => {
+                    setQuery('');
+                    setKeyboardOpen(false);
+                  }}
+                  aria-label="Очистить поиск"
+                >
+                  <Icon name="X" size={18} className="text-muted-foreground" />
+                </button>
+              )}
+            </label>
+
+            <button
+              onClick={() => {
+                if (!isAdmin) {
+                  onRequestAdmin();
+                  return;
+                }
+                setEditMode((v) => !v);
+              }}
+              className={`flex shrink-0 items-center justify-center gap-2 border-2 border-primary px-4 py-3 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] transition-colors ${
+                editMode
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-card text-primary hover:bg-muted'
+              }`}
+            >
+              <Icon
+                name={editMode ? 'Check' : isAdmin ? 'SlidersHorizontal' : 'Lock'}
+                size={16}
+                strokeWidth={2.5}
+              />
+              {editMode ? 'Готово' : 'Редактировать'}
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <button
+            onClick={() => {
+              setKeyboardOpen(false);
+              onDefrost();
+            }}
+            className="flex items-center justify-center gap-3 border-2 border-primary bg-card px-6 py-4 font-head text-[0.95rem] font-medium uppercase tracking-[0.06em] text-primary transition-transform hover:-translate-y-0.5 hover:bg-muted"
+          >
+            <Icon name="Snowflake" size={20} strokeWidth={2.5} />
+            Дефрост
+          </button>
+
+          <button
+            onClick={() => {
+              setKeyboardOpen(false);
+              setOnlySoon(false);
+              setOnlyExpired((v) => !v);
+            }}
+            disabled={!expiredCount && !onlyExpired}
+            className={`flex items-center justify-center gap-3 border-2 px-6 py-4 font-head text-[0.95rem] font-medium uppercase tracking-[0.06em] transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50 ${
+              onlyExpired
+                ? 'border-destructive bg-destructive text-destructive-foreground'
+                : 'border-destructive bg-card text-destructive'
+            }`}
+          >
+            <Icon name={onlyExpired ? 'ListRestart' : 'AlarmClock'} size={20} strokeWidth={2.5} />
+            {onlyExpired ? 'Показать все' : 'Только просроченные'}
+            <span className="border-l-2 border-current pl-3 tabular-nums">{expiredCount}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setKeyboardOpen(false);
+              setOnlyExpired(false);
+              setOnlySoon((v) => !v);
+            }}
+            disabled={!soonCount && !onlySoon}
+            className={`flex items-center justify-center gap-3 border-2 border-primary px-6 py-4 font-head text-[0.95rem] font-medium uppercase tracking-[0.06em] transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50 ${
+              onlySoon ? 'bg-accent text-accent-foreground' : 'bg-card text-primary'
+            }`}
+          >
+            <Icon name={onlySoon ? 'ListRestart' : 'Timer'} size={20} strokeWidth={2.5} />
+            {onlySoon ? 'Показать все' : 'Скоро истекает'}
+            <span className="border-l-2 border-current pl-3 tabular-nums">{soonCount}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setKeyboardOpen(false);
+              onPrintBatch(
+                visible,
+                onlyExpired ? 'Просроченные' : onlySoon ? 'Скоро истекает' : activeLabel,
+              );
+            }}
+            disabled={!visible.length}
+            className="flex items-center justify-center gap-3 border-2 border-primary bg-accent px-6 py-4 font-head text-[0.95rem] font-medium uppercase tracking-[0.06em] text-accent-foreground transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50 md:text-[1.05rem]"
+          >
+            <Icon name="Printer" size={20} strokeWidth={2.5} />
+            {onlyExpired
+              ? 'Печатать просроченные'
+              : onlySoon
+                ? 'Печатать истекающие'
+                : 'Печатать всю категорию'}
+            <span className="border-l-2 border-accent-foreground/40 pl-3">{visible.length}</span>
+          </button>
+        </div>
+
+        <div className="mt-8 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <button
+              onClick={() => scrollTabs(-1)}
+              aria-label="Прокрутить категории влево"
+              className="hidden h-[42px] w-[34px] shrink-0 items-center justify-center border-2 border-primary bg-card text-primary transition-colors hover:bg-accent hover:text-accent-foreground md:flex"
+            >
+              <Icon name="ChevronLeft" size={18} strokeWidth={2.5} />
+            </button>
+
+            <div
+              ref={tabsRef}
+              className="cat-scroll flex min-w-0 flex-1 gap-3 overflow-x-auto pb-2"
+            >
+              {[
+                { id: 'all', label: 'Все продукты', icon: 'LayoutGrid' },
+                ...categories,
+                ...(hasUncategorized
+                  ? [{ id: UNCATEGORIZED, label: 'Без категории', icon: 'CircleHelp' }]
+                  : []),
+              ].map((cat) => {
+                const isActive = active === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setActive(cat.id)}
+                    className={`flex shrink-0 items-center gap-2 border-2 border-primary px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] transition-colors ${
+                      isActive
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-card text-primary hover:bg-accent hover:text-accent-foreground'
+                    }`}
+                  >
+                    <Icon name={cat.icon} size={16} strokeWidth={2.5} />
+                    {cat.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => scrollTabs(1)}
+              aria-label="Прокрутить категории вправо"
+              className="hidden h-[42px] w-[34px] shrink-0 items-center justify-center border-2 border-primary bg-card text-primary transition-colors hover:bg-accent hover:text-accent-foreground md:flex"
+            >
+              <Icon name="ChevronRight" size={18} strokeWidth={2.5} />
+            </button>
+          </div>
+
+          <div className="flex shrink-0 flex-wrap gap-3">
+            {editMode && (
+              <button
+                onClick={onAdd}
+                className="flex items-center gap-2 border-2 border-primary bg-accent px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] text-accent-foreground transition-transform hover:-translate-y-0.5"
+              >
+                <Icon name="Plus" size={16} strokeWidth={2.5} />
+                Добавить
+              </button>
+            )}
+            {editMode && (
+              <>
+                <button
+                  onClick={onSharedBase}
+                  className="flex items-center gap-2 border-2 border-primary bg-primary px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] text-primary-foreground transition-transform hover:-translate-y-0.5"
+                >
+                  <Icon name="Database" size={16} strokeWidth={2.5} />
+                  Общая база
+                </button>
+                <button
+                  onClick={onExport}
+                  className="flex items-center gap-2 border-2 border-primary bg-card px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] text-primary transition-colors hover:bg-muted"
+                >
+                  <Icon name="Download" size={16} strokeWidth={2.5} />
+                  Выгрузить
+                </button>
+                <label className="flex cursor-pointer items-center gap-2 border-2 border-primary bg-card px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] text-primary transition-colors hover:bg-muted">
+                  <Icon name="Upload" size={16} strokeWidth={2.5} />
+                  Загрузить
+                  <input
+                    type="file"
+                    accept="application/json,.json"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) onImport(file);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="cat-scroll mt-3 flex gap-3 overflow-x-auto pb-2">
+          <button
+            onClick={() => setShelfFilter('all')}
+            className={`flex shrink-0 items-center gap-2 border-2 border-primary px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] transition-colors ${
+              shelfFilter === 'all'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-card text-primary hover:bg-accent hover:text-accent-foreground'
+            }`}
+          >
+            <Icon name="Clock" size={16} strokeWidth={2.5} />
+            Все сроки
+          </button>
+          {shelfOptions.map((opt) => (
+            <button
+              key={opt.hours}
+              onClick={() => setShelfFilter((v) => (v === opt.hours ? 'all' : opt.hours))}
+              disabled={!opt.count}
+              className={`flex shrink-0 items-center gap-2 border-2 border-primary px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] transition-colors disabled:opacity-40 ${
+                shelfFilter === opt.hours
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-card text-primary hover:bg-accent hover:text-accent-foreground'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
 
         {editMode && (
           <CategoryEditor
@@ -285,17 +501,50 @@ const MenuSection = ({
           />
         )}
 
-        <MenuProductGrid
-          visible={visible}
-          onlyExpired={onlyExpired}
-          onlySoon={onlySoon}
-          editMode={editMode}
-          handleSelect={handleSelect}
-          handlePrint={handlePrint}
-          getStatus={getStatus}
-          onEdit={onEdit}
-          onDelete={onDelete}
-        />
+        {visible.length === 0 ? (
+          <div className="mt-12 border-2 border-dashed border-primary p-10 text-center">
+            <p className="font-head text-lg uppercase text-primary">
+              {onlyExpired ? 'Просроченных нет' : onlySoon ? 'Истекающих нет' : 'Ничего не нашли'}
+            </p>
+            <p className="mt-2 text-muted-foreground">
+              {onlyExpired || onlySoon
+                ? 'Все позиции в этой категории с действующим сроком'
+                : 'Попробуйте другое название или категорию'}
+            </p>
+          </div>
+        ) : (
+          <div className="mt-8 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8">
+            {visible.map((product, i) => (
+              <div key={product.id} className="relative">
+                <ProductCard
+                  product={product}
+                  index={i}
+                  onSelect={handleSelect}
+                  onPrint={handlePrint}
+                  status={getStatus?.(product)}
+                />
+                {editMode && (
+                  <div className="absolute right-1 top-1/2 flex -translate-y-1/2 flex-col gap-1">
+                    <button
+                      onClick={() => onEdit(product)}
+                      aria-label="Изменить продукт"
+                      className="flex h-9 w-9 items-center justify-center border-2 border-primary bg-background text-primary transition-colors hover:bg-accent"
+                    >
+                      <Icon name="Pencil" size={18} strokeWidth={2.5} />
+                    </button>
+                    <button
+                      onClick={() => onDelete(product)}
+                      aria-label="Удалить продукт"
+                      className="flex h-9 w-9 items-center justify-center border-2 border-primary bg-background text-primary transition-colors hover:bg-destructive hover:text-destructive-foreground"
+                    >
+                      <Icon name="Trash2" size={18} strokeWidth={2.5} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <VirtualKeyboard
