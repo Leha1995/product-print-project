@@ -162,16 +162,18 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="h-[100dvh] max-h-[100dvh] w-full max-w-full overflow-y-auto rounded-none border-2 border-primary bg-background p-3 sm:h-auto sm:max-h-[94vh] sm:max-w-[520px] sm:p-4">
-        <h3 className="font-head text-lg font-black uppercase text-primary">Сканирование</h3>
-        <p className="mt-1 text-[13px] text-muted-foreground">
+      <DialogContent className="flex h-[100dvh] max-h-[100dvh] w-full max-w-full flex-col gap-0 overflow-hidden rounded-none border-2 border-primary bg-background p-3 sm:h-auto sm:max-h-[94vh] sm:max-w-[520px] sm:p-4">
+        <h3 className="shrink-0 pr-8 font-head text-base font-black uppercase text-primary sm:text-lg">
+          Сканирование
+        </h3>
+        <p className="mt-1 shrink-0 text-[13px] text-muted-foreground">
           {status === 'off'
             ? `Камера недоступна — вводи коды вручную. Отмечено ${scanned.length} из ${total}`
             : `Наведи камеру на QR-код. Отмечено ${scanned.length} из ${total}`}
         </p>
 
         {status === 'off' ? (
-          <div className="mt-3 flex flex-col items-center gap-2 border-2 border-dashed border-primary bg-card px-4 py-6 text-center">
+          <div className="mt-2 flex flex-1 flex-col items-center justify-center gap-2 overflow-y-auto border-2 border-dashed border-primary bg-card px-4 py-5 text-center sm:flex-none">
             <Icon name="CameraOff" size={28} strokeWidth={2} className="text-muted-foreground" />
             <p className="max-w-[340px] text-[13px] text-muted-foreground">{error}</p>
             {framed && (
@@ -196,7 +198,7 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
             </button>
           </div>
         ) : (
-          <div className="relative mt-3 aspect-square w-full overflow-hidden border-2 border-primary bg-black sm:aspect-[4/3]">
+          <div className="relative mt-2 min-h-[180px] w-full flex-1 overflow-hidden border-2 border-primary bg-black sm:mt-3 sm:aspect-[4/3] sm:flex-none">
             <video
               ref={videoRef}
               playsInline
@@ -251,60 +253,62 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
           </div>
         )}
 
-        {last && (
-          <p
-            className={`mt-2 flex items-center gap-2 border-2 px-3 py-2 font-head text-[0.78rem] font-bold uppercase ${
-              last.ok
-                ? 'border-success bg-success text-success-foreground'
-                : 'border-destructive bg-destructive text-destructive-foreground'
-            }`}
-          >
-            <Icon name={last.ok ? 'Check' : 'X'} size={16} strokeWidth={2.5} />
-            {last.name}
-          </p>
-        )}
+        <div className="shrink-0">
+          {last && (
+            <p
+              className={`mt-2 flex items-center gap-2 border-2 px-3 py-1.5 font-head text-[0.72rem] font-bold uppercase ${
+                last.ok
+                  ? 'border-success bg-success text-success-foreground'
+                  : 'border-destructive bg-destructive text-destructive-foreground'
+              }`}
+            >
+              <Icon name={last.ok ? 'Check' : 'X'} size={16} strokeWidth={2.5} />
+              <span className="truncate">{last.name}</span>
+            </p>
+          )}
 
-        <div className="mt-3 flex gap-2">
-          <input
-            value={manual}
-            onChange={(e) => setManual(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== 'Enter') return;
-              accept(manual);
-              setManual('');
-            }}
-            autoFocus={status === 'off'}
-            placeholder="Ввести код вручную"
-            className="flex-1 border-2 border-primary bg-background px-3 py-2.5 font-body text-[14px] text-primary outline-none"
-          />
-          <button
-            onClick={() => {
-              accept(manual);
-              setManual('');
-            }}
-            className="border-2 border-primary bg-card px-4 font-head text-[0.72rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
-          >
-            Ок
-          </button>
-        </div>
+          <div className="mt-2 flex gap-2">
+            <input
+              value={manual}
+              onChange={(e) => setManual(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return;
+                accept(manual);
+                setManual('');
+              }}
+              autoFocus={status === 'off'}
+              placeholder="Ввести код вручную"
+              className="min-w-0 flex-1 border-2 border-primary bg-background px-3 py-2 font-body text-[14px] text-primary outline-none"
+            />
+            <button
+              onClick={() => {
+                accept(manual);
+                setManual('');
+              }}
+              className="shrink-0 border-2 border-primary bg-card px-4 font-head text-[0.72rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
+            >
+              Ок
+            </button>
+          </div>
 
-        <div className="mt-3 flex items-center justify-between border-2 border-primary bg-card px-3 py-2">
-          <span className="font-head text-[0.72rem] font-bold uppercase text-primary">
-            Осталось найти
-          </span>
-          <span className="font-head text-lg font-black text-primary">{left}</span>
-        </div>
+          <div className="mt-2 flex items-center gap-2">
+            <div className="flex flex-1 items-center justify-between border-2 border-primary bg-card px-3 py-2">
+              <span className="font-head text-[0.68rem] font-bold uppercase text-primary">
+                Осталось
+              </span>
+              <span className="font-head text-lg font-black text-primary">{left}</span>
+            </div>
+            <button
+              onClick={() => onOpenChange(false)}
+              className="shrink-0 border-2 border-primary bg-card px-4 py-2.5 font-head text-[0.7rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
+            >
+              Прервать
+            </button>
+          </div>
 
-        <div className="mt-3 flex gap-2">
-          <button
-            onClick={() => onOpenChange(false)}
-            className="flex-1 border-2 border-primary bg-card px-4 py-3 font-head text-[0.78rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
-          >
-            Прервать
-          </button>
           <button
             onClick={() => onFinish(scanned)}
-            className="flex flex-[1.5] items-center justify-center gap-2 border-2 border-primary bg-accent px-4 py-3 font-head text-[0.78rem] font-bold uppercase text-accent-foreground transition-transform hover:-translate-y-0.5"
+            className="mt-2 flex w-full items-center justify-center gap-2 border-2 border-primary bg-accent px-4 py-3 font-head text-[0.78rem] font-bold uppercase text-accent-foreground transition-transform hover:-translate-y-0.5"
           >
             <Icon name="ClipboardCheck" size={18} strokeWidth={2.5} />
             Завершить и сверить
