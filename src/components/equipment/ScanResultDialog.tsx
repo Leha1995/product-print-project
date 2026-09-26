@@ -57,13 +57,23 @@ const ScanResultDialog = ({ result, open, onOpenChange, onRescan }: ScanResultDi
                   key={item.id}
                   className="flex items-center justify-between gap-2 border-2 border-destructive bg-card px-3 py-2"
                 >
-                  <div className="min-w-0">
-                    <p className="truncate font-head text-[0.8rem] font-bold uppercase text-primary">
-                      {item.name}
-                    </p>
-                    <p className="truncate text-[12px] text-muted-foreground">
-                      {`${item.location || 'без места'} · ${item.code}`}
-                    </p>
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    {item.image && (
+                      <img
+                        src={item.image}
+                        alt=""
+                        loading="lazy"
+                        className="h-[52px] w-[52px] shrink-0 border-2 border-destructive object-cover"
+                      />
+                    )}
+                    <div className="min-w-0">
+                      <p className="truncate font-head text-[0.8rem] font-bold uppercase text-primary">
+                        {item.name}
+                      </p>
+                      <p className="truncate text-[12px] text-muted-foreground">
+                        {`${item.location || 'без места'} · ${item.code}`}
+                      </p>
+                    </div>
                   </div>
                   <span className="shrink-0 font-head text-[0.8rem] font-bold text-destructive">
                     {money(item.price)}

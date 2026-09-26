@@ -1,8 +1,9 @@
+import base64
 import json
 import os
-import time
 import uuid
 
+import boto3
 import psycopg2
 
 CORS = {
@@ -23,6 +24,20 @@ def num(value) -> str:
         return str(round(float(value), 2))
     except (TypeError, ValueError):
         return '0'
+
+
+def upload_image(data_url: str, item_id: str) -> str:
+    header, _, payload = data_url.partition(',')
+    ext = 'png' if 'png' in header else 'webp' if 'webp' in header else 'jpg'
+    key = f"equipment/{item_id}-{uuid.uuid4().hex[:8]}.{ext}"
+    s3 = boto3.client(
+        's3',
+        endpoint_url='https://bucket.poehali.dev',
+        aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+        aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+    )
+    s3.put_object(Bucket='files', Key=key, Body=base64.b64decode(payload), ContentType=f'image/{ext}')
+    return f"https://cdn.poehali.dev/projects/{os.environ['AWS_ACCESS_KEY_ID']}/bucket/{key}"
 
 
 def session_user(cur, token: str):
@@ -97,10 +112,13 @@ def save_item(cur, uid: int, item: dict) -> int:
         return 0
     eid = str(item.get('id') or f"eq-{uuid.uuid4().hex[:10]}")
     code = (item.get('code') or '').strip() or make_code(uid)
+    image = item.get('image') or ''
+    if image.startswith('data:'):
+        image = upload_image(image, eid)
     cur.execute(
         'INSERT INTO equipment (user_id, id, name, code, price, location, note, image, serial, active, updated_at) '
         f"VALUES ({uid}, {q(eid)}, {q(name)}, {q(code)}, {num(item.get('price'))}, "
-        f"{q(item.get('location') or '')}, {q(item.get('note') or '')}, {q(item.get('image') or '')}, "
+        f"{q(item.get('location') or '')}, {q(item.get('note') or '')}, {q(image)}, "
         f"{q(item.get('serial') or '')}, {'FALSE' if item.get('active') is False else 'TRUE'}, NOW()) "
         'ON CONFLICT (user_id, id) DO UPDATE SET name = EXCLUDED.name, code = EXCLUDED.code, '
         'price = EXCLUDED.price, location = EXCLUDED.location, note = EXCLUDED.note, '

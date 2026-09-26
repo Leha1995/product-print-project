@@ -134,7 +134,16 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
               item.active ? 'border-primary' : 'border-muted-foreground opacity-60'
             }`}
           >
-            <div className="min-w-0">
+            <div className="flex min-w-0 gap-3">
+              {item.image && (
+                <img
+                  src={item.image}
+                  alt=""
+                  loading="lazy"
+                  className="h-[72px] w-[72px] shrink-0 border-2 border-primary object-cover"
+                />
+              )}
+              <div className="min-w-0 flex-1">
               <p className="truncate font-head text-[0.9rem] font-black uppercase text-primary">
                 {item.name}
               </p>
@@ -150,6 +159,7 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
               {item.note && (
                 <p className="mt-1 text-[12px] text-muted-foreground">{item.note}</p>
               )}
+              </div>
             </div>
 
             <div className="flex gap-1.5">

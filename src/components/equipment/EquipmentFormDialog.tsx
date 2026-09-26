@@ -16,7 +16,36 @@ const empty = {
   location: '',
   serial: '',
   note: '',
+  image: '',
 };
+
+const readFile = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+const shrink = (dataUrl: string, max = 900) =>
+  new Promise<string>((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.82));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
 
 const EquipmentFormDialog = ({ item, open, onOpenChange, onSave }: EquipmentFormDialogProps) => {
   const [form, setForm] = useState(empty);
@@ -31,6 +60,7 @@ const EquipmentFormDialog = ({ item, open, onOpenChange, onSave }: EquipmentForm
             location: item.location,
             serial: item.serial,
             note: item.note,
+            image: item.image || '',
           }
         : empty,
     );
@@ -50,6 +80,7 @@ const EquipmentFormDialog = ({ item, open, onOpenChange, onSave }: EquipmentForm
       location: form.location.trim(),
       serial: form.serial.trim(),
       note: form.note.trim(),
+      image: form.image,
       active: item?.active ?? true,
     });
     onOpenChange(false);
@@ -67,6 +98,43 @@ const EquipmentFormDialog = ({ item, open, onOpenChange, onSave }: EquipmentForm
           <h3 className="font-head text-lg font-black uppercase text-primary">
             {item ? 'Изменить оборудование' : 'Новое оборудование'}
           </h3>
+
+          <div className="mt-4 flex items-center gap-3">
+            <div className="flex h-[84px] w-[84px] shrink-0 items-center justify-center overflow-hidden border-2 border-primary bg-card">
+              {form.image ? (
+                <img src={form.image} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <Icon name="ImagePlus" size={26} className="text-muted-foreground" strokeWidth={2} />
+              )}
+            </div>
+            <div className="flex flex-1 flex-col gap-1.5">
+              <label className="flex cursor-pointer items-center justify-center gap-2 border-2 border-primary bg-background px-3 py-2 font-head text-[0.7rem] font-bold uppercase text-primary transition-colors hover:bg-muted">
+                <Icon name="Camera" size={16} strokeWidth={2.5} />
+                {form.image ? 'Заменить фото' : 'Добавить фото'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!file) return;
+                    const raw = await readFile(file);
+                    set('image', await shrink(raw));
+                  }}
+                />
+              </label>
+              {form.image && (
+                <button
+                  type="button"
+                  onClick={() => set('image', '')}
+                  className="border-2 border-primary bg-background px-3 py-1.5 font-head text-[0.68rem] font-bold uppercase text-destructive transition-colors hover:bg-muted"
+                >
+                  Убрать фото
+                </button>
+              )}
+            </div>
+          </div>
 
           <label className="mt-4 block">
             <span className={label}>Название</span>
