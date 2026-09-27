@@ -163,7 +163,7 @@ export const apiMe = async (): Promise<MeResult> => {
   if (!token) return { status: 'invalid' };
   try {
     const res = await fetch(`${API}?action=me`, { headers: { 'X-Auth-Token': token } });
-    if (res.status >= 500) return { status: 'offline' };
+    if (res.status >= 500 || res.status === 402 || res.status === 429) return { status: 'offline' };
     const data = (await res.json().catch(() => ({ user: null }))) as { user: AuthUser | null };
     if (!res.ok || !data.user) return { status: 'invalid' };
     return { status: 'ok', user: data.user };

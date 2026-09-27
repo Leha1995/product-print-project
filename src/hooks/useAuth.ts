@@ -74,7 +74,7 @@ export const useAuth = () => {
         setKicked(true);
       }
     };
-    const timer = window.setInterval(check, 30000);
+    const timer = window.setInterval(check, 300000);
     document.addEventListener('visibilitychange', check);
     return () => {
       window.clearInterval(timer);
