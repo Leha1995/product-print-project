@@ -1,6 +1,7 @@
+import { apiUrl } from '@/lib/apiBase';
 import { getToken } from '@/lib/authApi';
 
-const API = 'https://functions.poehali.dev/72436dc3-89cf-47ce-a4bc-2d471dd76275';
+const API = apiUrl('equipment');
 
 export interface Equipment {
   id: string;

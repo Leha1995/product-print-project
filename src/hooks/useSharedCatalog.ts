@@ -1,8 +1,9 @@
+import { apiUrl } from '@/lib/apiBase';
 import { useCallback, useEffect, useState } from 'react';
 import { Product } from '@/data/products';
 import { toast } from '@/hooks/use-toast';
 
-const API = 'https://functions.poehali.dev/ab7271ee-0998-4b1b-8aaf-dfa59fb9b932';
+const API = apiUrl('shared-catalog');
 
 export interface SharedProduct extends Product {
   author?: string;

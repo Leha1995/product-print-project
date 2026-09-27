@@ -14,13 +14,11 @@
       "expectedStatus": 401
     },
     {
-      "name": "Вход супер-админа",
+      "name": "Выгрузка без входа запрещена",
       "method": "POST",
       "path": "/",
-      "body": {"action": "login", "username": "superadmin", "password": "15271527"},
-      "expectedStatus": 200,
-      "expectedBody": {"token": "string"},
-      "bodyMatcher": "partial"
+      "body": {"action": "export"},
+      "expectedStatus": 401
     }
   ]
 }

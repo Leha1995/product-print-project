@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
-import { apiChangePassword, AuthUser } from '@/lib/authApi';
+import { apiChangePassword, apiExportAll, AuthUser } from '@/lib/authApi';
+import { isOwnServer } from '@/lib/apiBase';
 import { toast } from '@/hooks/use-toast';
 
 interface AdminLoginDialogProps {
@@ -35,6 +36,26 @@ const AdminLoginDialog = ({ open, onOpenChange, user, onLogout }: AdminLoginDial
       toast({ title: 'Пароль обновлён' });
     } catch {
       toast({ title: 'Не удалось сменить пароль' });
+    }
+  };
+
+  const [exporting, setExporting] = useState(false);
+
+  const exportData = async () => {
+    setExporting(true);
+    try {
+      const data = await apiExportAll();
+      const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `asap-data-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+      toast({ title: 'Файл с данными скачан' });
+    } catch {
+      toast({ title: 'Не удалось выгрузить данные' });
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -76,6 +97,16 @@ const AdminLoginDialog = ({ open, onOpenChange, user, onLogout }: AdminLoginDial
                   <Icon name="KeyRound" size={18} strokeWidth={2.5} />
                   Сохранить пароль
                 </button>
+                {!isOwnServer() && (
+                  <button
+                    onClick={exportData}
+                    disabled={exporting}
+                    className="flex items-center justify-center gap-2 border-2 border-primary bg-card px-4 py-3 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] text-primary transition-colors hover:bg-muted disabled:opacity-60"
+                  >
+                    <Icon name={exporting ? 'Loader2' : 'DatabaseBackup'} size={18} strokeWidth={2.5} className={exporting ? 'animate-spin' : ''} />
+                    Выгрузить данные для переноса
+                  </button>
+                )}
               </>
             )}
             <button

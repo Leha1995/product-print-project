@@ -1,7 +1,8 @@
+import { apiUrl } from '@/lib/apiBase';
 import { Category, Product } from '@/data/products';
 import { getToken } from '@/lib/authApi';
 
-const API = 'https://functions.poehali.dev/189bcae7-31a1-4023-9d91-07dee22dad90';
+const API = apiUrl('catalog');
 
 export interface UserPrefs {
   activeCategory?: string;

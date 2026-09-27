@@ -2,7 +2,8 @@ import json
 import os
 import hashlib
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 import psycopg2
 
@@ -182,6 +183,45 @@ def managed_ids(cur, me):
     return [r[0] for r in cur.fetchall()]
 
 
+EXPORT_TABLES = {
+    'app_users': 'id, username, full_name, password_hash, role, active, created_at, manager_id, access_until',
+    'app_sessions': 'token, user_id, created_at, expires_at',
+    'user_products': 'user_id, id, name, category, categories, weight, composition, image, barcode, hit, '
+                     'shelf_life_hours, storage_text, updated_at',
+    'user_categories': 'user_id, id, label, icon, position, updated_at',
+    'user_prefs': 'user_id, key, value, updated_at',
+    'user_meta': 'user_id, seeded, created_at',
+    'shared_products': 'id, name, category, categories, weight, composition, image, barcode, hit, '
+                       'shelf_life_hours, storage_text, author, created_at, updated_at',
+    'equipment': 'user_id, id, name, code, price, location, note, image, serial, active, created_at, '
+                 'updated_at, qr_broken, written_off_at, write_off_reason',
+    'inventory_sessions': 'id, user_id, started_by, started_at, finished_at, scanned, missing, total, '
+                          'total_price, missing_price',
+}
+
+
+def export_value(value):
+    if isinstance(value, datetime):
+        if value.tzinfo:
+            value = value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value.strftime('%Y-%m-%d %H:%M:%S')
+    if isinstance(value, Decimal):
+        return float(value)
+    return value
+
+
+def export_all(cur) -> dict:
+    """Полная выгрузка данных для переноса на собственный сервер."""
+    result = {}
+    for table, cols in EXPORT_TABLES.items():
+        cur.execute(f'SELECT {cols} FROM {table}')
+        names = [c.strip() for c in cols.split(',')]
+        result[table] = [
+            {name: export_value(val) for name, val in zip(names, row)} for row in cur.fetchall()
+        ]
+    return {'version': 1, 'tables': result}
+
+
 def handler(event: dict, context) -> dict:
     """Вход по логину и паролю, сессии и управление пользователями (супер-админ)."""
     method = event.get('httpMethod', 'GET')
@@ -278,6 +318,11 @@ def handler(event: dict, context) -> dict:
                     for r in cur.fetchall()
                 ]
             })
+
+        if action == 'export':
+            if me['role'] != 'superadmin':
+                return done({'error': 'forbidden'}, 403)
+            return done(export_all(cur))
 
         if me['role'] not in ('superadmin', 'admin', 'manager'):
             return done({'error': 'forbidden'}, 403)

@@ -1,4 +1,5 @@
-const API = 'https://functions.poehali.dev/e2f238d3-01a0-409f-973c-33e38bfdbb57';
+import { apiUrl } from '@/lib/apiBase';
+const API = apiUrl('auth');
 
 export type Role = 'user' | 'admin' | 'manager' | 'superadmin';
 
@@ -200,6 +201,8 @@ export const apiUpdateUser = (payload: {
 
 export const apiDeleteUser = (id: number) =>
   call<{ users: ManagedUser[] }>({ action: 'delete_user', id });
+
+export const apiExportAll = () => call<{ version: number; tables: Record<string, unknown[]> }>({ action: 'export' });
 
 export const apiChangePassword = (password: string) =>
   call<{ ok: boolean }>({ action: 'change_password', password });
