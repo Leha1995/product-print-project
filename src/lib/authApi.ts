@@ -124,6 +124,7 @@ const call = async <T>(body: Record<string, unknown>): Promise<T> => {
     headers: { 'Content-Type': 'application/json', 'X-Auth-Token': getToken() },
     body: JSON.stringify(body),
   });
+  if (res.status === 402) throw new Error('quota_exceeded');
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error((data as { error?: string }).error || String(res.status));
   return data as T;

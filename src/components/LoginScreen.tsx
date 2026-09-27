@@ -43,12 +43,18 @@ const LoginScreen = ({ onLogin, kicked }: LoginScreenProps) => {
     try {
       await onLogin(username, password);
     } catch (err) {
-      setError(
-        String(err).includes('access_expired')
-          ? 'Срок доступа истёк — обратитесь к администратору'
-          : 'Неверный логин или пароль',
-      );
-      setPassword('');
+      const text = String(err);
+      if (text.includes('quota_exceeded')) {
+        setError('Сервер временно недоступен: закончился лимит на тарифе');
+      } else if (text.includes('access_expired')) {
+        setError('Срок доступа истёк — обратитесь к администратору');
+        setPassword('');
+      } else if (text.includes('Failed to fetch') || text.includes('NetworkError')) {
+        setError('Нет связи с сервером — проверьте интернет и попробуйте ещё раз');
+      } else {
+        setError('Неверный логин или пароль');
+        setPassword('');
+      }
     } finally {
       setBusy(false);
     }
