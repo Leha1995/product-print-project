@@ -86,17 +86,38 @@ const UsersDialog = ({
   const admins = users.filter((u) => u.role === 'admin' || u.role === 'superadmin');
   const managers = users.filter((u) => u.role === 'manager');
 
-  const tree = (() => {
+  const treeMode = isSuperAdmin || readOnly;
+
+  const rows = (() => {
+    if (!treeMode) {
+      return users.map((u) => ({ user: u, depth: 0, ancestors: [] as number[], admins: 0, staff: 0 }));
+    }
+    const managerIds = new Set(managers.map((m) => m.id));
     const heads = users.filter((u) => u.role !== 'user');
-    const nodes = heads.map((head) => ({
-      head,
-      staff: users.filter((s) => s.role === 'user' && s.managerId === head.id),
-    }));
-    const orphans = users.filter(
-      (s) => s.role === 'user' && (!s.managerId || !heads.some((h) => h.id === s.managerId)),
-    );
-    return [...nodes, ...orphans.map((head) => ({ head, staff: [] as ManagedUser[] }))];
+    const staffOf = (id: number) => users.filter((s) => s.role === 'user' && s.managerId === id);
+    const adminsOf = (id: number) =>
+      users.filter((a) => a.role === 'admin' && a.managerId === id);
+    const result: { user: ManagedUser; depth: number; ancestors: number[]; admins: number; staff: number }[] = [];
+    const push = (u: ManagedUser, depth: number, ancestors: number[]) => {
+      const subAdmins = u.role === 'manager' ? adminsOf(u.id) : [];
+      const staff = staffOf(u.id);
+      const staffTotal =
+        staff.length + subAdmins.reduce((sum, a) => sum + staffOf(a.id).length, 0);
+      result.push({ user: u, depth, ancestors, admins: subAdmins.length, staff: staffTotal });
+      const next = [...ancestors, u.id];
+      subAdmins.forEach((a) => push(a, depth + 1, next));
+      staff.forEach((s) => push(s, depth + 1, next));
+    };
+    heads
+      .filter((h) => !(h.role === 'admin' && h.managerId && managerIds.has(h.managerId)))
+      .forEach((h) => push(h, 0, []));
+    users
+      .filter((s) => s.role === 'user' && (!s.managerId || !heads.some((h) => h.id === s.managerId)))
+      .forEach((s) => push(s, 0, []));
+    return result;
   })();
+
+  const groupIds = rows.filter((r) => r.admins + r.staff > 0).map((r) => r.user.id);
 
   const apply = (list: ManagedUser[]) => {
     setUsers(list);
@@ -319,14 +340,10 @@ const UsersDialog = ({
           </div>
           )}
 
-          {(isSuperAdmin || readOnly) && tree.some((n) => n.staff.length > 0) && (
+          {treeMode && groupIds.length > 0 && (
             <div className="mt-4 flex justify-end">
               <button
-                onClick={() =>
-                  setCollapsed((prev) =>
-                    prev.length ? [] : tree.filter((n) => n.staff.length).map((n) => n.head.id),
-                  )
-                }
+                onClick={() => setCollapsed((prev) => (prev.length ? [] : groupIds))}
                 className="flex items-center gap-1.5 border-2 border-primary bg-background px-3 py-1.5 font-head text-[0.7rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
               >
                 <Icon
@@ -340,17 +357,21 @@ const UsersDialog = ({
           )}
 
           <div className="mt-3 grid gap-2">
-            {(isSuperAdmin || readOnly ? tree : users.map((u) => ({ head: u, staff: [] }))).map((node) => (
-              <div key={node.head.id} className={node.staff.length ? 'grid gap-1' : ''}>
-            {[node.head, ...node.staff].map((u, idx) => (
+            {rows.map(({ user: u, depth, ancestors, admins: adminCount, staff: staffCount }) => {
+              const isGroup = adminCount + staffCount > 0;
+              const isCollapsed = collapsed.includes(u.id);
+              const hiddenRow = ancestors.some((id) => collapsed.includes(id));
+              return (
               <div
                 key={u.id}
-                hidden={idx > 0 && collapsed.includes(node.head.id)}
-                className={`flex flex-wrap items-center gap-2 border-2 border-primary bg-card px-3 py-2 ${
-                  idx > 0 ? 'ml-4 border-l-8 md:ml-8' : ''
-                } ${idx > 0 && collapsed.includes(node.head.id) ? 'hidden' : ''}`}
+                hidden={hiddenRow}
+                className={`flex flex-wrap items-center gap-2 border-2 border-primary px-3 py-2 ${
+                  u.role === 'manager' && treeMode ? 'bg-muted' : 'bg-card'
+                } ${depth === 1 ? 'ml-4 border-l-8 md:ml-8' : ''} ${
+                  depth >= 2 ? 'ml-8 border-l-8 md:ml-16' : ''
+                } ${hiddenRow ? 'hidden' : ''}`}
               >
-                {idx > 0 && (
+                {depth > 0 && (
                   <Icon
                     name="CornerDownRight"
                     size={16}
@@ -358,43 +379,37 @@ const UsersDialog = ({
                     className="shrink-0 text-muted-foreground"
                   />
                 )}
-                {idx === 0 && node.staff.length > 0 && (
+                {isGroup && (
                   <button
-                    onClick={() => toggleGroup(node.head.id)}
-                    aria-label={
-                      collapsed.includes(node.head.id) ? 'Показать сотрудников' : 'Скрыть сотрудников'
-                    }
+                    onClick={() => toggleGroup(u.id)}
+                    aria-label={isCollapsed ? 'Развернуть ветку' : 'Свернуть ветку'}
                     className="flex h-7 w-7 shrink-0 items-center justify-center border-2 border-primary bg-background text-primary transition-colors hover:bg-muted"
                   >
                     <Icon
-                      name={collapsed.includes(node.head.id) ? 'ChevronRight' : 'ChevronDown'}
+                      name={isCollapsed ? 'ChevronRight' : 'ChevronDown'}
                       size={16}
                       strokeWidth={2.5}
                     />
                   </button>
                 )}
                 <div
-                  className={`min-w-0 flex-1 ${idx === 0 && node.staff.length > 0 ? 'cursor-pointer' : ''}`}
-                  onClick={
-                    idx === 0 && node.staff.length > 0
-                      ? () => toggleGroup(node.head.id)
-                      : undefined
-                  }
+                  className={`min-w-0 flex-1 ${isGroup ? 'cursor-pointer' : ''}`}
+                  onClick={isGroup ? () => toggleGroup(u.id) : undefined}
                 >
                   <p className="truncate font-head text-[0.85rem] font-bold uppercase text-primary">
                     {u.username}
                     {!u.active && <span className="ml-2 text-destructive">(отключён)</span>}
-                    {idx === 0 && node.staff.length > 0 && (
+                    {isGroup && (
                       <span className="ml-2 text-[11px] font-bold text-muted-foreground">
-                        {`· сотрудников: ${node.staff.length}${
-                          collapsed.includes(node.head.id) ? ' (свёрнуто)' : ''
+                        {`·${adminCount ? ` админов: ${adminCount} ·` : ''} сотрудников: ${staffCount}${
+                          isCollapsed ? ' (свёрнуто)' : ''
                         }`}
                       </span>
                     )}
                   </p>
                   <p className="truncate text-[12px] text-muted-foreground">
                     {`${u.fullName || '—'} · ${roleLabel[u.role]}${
-                      u.managerId && idx === 0
+                      u.managerId && depth === 0
                         ? ` · руководитель: ${
                             users.find((a) => a.id === u.managerId)?.fullName ||
                             users.find((a) => a.id === u.managerId)?.username ||
@@ -498,9 +513,8 @@ const UsersDialog = ({
                   </button>
                 )}
               </div>
-            ))}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
         {editId !== null && (
