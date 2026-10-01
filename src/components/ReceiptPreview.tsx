@@ -101,33 +101,19 @@ const ReceiptPreview = ({
               </div>
             </>
           ))}
-      </dl>
-
-      {settings.showExpiry && (
-        <>
-          <div
-            className={`border-dashed border-primary ${micro ? 'my-0.5 border-t' : tiny ? 'my-1.5 border-t-2' : 'my-3 border-t-2'}`}
-          />
-
-          <div className="text-center">
-            <div
-              className={`font-head uppercase tracking-[0.1em] ${micro ? 'text-[7px] leading-none' : tiny ? 'text-[9px]' : 'text-xs'}`}
-            >
-              Годен до
-            </div>
-            <div
-              className={`font-head font-black leading-tight ${large ? 'text-3xl' : micro ? 'text-[10px]' : tiny ? 'text-[13px]' : compact ? 'text-lg' : 'text-xl'}`}
-            >
-              {expiry}
-            </div>
-            {!micro && (
-              <div className={`mt-0.5 ${tiny ? 'text-[8px]' : 'text-[11px]'}`}>
-                Срок хранения {hours} ч
-              </div>
-            )}
+        {settings.showExpiry && (
+          <div className="flex justify-between gap-1">
+            <dt className="shrink-0">Годен до</dt>
+            <dd className="font-semibold">{expiry}</dd>
           </div>
-        </>
-      )}
+        )}
+        {settings.showExpiry && !micro && (
+          <div className="flex justify-between gap-1">
+            <dt className="shrink-0">Срок хранения</dt>
+            <dd className="font-semibold">{hours} ч</dd>
+          </div>
+        )}
+      </dl>
 
       {settings.showStorage && (
         <div
