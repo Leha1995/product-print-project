@@ -5,7 +5,7 @@ import QrLabel from '@/components/equipment/QrLabel';
 import { printNodeHtml } from '@/components/DirectPrintArea';
 import { Equipment } from '@/lib/equipmentApi';
 import { defaultLabelSettings } from '@/hooks/useLabelSettings';
-import { printNodesNetwork } from '@/lib/netPrint';
+import { isRawMode, printNodesNetwork } from '@/lib/netPrint';
 
 const readLabelSettings = () => {
   try {
@@ -39,7 +39,7 @@ const QrPrintDialog = ({ items, open, onOpenChange }: QrPrintDialogProps) => {
     const nodes = ref.current?.querySelectorAll('.print-area');
     if (!nodes?.length) return;
     const settings = readLabelSettings();
-    if (settings.printMode === 'network') {
+    if (isRawMode(settings)) {
       printNodesNetwork(Array.from(nodes) as HTMLElement[], settings, 1, {
         widthMm: 58,
         heightMm: 40,

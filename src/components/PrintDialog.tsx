@@ -6,7 +6,7 @@ import LabelSettingsPanel from '@/components/LabelSettingsPanel';
 import { LabelSettings, getPaper } from '@/hooks/useLabelSettings';
 import { printNodeHtml } from '@/components/DirectPrintArea';
 import { downloadBartenderJob } from '@/lib/bartender';
-import { printNodesNetwork } from '@/lib/netPrint';
+import { isRawMode, printNodesNetwork } from '@/lib/netPrint';
 import { Product } from '@/data/products';
 
 interface PrintDialogProps {
@@ -56,7 +56,7 @@ const PrintDialog = ({
         return;
       }
       const node = document.querySelector('.print-area');
-      if (settings.printMode === 'network') {
+      if (isRawMode(settings)) {
         if (node) printNodesNetwork([node as HTMLElement], settings, copies);
         return;
       }
@@ -148,7 +148,7 @@ const PrintDialog = ({
               </button>
 
               <p className="mt-3 text-center text-[12px] uppercase tracking-[0.06em] text-muted-foreground">
-                {settings.printMode === 'network' ? 'Принтер по IP' : settings.printMode === 'bartender' ? 'BarTender' : 'Печать браузером'} · {getPaper(settings.paper).label}
+                {settings.printMode === 'rawbt' ? 'Через RawBT' : settings.printMode === 'network' ? 'Принтер по IP' : settings.printMode === 'bartender' ? 'BarTender' : 'Печать браузером'} · {getPaper(settings.paper).label}
               </p>
             </div>
           </div>

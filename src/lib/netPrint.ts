@@ -94,12 +94,56 @@ export const networkOptions = (settings: LabelSettings, copies = 1): TsplOptions
   };
 };
 
+export const isRawMode = (settings: LabelSettings) =>
+  settings.printMode === 'network' || settings.printMode === 'rawbt';
+
+const RAWBT_CHUNK = 30;
+
+const openRawbt = (bytes: Uint8Array) => {
+  window.location.href = `rawbt:base64,${toBase64(bytes)}`;
+};
+
+export const sendToRawbt = async (labels: Uint8Array[]) => {
+  for (let i = 0; i < labels.length; i += RAWBT_CHUNK) {
+    const part = labels.slice(i, i + RAWBT_CHUNK);
+    const total = part.reduce((s, p) => s + p.length, 0);
+    const bytes = new Uint8Array(total);
+    let pos = 0;
+    part.forEach((p) => {
+      bytes.set(p, pos);
+      pos += p.length;
+    });
+    if (i > 0) await sleep(2500);
+    openRawbt(bytes);
+  }
+  return true;
+};
+
+const printNodesRawbt = async (
+  nodes: HTMLElement[],
+  settings: LabelSettings,
+  copies: number,
+  override?: Partial<TsplOptions>,
+) => {
+  try {
+    const labels: Uint8Array[] = [];
+    for (const node of nodes) {
+      labels.push(await nodeToTspl(node, { ...networkOptions(settings, copies), ...override }));
+    }
+    return await sendToRawbt(labels);
+  } catch {
+    toast({ title: 'Не удалось подготовить этикетку для RawBT' });
+    return false;
+  }
+};
+
 export const printNodesNetwork = async (
   nodes: HTMLElement[],
   settings: LabelSettings,
   copies = 1,
   override?: Partial<TsplOptions>,
 ) => {
+  if (settings.printMode === 'rawbt') return printNodesRawbt(nodes, settings, copies, override);
   const config = await loadPrintConfig();
   const printer = pickPrinter(settings, config);
   if (!printer) {

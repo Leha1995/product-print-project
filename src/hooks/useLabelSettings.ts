@@ -37,7 +37,7 @@ export interface LabelSettings {
   shelfLifeHours: number;
   logo: string;
   shopName: string;
-  printMode: 'browser' | 'bartender' | 'network';
+  printMode: 'browser' | 'bartender' | 'network' | 'rawbt';
   netPrinterId: string;
   netGapMm: number;
   netDensity: number;

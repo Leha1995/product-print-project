@@ -3,7 +3,7 @@ import ReceiptPreview from '@/components/ReceiptPreview';
 import { printNodeHtml } from '@/components/DirectPrintArea';
 import { LabelSettings, getPaper } from '@/hooks/useLabelSettings';
 import { downloadBartenderBatch } from '@/lib/bartender';
-import { printNodesNetwork } from '@/lib/netPrint';
+import { isRawMode, printNodesNetwork } from '@/lib/netPrint';
 import { Product } from '@/data/products';
 
 interface BatchPrintAreaProps {
@@ -29,7 +29,7 @@ const BatchPrintArea = ({ products, settings, printedAt, onDone }: BatchPrintAre
 
     const id = window.setTimeout(() => {
       const nodes = Array.from(ref.current?.querySelectorAll('.print-area') ?? []);
-      if (nodes.length && settings.printMode === 'network') {
+      if (nodes.length && isRawMode(settings)) {
         printNodesNetwork(nodes as HTMLElement[], settings);
       } else if (nodes.length) {
         const paper = getPaper(settings.paper);

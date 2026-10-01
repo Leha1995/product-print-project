@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Icon from '@/components/ui/icon';
 import SoundPicker from '@/components/SoundPicker';
 import NetworkPrinterSettings from '@/components/NetworkPrinterSettings';
+import RawbtSettings from '@/components/RawbtSettings';
 import { LabelSettings } from '@/hooks/useLabelSettings';
 
 const staffFieldClass =
@@ -81,7 +82,8 @@ const LabelSettingsPanel = ({
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         {[
-          { value: 'network' as const, label: 'Принтер по IP', hint: 'Напрямую по Wi-Fi' },
+          { value: 'rawbt' as const, label: 'С планшета', hint: 'Через RawBT, без ПК' },
+          { value: 'network' as const, label: 'Принтер по IP', hint: 'Через помощник на ПК' },
           { value: 'browser' as const, label: 'Печать браузером', hint: 'Обычный принтер' },
           { value: 'bartender' as const, label: 'BarTender', hint: 'Файл задания в папку' },
         ].map((mode) => {
@@ -95,7 +97,7 @@ const LabelSettingsPanel = ({
               }`}
             >
               <Icon
-                name={mode.value === 'bartender' ? 'FileDown' : mode.value === 'network' ? 'Wifi' : 'Printer'}
+                name={mode.value === 'bartender' ? 'FileDown' : mode.value === 'network' ? 'Wifi' : mode.value === 'rawbt' ? 'TabletSmartphone' : 'Printer'}
                 size={16}
                 strokeWidth={2.5}
                 className="shrink-0"
@@ -118,6 +120,8 @@ const LabelSettingsPanel = ({
       {settings.printMode === 'network' && (
         <NetworkPrinterSettings settings={settings} onChange={onChange} />
       )}
+
+      {settings.printMode === 'rawbt' && <RawbtSettings settings={settings} onChange={onChange} />}
 
       {settings.printMode === 'bartender' && (
         <div className="mt-3 grid gap-2 border-2 border-dashed border-primary p-3">
@@ -332,16 +336,28 @@ const LabelSettingsPanel = ({
 
       {staffOnly && (
         <>
-          <label className="mt-3 flex items-center gap-2 border-2 border-primary bg-card px-3 py-2 text-[13px] text-primary">
-            <input
-              type="checkbox"
-              checked={settings.printMode === 'network'}
-              onChange={(e) => onChange({ printMode: e.target.checked ? 'network' : 'browser' })}
-              className="h-4 w-4 accent-[hsl(var(--primary))]"
-            />
-            <Icon name="Wifi" size={15} strokeWidth={2.5} />
-            Печатать на принтер по IP
-          </label>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {[
+              { value: 'rawbt' as const, label: 'С планшета', icon: 'TabletSmartphone' },
+              { value: 'network' as const, label: 'По IP', icon: 'Wifi' },
+              { value: 'browser' as const, label: 'Браузер', icon: 'Printer' },
+            ].map((mode) => {
+              const active = settings.printMode === mode.value;
+              return (
+                <button
+                  key={mode.value}
+                  onClick={() => onChange({ printMode: mode.value })}
+                  className={`flex items-center justify-center gap-1.5 border-2 border-primary px-2 py-2 font-head text-[0.7rem] font-medium uppercase transition-colors ${
+                    active ? 'bg-primary text-primary-foreground' : 'bg-card text-primary hover:bg-muted'
+                  }`}
+                >
+                  <Icon name={mode.icon} size={15} strokeWidth={2.5} />
+                  {mode.label}
+                </button>
+              );
+            })}
+          </div>
+          {settings.printMode === 'rawbt' && <RawbtSettings settings={settings} onChange={onChange} />}
           {settings.printMode === 'network' && (
             <NetworkPrinterSettings settings={settings} onChange={onChange} />
           )}
