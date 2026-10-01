@@ -3,6 +3,7 @@ import Icon from '@/components/ui/icon';
 import SoundPicker from '@/components/SoundPicker';
 import NetworkPrinterSettings from '@/components/NetworkPrinterSettings';
 import RawbtSettings from '@/components/RawbtSettings';
+import PrintLabelSettings from '@/components/PrintLabelSettings';
 import { LabelSettings } from '@/hooks/useLabelSettings';
 
 const staffFieldClass =
@@ -82,6 +83,7 @@ const LabelSettingsPanel = ({
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         {[
+          { value: 'share' as const, label: 'Print Label', hint: 'Приложение на планшете' },
           { value: 'rawbt' as const, label: 'С планшета', hint: 'Через RawBT, без ПК' },
           { value: 'network' as const, label: 'Принтер по IP', hint: 'Через помощник на ПК' },
           { value: 'browser' as const, label: 'Печать браузером', hint: 'Обычный принтер' },
@@ -97,7 +99,7 @@ const LabelSettingsPanel = ({
               }`}
             >
               <Icon
-                name={mode.value === 'bartender' ? 'FileDown' : mode.value === 'network' ? 'Wifi' : mode.value === 'rawbt' ? 'TabletSmartphone' : 'Printer'}
+                name={mode.value === 'bartender' ? 'FileDown' : mode.value === 'network' ? 'Wifi' : mode.value === 'rawbt' ? 'TabletSmartphone' : mode.value === 'share' ? 'Tag' : 'Printer'}
                 size={16}
                 strokeWidth={2.5}
                 className="shrink-0"
@@ -122,6 +124,8 @@ const LabelSettingsPanel = ({
       )}
 
       {settings.printMode === 'rawbt' && <RawbtSettings settings={settings} onChange={onChange} />}
+
+      {settings.printMode === 'share' && <PrintLabelSettings settings={settings} />}
 
       {settings.printMode === 'bartender' && (
         <div className="mt-3 grid gap-2 border-2 border-dashed border-primary p-3">
@@ -336,8 +340,9 @@ const LabelSettingsPanel = ({
 
       {staffOnly && (
         <>
-          <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="mt-3 grid grid-cols-2 gap-2">
             {[
+              { value: 'share' as const, label: 'Print Label', icon: 'Tag' },
               { value: 'rawbt' as const, label: 'С планшета', icon: 'TabletSmartphone' },
               { value: 'network' as const, label: 'По IP', icon: 'Wifi' },
               { value: 'browser' as const, label: 'Браузер', icon: 'Printer' },
@@ -357,6 +362,7 @@ const LabelSettingsPanel = ({
               );
             })}
           </div>
+          {settings.printMode === 'share' && <PrintLabelSettings settings={settings} />}
           {settings.printMode === 'rawbt' && <RawbtSettings settings={settings} onChange={onChange} />}
           {settings.printMode === 'network' && (
             <NetworkPrinterSettings settings={settings} onChange={onChange} />

@@ -148,7 +148,7 @@ const PrintDialog = ({
               </button>
 
               <p className="mt-3 text-center text-[12px] uppercase tracking-[0.06em] text-muted-foreground">
-                {settings.printMode === 'rawbt' ? 'Через RawBT' : settings.printMode === 'network' ? 'Принтер по IP' : settings.printMode === 'bartender' ? 'BarTender' : 'Печать браузером'} · {getPaper(settings.paper).label}
+                {settings.printMode === 'share' ? 'Через Print Label' : settings.printMode === 'rawbt' ? 'Через RawBT' : settings.printMode === 'network' ? 'Принтер по IP' : settings.printMode === 'bartender' ? 'BarTender' : 'Печать браузером'} · {getPaper(settings.paper).label}
               </p>
             </div>
           </div>

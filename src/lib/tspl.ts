@@ -125,7 +125,7 @@ export const nodeToTspl = async (node: HTMLElement, opts: TsplOptions) => {
   return canvasToTspl(layoutCanvas(src, opts), opts);
 };
 
-export const testLabelTspl = (opts: TsplOptions, title: string) => {
+export const testLabelCanvas = (opts: TsplOptions, title: string) => {
   const w = Math.round(opts.widthMm * DOTS_PER_MM);
   const h = Math.round((opts.heightMm ?? 30) * DOTS_PER_MM);
   const canvas = document.createElement('canvas');
@@ -144,8 +144,11 @@ export const testLabelTspl = (opts: TsplOptions, title: string) => {
   ctx.fillText('ТЕСТ', w / 2, h * 0.4);
   ctx.font = `${Math.round(Math.min(w / 14, h / 9))}px sans-serif`;
   ctx.fillText(title, w / 2, h * 0.72);
-  return canvasToTspl(canvas, { ...opts, rotate90: false });
+  return canvas;
 };
+
+export const testLabelTspl = (opts: TsplOptions, title: string) =>
+  canvasToTspl(testLabelCanvas(opts, title), { ...opts, rotate90: false });
 
 export const toBase64 = (bytes: Uint8Array) => {
   let binary = '';
@@ -154,4 +157,9 @@ export const toBase64 = (bytes: Uint8Array) => {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
   return btoa(binary);
+};
+
+export const nodeToLabelCanvas = async (node: HTMLElement, opts: TsplOptions) => {
+  const src = await renderNode(node, opts.widthMm * DOTS_PER_MM);
+  return layoutCanvas(src, opts);
 };

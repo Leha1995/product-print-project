@@ -1,4 +1,6 @@
+import { createElement } from 'react';
 import { toast } from '@/hooks/use-toast';
+import { ToastAction, ToastActionElement } from '@/components/ui/toast';
 import { LabelSettings, getPaper } from '@/hooks/useLabelSettings';
 import {
   NetPrinter,
@@ -7,7 +9,7 @@ import {
   apiPrintJob,
   apiPrintStatus,
 } from '@/lib/printApi';
-import { TsplOptions, nodeToTspl, toBase64 } from '@/lib/tspl';
+import { TsplOptions, nodeToLabelCanvas, nodeToTspl, toBase64 } from '@/lib/tspl';
 
 type Listener = (config: PrintConfig | null) => void;
 
@@ -95,7 +97,77 @@ export const networkOptions = (settings: LabelSettings, copies = 1): TsplOptions
 };
 
 export const isRawMode = (settings: LabelSettings) =>
-  settings.printMode === 'network' || settings.printMode === 'rawbt';
+  settings.printMode === 'network' || settings.printMode === 'rawbt' || settings.printMode === 'share';
+
+const canvasToFile = (canvas: HTMLCanvasElement, name: string) =>
+  new Promise<File>((resolve, reject) =>
+    canvas.toBlob(
+      (blob) => (blob ? resolve(new File([blob], name, { type: 'image/png' })) : reject(new Error('png'))),
+      'image/png',
+    ),
+  );
+
+const downloadFiles = (files: File[]) => {
+  files.forEach((file) => {
+    const url = URL.createObjectURL(file);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = file.name;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+  });
+};
+
+export const shareLabelFiles = async (files: File[]) => {
+  const nav = navigator as Navigator & { canShare?: (data: ShareData) => boolean };
+  if (!nav.share || (nav.canShare && !nav.canShare({ files }))) {
+    downloadFiles(files);
+    toast({
+      title: 'Этикетка сохранена картинкой',
+      description: 'Этот браузер не умеет передавать файлы в приложения. Открой картинку в Print Label.',
+    });
+    return false;
+  }
+  try {
+    await nav.share({ files });
+    return true;
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') return false;
+    toast({
+      title: files.length > 1 ? `Этикетки готовы: ${files.length} шт.` : 'Этикетка готова',
+      description: 'Нажми «Отправить» и выбери Print Label.',
+      action: createElement(
+        ToastAction,
+        { altText: 'Отправить', onClick: () => nav.share?.({ files }).catch(() => undefined) },
+        'Отправить',
+      ) as unknown as ToastActionElement,
+    });
+    return false;
+  }
+};
+
+const printNodesShare = async (
+  nodes: HTMLElement[],
+  settings: LabelSettings,
+  copies: number,
+  override?: Partial<TsplOptions>,
+) => {
+  try {
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
+    const files: File[] = [];
+    for (let i = 0; i < nodes.length; i += 1) {
+      const canvas = await nodeToLabelCanvas(nodes[i], { ...networkOptions(settings, copies), ...override });
+      files.push(await canvasToFile(canvas, `etiketka-${stamp}-${i + 1}.png`));
+    }
+    if (copies > 1) {
+      toast({ title: `Копий: ${copies}`, description: 'Укажи количество копий в Print Label.' });
+    }
+    return await shareLabelFiles(files);
+  } catch {
+    toast({ title: 'Не удалось подготовить этикетку' });
+    return false;
+  }
+};
 
 const RAWBT_CHUNK = 30;
 
@@ -143,6 +215,7 @@ export const printNodesNetwork = async (
   copies = 1,
   override?: Partial<TsplOptions>,
 ) => {
+  if (settings.printMode === 'share') return printNodesShare(nodes, settings, copies, override);
   if (settings.printMode === 'rawbt') return printNodesRawbt(nodes, settings, copies, override);
   const config = await loadPrintConfig();
   const printer = pickPrinter(settings, config);
