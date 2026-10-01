@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-export type PaperId = 'label43x25' | 'roll58' | 'roll80' | 'label58x40' | 'a6';
+export type PaperId = 'label43x25';
 
 export interface PaperFormat {
   id: PaperId;
@@ -13,21 +13,11 @@ export interface PaperFormat {
 export const paperFormats: PaperFormat[] = [
   {
     id: 'label43x25',
-    label: 'Лента 43×25',
+    label: 'Этикетка 43×25',
     hint: 'Мелкая этикетка на упаковку',
     widthMm: 43,
     heightMm: 25,
   },
-  { id: 'roll58', label: 'Лента 58 мм', hint: 'Компактный чековый принтер', widthMm: 58 },
-  { id: 'roll80', label: 'Лента 80 мм', hint: 'Стандарт кассовой ленты', widthMm: 80 },
-  {
-    id: 'label58x40',
-    label: 'Этикетка 58×40',
-    hint: 'Термоэтикетка на полку',
-    widthMm: 58,
-    heightMm: 40,
-  },
-  { id: 'a6', label: 'A6 (105×148)', hint: 'Крупная маркировка на витрину', widthMm: 105, heightMm: 148 },
 ];
 
 export interface LabelSettings {
@@ -61,7 +51,7 @@ export interface LabelSettings {
 }
 
 export const defaultLabelSettings: LabelSettings = {
-  paper: 'roll80',
+  paper: 'label43x25',
   rotate90: false,
   showComposition: true,
   showWeight: true,
@@ -92,8 +82,7 @@ export const defaultLabelSettings: LabelSettings = {
 
 const STORAGE_KEY = 'asap-label-settings-v1';
 
-export const getPaper = (id: PaperId) =>
-  paperFormats.find((p) => p.id === id) ?? paperFormats.find((p) => p.id === 'roll80')!;
+export const getPaper = (_id?: PaperId) => paperFormats[0];
 
 export const useLabelSettings = () => {
   const [settings, setSettings] = useState<LabelSettings>(defaultLabelSettings);
@@ -101,7 +90,7 @@ export const useLabelSettings = () => {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setSettings({ ...defaultLabelSettings, ...JSON.parse(raw) });
+      if (raw) setSettings({ ...defaultLabelSettings, ...JSON.parse(raw), paper: 'label43x25' });
     } catch {
       /* storage unavailable */
     }
@@ -116,7 +105,7 @@ export const useLabelSettings = () => {
 
   const update = useCallback((patch: Partial<LabelSettings>) => {
     setSettings((prev) => {
-      const next = { ...prev, ...patch };
+      const next = { ...prev, ...patch, paper: 'label43x25' as PaperId };
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       } catch {

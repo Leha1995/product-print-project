@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Icon from '@/components/ui/icon';
 import SoundPicker from '@/components/SoundPicker';
 import NetworkPrinterSettings from '@/components/NetworkPrinterSettings';
-import { LabelSettings, paperFormats } from '@/hooks/useLabelSettings';
+import { LabelSettings } from '@/hooks/useLabelSettings';
 
 const staffFieldClass =
   'w-full border-2 border-primary bg-card px-3 py-2 font-body text-[14px] text-primary outline-none placeholder:text-muted-foreground focus:bg-muted';
@@ -72,26 +72,11 @@ const LabelSettingsPanel = ({
 
       {!staffOnly && (
         <>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        {paperFormats.map((paper) => {
-          const active = settings.paper === paper.id;
-          return (
-            <button
-              key={paper.id}
-              onClick={() => onChange({ paper: paper.id })}
-              className={`border-2 border-primary px-3 py-2 text-left transition-colors ${
-                active ? 'bg-primary text-primary-foreground' : 'bg-card text-primary hover:bg-muted'
-              }`}
-            >
-              <span className="block font-head text-[0.75rem] font-medium uppercase tracking-[0.04em]">
-                {paper.label}
-              </span>
-              <span className={`block text-[11px] ${active ? 'opacity-80' : 'text-muted-foreground'}`}>
-                {paper.hint}
-              </span>
-            </button>
-          );
-        })}
+      <div className="mt-3 flex items-center gap-2 border-2 border-primary bg-card px-3 py-2 text-primary">
+        <Icon name="Tag" size={16} strokeWidth={2.5} className="shrink-0" />
+        <span className="font-head text-[0.75rem] font-medium uppercase tracking-[0.04em]">
+          Этикетка 43×25 мм
+        </span>
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
