@@ -125,6 +125,12 @@ const NetworkPrinterSettings = ({ settings, onChange }: NetworkPrinterSettingsPr
               : 'Помощник печати не запущен'}
         </span>
       </div>
+      {config?.canSetup && (
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          Один помощник на компьютере печатает задания этого аккаунта и всех привязанных к нему
+          сотрудников. Скачивай его под старшим аккаунтом точки.
+        </p>
+      )}
 
       {printers.length > 0 && (
         <div className="grid gap-2">

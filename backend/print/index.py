@@ -49,6 +49,33 @@ def owner_of(me) -> int:
     return int(me['id'])
 
 
+def team_ids(cur, owner: int) -> list:
+    ids = [owner]
+    level = [owner]
+    for _ in range(3):
+        cur.execute(
+            'SELECT id FROM app_users WHERE manager_id IN (' + ','.join(str(i) for i in level) + ')'
+        )
+        level = [int(r[0]) for r in cur.fetchall() if int(r[0]) not in ids]
+        if not level:
+            break
+        ids.extend(level)
+    return ids
+
+
+def chain_ids(cur, owner: int) -> list:
+    ids = [owner]
+    current = owner
+    for _ in range(3):
+        cur.execute(f'SELECT manager_id FROM app_users WHERE id = {current}')
+        row = cur.fetchone()
+        if not row or not row[0] or int(row[0]) in ids:
+            break
+        current = int(row[0])
+        ids.append(current)
+    return ids
+
+
 def ensure_key(cur, owner: int):
     cur.execute(f'SELECT key, printers, last_seen FROM print_keys WHERE owner_id = {owner}')
     row = cur.fetchone()
@@ -64,8 +91,9 @@ def ensure_key(cur, owner: int):
 
 
 def is_online(cur, owner: int) -> bool:
+    ids = ','.join(str(i) for i in chain_ids(cur, owner))
     cur.execute(
-        f'SELECT 1 FROM print_keys WHERE owner_id = {owner} '
+        f'SELECT 1 FROM print_keys WHERE owner_id IN ({ids}) '
         f"AND last_seen > NOW() - INTERVAL '{ONLINE_SEC} seconds'"
     )
     return cur.fetchone() is not None
@@ -92,22 +120,23 @@ def clean_printers(raw) -> list:
     return result[:20]
 
 
-def take_jobs(cur, owner: int):
+def take_jobs(cur, team: list):
+    ids = ','.join(str(i) for i in team)
     cur.execute(
-        f"UPDATE print_jobs SET status = 'expired' WHERE owner_id = {owner} AND status = 'pending' "
+        f"UPDATE print_jobs SET status = 'expired' WHERE owner_id IN ({ids}) AND status = 'pending' "
         f"AND created_at < NOW() - INTERVAL '{JOB_TTL_MIN} minutes'"
     )
     cur.execute(
         "UPDATE print_jobs SET status = 'taken', taken_at = NOW() WHERE id IN ("
-        f"SELECT id FROM print_jobs WHERE owner_id = {owner} AND status = 'pending' "
-        'ORDER BY id LIMIT 10) RETURNING id, printer_ip, printer_port, data'
+        f"SELECT id FROM print_jobs WHERE owner_id IN ({ids}) AND status = 'pending' "
+        'ORDER BY id LIMIT 10 FOR UPDATE SKIP LOCKED) RETURNING id, printer_ip, printer_port, data'
     )
     rows = sorted(cur.fetchall(), key=lambda r: r[0])
     return [{'id': r[0], 'ip': r[1], 'port': r[2], 'data': r[3]} for r in rows]
 
 
 def handler(event: dict, context) -> dict:
-    """Сетевая печать: очередь заданий для принтеров по IP и помощник печати в точке."""
+    """Сетевая печать: очередь заданий для принтеров по IP. Помощник печатает задания своего аккаунта и всех привязанных к нему сотрудников."""
     method = event.get('httpMethod', 'GET')
     if method == 'OPTIONS':
         return {'statusCode': 200, 'headers': CORS, 'body': ''}
@@ -139,20 +168,22 @@ def handler(event: dict, context) -> dict:
             return done({'error': 'bad_key'}, 403)
         owner = int(row[0])
         cur.execute(f'UPDATE print_keys SET last_seen = NOW() WHERE owner_id = {owner}')
+        team = team_ids(cur, owner)
+        team_sql = ','.join(str(i) for i in team)
 
         if action == 'report':
             status = 'done' if body.get('ok') else 'failed'
             cur.execute(
                 f"UPDATE print_jobs SET status = {q(status)}, error = {q(str(body.get('error') or '')[:300])} "
-                f"WHERE id = {int(body.get('id') or 0)} AND owner_id = {owner}"
+                f"WHERE id = {int(body.get('id') or 0)} AND owner_id IN ({team_sql})"
             )
             return done({'ok': True})
 
         started = time.time()
-        jobs = take_jobs(cur, owner)
+        jobs = take_jobs(cur, team)
         while not jobs and time.time() - started < POLL_WAIT:
             time.sleep(0.5)
-            jobs = take_jobs(cur, owner)
+            jobs = take_jobs(cur, team)
         return done({'jobs': jobs})
 
     me = session_user(cur, headers.get('x-auth-token', ''))
@@ -163,9 +194,17 @@ def handler(event: dict, context) -> dict:
 
     if action == 'config':
         key, printers, _ = ensure_key(cur, owner)
+        own = json.loads(printers or '[]')
+        if not own:
+            for upper in chain_ids(cur, owner)[1:]:
+                cur.execute(f'SELECT printers FROM print_keys WHERE owner_id = {upper}')
+                row = cur.fetchone()
+                own = json.loads(row[0] or '[]') if row else []
+                if own:
+                    break
         return done(
             {
-                'printers': json.loads(printers or '[]'),
+                'printers': own,
                 'online': is_online(cur, owner),
                 'key': key if can_setup else None,
                 'canSetup': can_setup,

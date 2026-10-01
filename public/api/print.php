@@ -48,12 +48,45 @@ function print_key_row(PDO $db, int $owner): array
     return one_row($db, 'SELECT print_key, printers, last_seen FROM print_keys WHERE owner_id = ?', [$owner]);
 }
 
+function team_ids(PDO $db, int $owner): array
+{
+    $ids = [$owner];
+    $level = [$owner];
+    for ($i = 0; $i < 3 && $level; $i++) {
+        $rows = all_rows($db, 'SELECT id FROM app_users WHERE manager_id IN (' . in_list($level) . ')');
+        $level = [];
+        foreach ($rows as $r) {
+            $id = (int)$r['id'];
+            if (!in_array($id, $ids, true)) {
+                $ids[] = $id;
+                $level[] = $id;
+            }
+        }
+    }
+    return $ids;
+}
+
+function chain_ids(PDO $db, int $owner): array
+{
+    $ids = [$owner];
+    $current = $owner;
+    for ($i = 0; $i < 3; $i++) {
+        $up = one_value($db, 'SELECT manager_id FROM app_users WHERE id = ?', [$current]);
+        if (!$up || in_array((int)$up, $ids, true)) {
+            break;
+        }
+        $current = (int)$up;
+        $ids[] = $current;
+    }
+    return $ids;
+}
+
 function helper_online(PDO $db, int $owner): bool
 {
     return (bool)one_value(
         $db,
-        'SELECT 1 FROM print_keys WHERE owner_id = ? AND last_seen > ?',
-        [$owner, now_utc(-ONLINE_SEC)]
+        'SELECT 1 FROM print_keys WHERE owner_id IN (' . in_list(chain_ids($db, $owner)) . ') AND last_seen > ?',
+        [now_utc(-ONLINE_SEC)]
     );
 }
 
@@ -76,17 +109,17 @@ function clean_printers($raw): array
     return array_slice($result, 0, 20);
 }
 
-function take_jobs(PDO $db, int $owner): array
+function take_jobs(PDO $db, array $team): array
 {
+    $ids = in_list($team);
     run(
         $db,
-        "UPDATE print_jobs SET status = 'expired' WHERE owner_id = ? AND status = 'pending' AND created_at < ?",
-        [$owner, now_utc(-JOB_TTL_SEC)]
+        "UPDATE print_jobs SET status = 'expired' WHERE owner_id IN ($ids) AND status = 'pending' AND created_at < ?",
+        [now_utc(-JOB_TTL_SEC)]
     );
     $rows = all_rows(
         $db,
-        "SELECT id, printer_ip, printer_port, data FROM print_jobs WHERE owner_id = ? AND status = 'pending' ORDER BY id LIMIT 10",
-        [$owner]
+        "SELECT id, printer_ip, printer_port, data FROM print_jobs WHERE owner_id IN ($ids) AND status = 'pending' ORDER BY id LIMIT 10"
     );
     $jobs = [];
     foreach ($rows as $r) {
@@ -113,21 +146,22 @@ if ($printKey !== '') {
     }
     $owner = (int)$owner;
     run($db, 'UPDATE print_keys SET last_seen = ? WHERE owner_id = ?', [now_utc(), $owner]);
+    $team = team_ids($db, $owner);
 
     if ($action === 'report') {
         run(
             $db,
-            'UPDATE print_jobs SET status = ?, error = ? WHERE id = ? AND owner_id = ?',
-            [!empty($body['ok']) ? 'done' : 'failed', mb_substr((string)($body['error'] ?? ''), 0, 250), (int)($body['id'] ?? 0), $owner]
+            'UPDATE print_jobs SET status = ?, error = ? WHERE id = ? AND owner_id IN (' . in_list($team) . ')',
+            [!empty($body['ok']) ? 'done' : 'failed', mb_substr((string)($body['error'] ?? ''), 0, 250), (int)($body['id'] ?? 0)]
         );
         out(['ok' => true]);
     }
 
     $started = microtime(true);
-    $jobs = take_jobs($db, $owner);
+    $jobs = take_jobs($db, $team);
     while (!$jobs && microtime(true) - $started < POLL_WAIT) {
         usleep(500000);
-        $jobs = take_jobs($db, $owner);
+        $jobs = take_jobs($db, $team);
     }
     out(['jobs' => $jobs]);
 }
@@ -141,8 +175,17 @@ $canSetup = in_array($me['role'], ['admin', 'superadmin', 'manager'], true);
 
 if ($action === 'config') {
     $row = print_key_row($db, $owner);
+    $printers = json_list($row['printers']);
+    if (!$printers) {
+        foreach (array_slice(chain_ids($db, $owner), 1) as $upper) {
+            $printers = json_list(one_value($db, 'SELECT printers FROM print_keys WHERE owner_id = ?', [$upper]));
+            if ($printers) {
+                break;
+            }
+        }
+    }
     out([
-        'printers' => json_list($row['printers']),
+        'printers' => $printers,
         'online' => helper_online($db, $owner),
         'key' => $canSetup ? $row['print_key'] : null,
         'canSetup' => $canSetup,
