@@ -153,7 +153,7 @@ const printNodesShare = async (
   override?: Partial<TsplOptions>,
 ) => {
   try {
-    const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '');
+    const stamp = String(Date.now());
     const files: File[] = [];
     for (let i = 0; i < nodes.length; i += 1) {
       const canvas = await nodeToLabelCanvas(nodes[i], { ...networkOptions(settings, copies), ...override });
