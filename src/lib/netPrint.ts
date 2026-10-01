@@ -52,8 +52,9 @@ export const pickPrinter = (settings: LabelSettings, config: PrintConfig | null)
 
 const sleep = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
 
-export const sendRaw = async (printer: NetPrinter, bytes: Uint8Array) => {
+export const sendRaw = async (printer: NetPrinter, bytes: Uint8Array, wait = true) => {
   const job = await apiPrintJob(printer, toBase64(bytes));
+  if (job.online && !wait) return true;
   if (!job.online) {
     toast({
       title: 'Помощник печати не в сети',
@@ -209,6 +210,35 @@ const printNodesRawbt = async (
   }
 };
 
+const BATCH_BYTES = 150_000;
+
+const joinParts = (list: Uint8Array[]) => {
+  const bytes = new Uint8Array(list.reduce((s, p) => s + p.length, 0));
+  let pos = 0;
+  list.forEach((p) => {
+    bytes.set(p, pos);
+    pos += p.length;
+  });
+  return bytes;
+};
+
+const splitBatches = (parts: Uint8Array[]) => {
+  const batches: Uint8Array[] = [];
+  let current: Uint8Array[] = [];
+  let size = 0;
+  parts.forEach((p) => {
+    if (current.length && size + p.length > BATCH_BYTES) {
+      batches.push(joinParts(current));
+      current = [];
+      size = 0;
+    }
+    current.push(p);
+    size += p.length;
+  });
+  if (current.length) batches.push(joinParts(current));
+  return batches;
+};
+
 export const printNodesNetwork = async (
   nodes: HTMLElement[],
   settings: LabelSettings,
@@ -226,21 +256,31 @@ export const printNodesNetwork = async (
     });
     return false;
   }
+  let parts: Uint8Array[] = [];
   try {
-    const parts: Uint8Array[] = [];
     for (const node of nodes) {
       parts.push(await nodeToTspl(node, { ...networkOptions(settings, copies), ...override }));
     }
-    const total = parts.reduce((s, p) => s + p.length, 0);
-    const bytes = new Uint8Array(total);
-    let pos = 0;
-    parts.forEach((p) => {
-      bytes.set(p, pos);
-      pos += p.length;
-    });
-    return await sendRaw(printer, bytes);
   } catch {
-    toast({ title: 'Не удалось отправить на принтер' });
+    toast({ title: 'Не удалось подготовить этикетку для печати' });
     return false;
   }
+  const batches = splitBatches(parts);
+  parts = [];
+  for (let i = 0; i < batches.length; i += 1) {
+    try {
+      const ok = await sendRaw(printer, batches[i], i === batches.length - 1);
+      if (!ok) return false;
+    } catch (e) {
+      toast({
+        title: 'Не удалось отправить на принтер',
+        description:
+          batches.length > 1
+            ? `Отправлено частей: ${i} из ${batches.length}. ${(e as Error).message || ''}`.trim()
+            : (e as Error).message || undefined,
+      });
+      return false;
+    }
+  }
+  return true;
 };
