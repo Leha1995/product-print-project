@@ -6,6 +6,8 @@ import { printNodeHtml } from '@/components/DirectPrintArea';
 import { Equipment } from '@/lib/equipmentApi';
 import { defaultLabelSettings } from '@/hooks/useLabelSettings';
 import { isRawMode, printNodesNetwork } from '@/lib/netPrint';
+import { exportQrLabelsPdf } from '@/lib/qrPdf';
+import { toast } from '@/hooks/use-toast';
 
 const readLabelSettings = () => {
   try {
@@ -25,6 +27,7 @@ interface QrPrintDialogProps {
 const QrPrintDialog = ({ items, open, onOpenChange }: QrPrintDialogProps) => {
   const ref = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -52,6 +55,20 @@ const QrPrintDialog = ({ items, open, onOpenChange }: QrPrintDialogProps) => {
     printNodeHtml(Array.from(nodes).map((n) => n.outerHTML).join(''), 58, 40);
   };
 
+  const downloadPdf = async () => {
+    const nodes = ref.current?.querySelectorAll('.print-area');
+    if (!nodes?.length) return;
+    setPdfBusy(true);
+    try {
+      const date = new Date().toISOString().slice(0, 10);
+      await exportQrLabelsPdf(Array.from(nodes) as HTMLElement[], `nakleyki-qr-${date}.pdf`);
+    } catch {
+      toast({ title: 'Не удалось сформировать PDF' });
+    } finally {
+      setPdfBusy(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] max-w-[560px] overflow-y-auto border-2 border-primary bg-background p-5">
@@ -75,6 +92,15 @@ const QrPrintDialog = ({ items, open, onOpenChange }: QrPrintDialogProps) => {
         >
           <Icon name={ready ? 'Printer' : 'Loader'} size={18} strokeWidth={2.5} />
           {ready ? 'Печатать наклейки' : 'Готовим коды...'}
+        </button>
+
+        <button
+          onClick={downloadPdf}
+          disabled={!ready || pdfBusy}
+          className="mt-2 flex w-full items-center justify-center gap-2 border-2 border-primary bg-card px-4 py-3 font-head text-[0.85rem] font-bold uppercase text-primary transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-60"
+        >
+          <Icon name={pdfBusy ? 'Loader' : 'FileDown'} size={18} strokeWidth={2.5} className={pdfBusy ? 'animate-spin' : ''} />
+          {pdfBusy ? 'Собираем PDF...' : 'Скачать PDF на листах А4'}
         </button>
       </DialogContent>
     </Dialog>
