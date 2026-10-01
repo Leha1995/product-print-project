@@ -1,4 +1,4 @@
-import { toCanvas } from 'html-to-image';
+import { getFontEmbedCSS, toCanvas } from 'html-to-image';
 
 const DOTS_PER_MM = 8;
 const MARGIN_MM = 1;
@@ -17,10 +17,24 @@ export interface TsplOptions {
 
 const encoder = new TextEncoder();
 
+let fontCss: Promise<string> | null = null;
+
+const loadFontCss = (node: HTMLElement) => {
+  if (!fontCss) {
+    fontCss = getFontEmbedCSS(node).catch(() => {
+      fontCss = null;
+      return '';
+    });
+  }
+  return fontCss;
+};
+
 const renderNode = async (node: HTMLElement, targetWidth: number) => {
   const natural = Math.max(1, node.offsetWidth || node.scrollWidth || 280);
+  const fontEmbedCSS = await loadFontCss(node);
   return toCanvas(node, {
-    pixelRatio: Math.min(6, Math.max(1, (targetWidth / natural) * 1.5)),
+    fontEmbedCSS: fontEmbedCSS || undefined,
+    pixelRatio: Math.min(4, Math.max(1, (targetWidth / natural) * 1.25)),
     backgroundColor: '#ffffff',
     style: {
       animation: 'none',

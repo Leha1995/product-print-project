@@ -210,8 +210,6 @@ const printNodesRawbt = async (
   }
 };
 
-const BATCH_BYTES = 1;
-
 export interface PrintProgress {
   sent: number;
   total: number;
@@ -238,33 +236,6 @@ const emitProgress = (progress: PrintProgress | null) => {
   }
 };
 
-const joinParts = (list: Uint8Array[]) => {
-  const bytes = new Uint8Array(list.reduce((s, p) => s + p.length, 0));
-  let pos = 0;
-  list.forEach((p) => {
-    bytes.set(p, pos);
-    pos += p.length;
-  });
-  return bytes;
-};
-
-const splitBatches = (parts: Uint8Array[]) => {
-  const batches: Uint8Array[] = [];
-  let current: Uint8Array[] = [];
-  let size = 0;
-  parts.forEach((p) => {
-    if (current.length && size + p.length > BATCH_BYTES) {
-      batches.push(joinParts(current));
-      current = [];
-      size = 0;
-    }
-    current.push(p);
-    size += p.length;
-  });
-  if (current.length) batches.push(joinParts(current));
-  return batches;
-};
-
 export const printNodesNetwork = async (
   nodes: HTMLElement[],
   settings: LabelSettings,
@@ -282,25 +253,27 @@ export const printNodesNetwork = async (
     });
     return false;
   }
-  const track = nodes.length > 1;
-  if (track) emitProgress({ sent: 0, total: nodes.length, status: 'preparing' });
-  let parts: Uint8Array[] = [];
-  try {
-    for (const node of nodes) {
-      parts.push(await nodeToTspl(node, { ...networkOptions(settings, copies), ...override }));
-    }
-  } catch {
-    if (track) emitProgress({ sent: 0, total: nodes.length, status: 'failed' });
-    toast({ title: 'Не удалось подготовить этикетку для печати' });
-    return false;
-  }
-  const batches = splitBatches(parts);
-  parts = [];
-  const total = batches.length;
-  if (track) emitProgress({ sent: 0, total, status: 'sending' });
-  for (let i = 0; i < batches.length; i += 1) {
+  const total = nodes.length;
+  if (!total) return false;
+  const track = total > 1;
+  if (track) emitProgress({ sent: 0, total, status: 'preparing' });
+  const opts = { ...networkOptions(settings, copies), ...override };
+  let next: Promise<Uint8Array> | null = nodeToTspl(nodes[0], opts);
+  for (let i = 0; i < total; i += 1) {
+    let bytes: Uint8Array;
     try {
-      const ok = await sendRaw(printer, batches[i], i === batches.length - 1);
+      bytes = await next!;
+    } catch {
+      if (track) emitProgress({ sent: i, total, status: 'failed' });
+      toast({
+        title: 'Не удалось подготовить этикетку для печати',
+        description: track ? `Отправлено ${i} из ${total}.` : undefined,
+      });
+      return false;
+    }
+    next = i + 1 < total ? nodeToTspl(nodes[i + 1], opts) : null;
+    try {
+      const ok = await sendRaw(printer, bytes, i === total - 1);
       if (!ok) {
         if (track) emitProgress({ sent: i, total, status: 'failed' });
         return false;
@@ -310,10 +283,9 @@ export const printNodesNetwork = async (
       if (track) emitProgress({ sent: i, total, status: 'failed' });
       toast({
         title: 'Не удалось отправить на принтер',
-        description:
-          batches.length > 1
-            ? `Отправлено частей: ${i} из ${batches.length}. ${(e as Error).message || ''}`.trim()
-            : (e as Error).message || undefined,
+        description: track
+          ? `Отправлено ${i} из ${total}. ${(e as Error).message || ''}`.trim()
+          : (e as Error).message || undefined,
       });
       return false;
     }
