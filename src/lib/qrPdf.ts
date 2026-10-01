@@ -16,6 +16,25 @@ const loadSize = (src: string) =>
     img.src = src;
   });
 
+const drawCutLines = (doc: jsPDF, count: number, cellW: number, cellH: number) => {
+  const has = (col: number, row: number) =>
+    col >= 0 && col < COLS && row >= 0 && row * COLS + col < count;
+  doc.setLineWidth(0.15);
+  doc.setDrawColor(150, 150, 150);
+  doc.setLineDashPattern([1.5, 1.5], 0);
+  for (let slot = 0; slot < count; slot += 1) {
+    const col = slot % COLS;
+    const row = Math.floor(slot / COLS);
+    const x = MARGIN + col * cellW;
+    const y = MARGIN + row * cellH;
+    doc.line(x, y, x + cellW, y);
+    doc.line(x, y, x, y + cellH);
+    if (!has(col, row + 1)) doc.line(x, y + cellH, x + cellW, y + cellH);
+    if (!has(col + 1, row)) doc.line(x + cellW, y, x + cellW, y + cellH);
+  }
+  doc.setLineDashPattern([], 0);
+};
+
 export const exportQrLabelsPdf = async (nodes: HTMLElement[], fileName: string) => {
   if (!nodes.length) return;
   const fontEmbedCSS = await getFontEmbedCSS(nodes[0]).catch(() => '');
@@ -26,7 +45,10 @@ export const exportQrLabelsPdf = async (nodes: HTMLElement[], fileName: string) 
 
   for (let i = 0; i < nodes.length; i += 1) {
     const slot = i % perPage;
-    if (i > 0 && slot === 0) doc.addPage();
+    if (slot === 0) {
+      if (i > 0) doc.addPage();
+      drawCutLines(doc, Math.min(perPage, nodes.length - i), cellW, cellH);
+    }
     const png = await toPng(nodes[i], {
       pixelRatio: 3,
       backgroundColor: '#ffffff',
