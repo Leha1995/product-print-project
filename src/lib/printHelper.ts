@@ -6,6 +6,25 @@ $Host.UI.RawUI.WindowTitle = 'ASAP - pomoshnik pechati'
 $api = '${endpoint}'
 $key = '${key}'
 $headers = @{ 'X-Print-Key' = $key }
+[Net.ServicePointManager]::DefaultConnectionLimit = 8
+
+try {
+  Add-Type -Name AsapWin -Namespace Asap -MemberDefinition @'
+[DllImport("kernel32.dll")] public static extern IntPtr GetStdHandle(int h);
+[DllImport("kernel32.dll")] public static extern bool GetConsoleMode(IntPtr h, out uint m);
+[DllImport("kernel32.dll")] public static extern bool SetConsoleMode(IntPtr h, uint m);
+[DllImport("kernel32.dll")] public static extern uint SetThreadExecutionState(uint f);
+'@
+  $inp = [Asap.AsapWin]::GetStdHandle(-10)
+  $mode = 0
+  if ([Asap.AsapWin]::GetConsoleMode($inp, [ref]$mode)) {
+    [Asap.AsapWin]::SetConsoleMode($inp, (($mode -band (-bnot 0x0040)) -bor 0x0080)) | Out-Null
+  }
+} catch {}
+
+function Keep-Awake {
+  try { [Asap.AsapWin]::SetThreadExecutionState([uint32]2147483649) | Out-Null } catch {}
+}
 
 function Send-Report($id, $ok, $err) {
   $body = @{ action = 'report'; id = $id; ok = $ok; error = $err } | ConvertTo-Json -Compress
@@ -33,9 +52,15 @@ Write-Host ''
 
 $idle = 0
 $offline = $false
+$beat = Get-Date
 while ($true) {
+  Keep-Awake
+  if (((Get-Date) - $beat).TotalMinutes -ge 30) {
+    Write-Host "  $(Get-Date -Format HH:mm:ss)  pomoshnik rabotaet" -ForegroundColor DarkGray
+    $beat = Get-Date
+  }
   try {
-    $res = Invoke-RestMethod -Uri ($api + '?action=poll') -Headers $headers -TimeoutSec 20
+    $res = Invoke-RestMethod -Uri ($api + '?action=poll&t=' + [DateTime]::Now.Ticks) -Headers $headers -TimeoutSec 15
     if ($offline) { Write-Host "  $(Get-Date -Format HH:mm:ss)  svyaz s saytom vosstanovlena" -ForegroundColor Green; $offline = $false }
     $jobs = @($res.jobs)
     foreach ($job in $jobs) {
@@ -57,12 +82,12 @@ while ($true) {
       Write-Host '  Klyuch pechati ustarel. Skachayte pomoshnik zanovo v nastroykah markirovki.' -ForegroundColor Red
       Start-Sleep -Seconds 60
     } elseif (-not $offline) {
-      Write-Host "  $(Get-Date -Format HH:mm:ss)  net svyazi s saytom, povtoryayu..." -ForegroundColor Yellow
+      Write-Host "  $(Get-Date -Format HH:mm:ss)  net svyazi s saytom, povtoryayu... $($_.Exception.Message)" -ForegroundColor Yellow
       $offline = $true
     }
     $idle = 30
   }
-  if ($idle -lt 30) { Start-Sleep -Milliseconds 500 } else { Start-Sleep -Seconds 6 }
+  if ($idle -lt 30) { Start-Sleep -Milliseconds 300 } else { Start-Sleep -Seconds 3 }
 }
 `;
 
@@ -72,9 +97,11 @@ export const buildHelperBat = (endpoint: string, key: string) => {
     'chcp 65001 >nul',
     'set "ASAP_STARTUP=%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\asap-pechat.bat"',
     'if /i not "%~f0"=="%ASAP_STARTUP%" copy /y "%~f0" "%ASAP_STARTUP%" >nul 2>&1',
+    ':asap_loop',
     'powershell -NoProfile -ExecutionPolicy Bypass -Command "$t = Get-Content -LiteralPath \'%~f0\' -Raw -Encoding UTF8; $m = \'#\' + \'ASAPPS\'; Invoke-Expression ($t.Substring($t.LastIndexOf($m) + $m.Length))"',
-    'pause',
-    'exit /b',
+    'echo Pomoshnik ostanovilsya, perezapusk cherez 5 sekund...',
+    'timeout /t 5 /nobreak >nul',
+    'goto asap_loop',
     '#ASAPPS',
   ].join('\r\n');
   return `${head}\r\n${psScript(endpoint, key).replace(/\n/g, '\r\n')}`;
