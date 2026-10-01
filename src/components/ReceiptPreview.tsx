@@ -35,7 +35,7 @@ const ReceiptPreview = ({
 
   return (
     <div
-      className={`print-area animate-print-out mx-auto border-2 border-primary bg-white font-body text-primary ${micro ? 'p-1.5' : tiny ? 'p-2' : 'p-4'}`}
+      className={`print-area animate-print-out mx-auto border-y-2 border-primary bg-white font-body text-primary ${micro ? 'p-1.5' : tiny ? 'p-2' : 'p-4'}`}
       style={{ maxWidth: `${paper.widthMm * 3.5}px` }}
     >
       {settings.logo && !micro && (
@@ -45,16 +45,6 @@ const ReceiptPreview = ({
           className={`mx-auto mb-1 w-auto object-contain ${tiny ? 'max-h-[26px]' : 'mb-2 max-h-[52px]'}`}
         />
       )}
-      <div
-        className={`text-center font-head font-black uppercase tracking-[0.04em] ${large ? 'text-lg' : micro ? 'text-[8px] leading-none' : tiny ? 'text-[10px] leading-tight' : 'text-sm'}`}
-      >
-        {settings.shopName}
-      </div>
-
-      <div
-        className={`border-dashed border-primary ${micro ? 'my-0.5 border-t' : tiny ? 'my-1.5 border-t-2' : 'my-3 border-t-2'}`}
-      />
-
       <div
         className={`font-head font-bold uppercase leading-tight ${large ? 'text-2xl' : micro ? 'line-clamp-2 text-[9px]' : tiny ? 'text-[11px]' : compact ? 'text-base' : 'text-lg'}`}
       >

@@ -34,19 +34,13 @@ const DefrostLabel = ({ info, printedAt, settings }: DefrostLabelProps) => {
 
   return (
     <div
-      className={`print-area animate-print-out mx-auto border-2 border-primary bg-white font-body text-primary ${micro ? 'p-1' : tiny ? 'p-2' : 'p-4'}`}
+      className={`print-area animate-print-out mx-auto border-y-2 border-primary bg-white font-body text-primary ${micro ? 'p-1' : tiny ? 'p-2' : 'p-4'}`}
       style={{ maxWidth: `${paper.widthMm * 3.5}px`, minHeight: micro ? `${paper.heightMm! * 3.5}px` : undefined }}
     >
       <div className="flex h-full w-full flex-col justify-between">
         <div
-          className={`text-center font-head font-black uppercase tracking-[0.04em] ${large ? 'text-lg' : micro ? 'text-[11px] leading-tight' : tiny ? 'text-[10px] leading-tight' : 'text-sm'}`}
-        >
-          {settings.shopName}
-        </div>
-
-        <div
           className={`text-center font-head font-bold uppercase leading-tight text-primary ${
-            large ? 'text-2xl' : micro ? 'text-[19px]' : tiny ? 'mt-1.5 text-[11px]' : 'mt-3 text-lg'
+            large ? 'text-2xl' : micro ? 'text-[19px]' : tiny ? 'text-[11px]' : 'text-lg'
           }`}
         >
           Дефрост
