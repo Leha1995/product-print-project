@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 import { Equipment, FinishResult } from '@/lib/equipmentApi';
 
 const stamp = (iso?: string | null) => {
@@ -45,6 +45,35 @@ const row = (item: Equipment, found: boolean, index: number) => ({
   Заметка: item.note || '',
 });
 
+const COLORS = {
+  green: 'C6EFCE',
+  yellow: 'FFEB9C',
+  red: 'FFC7CE',
+};
+
+const rowColor = (item: Equipment, found: boolean) => {
+  if (!item.active) return COLORS.red;
+  if (found && item.qrBroken) return COLORS.yellow;
+  if (found) return COLORS.green;
+  return null;
+};
+
+const paintRows = (sheet: XLSX.WorkSheet, colors: (string | null)[]) => {
+  const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+  for (let c = range.s.c; c <= range.e.c; c += 1) {
+    const head = sheet[XLSX.utils.encode_cell({ r: 0, c })];
+    if (head) head.s = { font: { bold: true } };
+  }
+  colors.forEach((color, i) => {
+    if (!color) return;
+    for (let c = range.s.c; c <= range.e.c; c += 1) {
+      const ref = XLSX.utils.encode_cell({ r: i + 1, c });
+      if (!sheet[ref]) sheet[ref] = { t: 's', v: '' };
+      sheet[ref].s = { fill: { patternType: 'solid', fgColor: { rgb: color } } };
+    }
+  });
+};
+
 export const exportInventory = (result: FinishResult, finishedAt?: string | null) => {
   const all = [
     ...result.found.map((item) => ({ item, found: true })),
@@ -68,6 +97,10 @@ export const exportInventory = (result: FinishResult, finishedAt?: string | null
     { wch: 28 },
   ];
   sheet['!autofilter'] = { ref: sheet['!ref'] || 'A1' };
+  paintRows(
+    sheet,
+    all.map(({ item, found }) => rowColor(item, found)),
+  );
 
   const summary = XLSX.utils.json_to_sheet([
     {
@@ -100,6 +133,10 @@ export const exportEquipmentList = (items: Equipment[]) => {
     Заметка: item.note || '',
   }));
   const sheet = XLSX.utils.json_to_sheet(rows);
+  paintRows(
+    sheet,
+    items.map((item) => (!item.active ? COLORS.red : item.qrBroken ? COLORS.yellow : COLORS.green)),
+  );
   sheet['!cols'] = [
     { wch: 34 },
     { wch: 20 },
