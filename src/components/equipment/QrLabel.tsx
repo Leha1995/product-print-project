@@ -29,18 +29,9 @@ const QrLabel = ({ item }: QrLabelProps) => {
       <p className="text-center font-head text-[13px] font-black uppercase leading-tight">
         {item.name}
       </p>
-      {item.location && (
-        <p className="mt-0.5 text-center text-[10px] uppercase">{item.location}</p>
-      )}
       <div className="mt-2 flex justify-center">
         {src && <img src={src} alt={item.code} className="h-[130px] w-[130px]" />}
       </div>
-      <p className="mt-2 text-center text-[10px] font-bold tracking-[0.06em]">{item.code}</p>
-      {item.price > 0 && (
-        <p className="text-center text-[11px] font-bold">
-          {`${item.price.toLocaleString('ru-RU')} ₽`}
-        </p>
-      )}
     </div>
   );
 };
