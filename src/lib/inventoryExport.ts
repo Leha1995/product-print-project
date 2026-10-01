@@ -9,38 +9,65 @@ const stamp = (iso?: string | null) => {
   )}`;
 };
 
+export const pickEquipment = (items: Equipment[], ids: string[]) => {
+  const byId = new Map(items.map((i) => [i.id, i]));
+  return ids.map(
+    (id) =>
+      byId.get(id) ||
+      ({
+        id,
+        name: 'Удалённая позиция',
+        code: id,
+        price: 0,
+        location: '',
+        note: '',
+        image: '',
+        serial: '',
+        active: true,
+      } as Equipment),
+  );
+};
+
 const statusText = (item: Equipment, found: boolean) => {
-  if (!item.active) return 'Списано';
   if (found && item.qrBroken) return 'Найдено, QR повреждён';
   return found ? 'Найдено' : 'Не найдено';
 };
 
-const row = (item: Equipment, found: boolean) => ({
+const row = (item: Equipment, found: boolean, index: number) => ({
+  '№': index + 1,
   Наименование: item.name,
   Статус: statusText(item, found),
   Место: item.location || '',
   'Стоимость, ₽': item.price || 0,
   'Серийный номер': item.serial || '',
   'QR-код': item.code,
+  Сейчас: item.active ? 'В работе' : 'Списано',
   Заметка: item.note || '',
 });
 
 export const exportInventory = (result: FinishResult, finishedAt?: string | null) => {
-  const rows = [
-    ...result.missing.map((i) => row(i, false)),
-    ...result.found.map((i) => row(i, true)),
-  ];
+  const all = [
+    ...result.found.map((item) => ({ item, found: true })),
+    ...result.missing.map((item) => ({ item, found: false })),
+  ].sort(
+    (a, b) =>
+      Number(a.found) - Number(b.found) || a.item.name.localeCompare(b.item.name, 'ru'),
+  );
+  const rows = all.map(({ item, found }, i) => row(item, found, i));
 
   const sheet = XLSX.utils.json_to_sheet(rows);
   sheet['!cols'] = [
+    { wch: 5 },
     { wch: 34 },
-    { wch: 13 },
+    { wch: 22 },
     { wch: 20 },
     { wch: 14 },
     { wch: 18 },
     { wch: 20 },
+    { wch: 11 },
     { wch: 28 },
   ];
+  sheet['!autofilter'] = { ref: sheet['!ref'] || 'A1' };
 
   const summary = XLSX.utils.json_to_sheet([
     {

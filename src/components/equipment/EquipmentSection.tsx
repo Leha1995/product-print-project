@@ -15,7 +15,7 @@ import {
   restoreEquipment,
 } from '@/lib/equipmentApi';
 import { toast } from '@/hooks/use-toast';
-import { exportEquipmentList, exportInventory } from '@/lib/inventoryExport';
+import { exportEquipmentList, exportInventory, pickEquipment } from '@/lib/inventoryExport';
 
 interface EquipmentSectionProps {
   userId?: number;
@@ -135,9 +135,7 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
             <button
               onClick={() => {
                 if (lastSession?.finishedAt) {
-                  const byId = new Map(items.map((i) => [i.id, i]));
-                  const pick = (ids: string[]) =>
-                    ids.map((id) => byId.get(id)).filter(Boolean) as Equipment[];
+                  const pick = (ids: string[]) => pickEquipment(items, ids);
                   exportInventory({
                     sessionId: lastSession.id,
                     found: pick(lastSession.scanned),

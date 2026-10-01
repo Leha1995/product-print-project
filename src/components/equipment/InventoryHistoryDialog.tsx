@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
 import { Equipment, InventorySession } from '@/lib/equipmentApi';
-import { exportInventory } from '@/lib/inventoryExport';
+import { exportInventory, pickEquipment } from '@/lib/inventoryExport';
 
 interface InventoryHistoryDialogProps {
   open: boolean;
@@ -170,8 +170,8 @@ const InventoryHistoryDialog = ({
                         exportInventory(
                           {
                             sessionId: s.id,
-                            found: pick(s.scanned),
-                            missing,
+                            found: pickEquipment(items, s.scanned),
+                            missing: pickEquipment(items, s.missing),
                             total: s.total,
                             totalPrice: s.totalPrice,
                             missingPrice: s.missingPrice,
