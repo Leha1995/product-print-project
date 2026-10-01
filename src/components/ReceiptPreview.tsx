@@ -94,7 +94,7 @@ const ReceiptPreview = ({
         {settings.showExpiry && (
           <div
             className={`flex items-baseline justify-between gap-1 font-head font-bold ${
-              large ? 'text-xl' : micro ? 'text-[9px]' : tiny ? 'text-[11px]' : 'text-base'
+              large ? 'text-2xl' : micro ? 'text-[10px]' : tiny ? 'text-[12px]' : 'text-lg'
             }`}
           >
             <dt className="shrink-0">Годен до</dt>
