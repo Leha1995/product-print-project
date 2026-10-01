@@ -210,7 +210,7 @@ const printNodesRawbt = async (
   }
 };
 
-const BATCH_BYTES = 150_000;
+const BATCH_BYTES = 1;
 
 const joinParts = (list: Uint8Array[]) => {
   const bytes = new Uint8Array(list.reduce((s, p) => s + p.length, 0));
