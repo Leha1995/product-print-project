@@ -1,6 +1,6 @@
 import func2url from '../../backend/func2url.json';
 
-type Endpoint = 'auth' | 'catalog' | 'equipment' | 'shared-catalog';
+type Endpoint = 'auth' | 'catalog' | 'equipment' | 'shared-catalog' | 'print';
 
 declare global {
   interface Window {

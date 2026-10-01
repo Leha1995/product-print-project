@@ -4,6 +4,17 @@ import Icon from '@/components/ui/icon';
 import QrLabel from '@/components/equipment/QrLabel';
 import { printNodeHtml } from '@/components/DirectPrintArea';
 import { Equipment } from '@/lib/equipmentApi';
+import { defaultLabelSettings } from '@/hooks/useLabelSettings';
+import { printNodesNetwork } from '@/lib/netPrint';
+
+const readLabelSettings = () => {
+  try {
+    const raw = localStorage.getItem('asap-label-settings-v1');
+    return raw ? { ...defaultLabelSettings, ...JSON.parse(raw) } : defaultLabelSettings;
+  } catch {
+    return defaultLabelSettings;
+  }
+};
 
 interface QrPrintDialogProps {
   items: Equipment[];
@@ -27,6 +38,17 @@ const QrPrintDialog = ({ items, open, onOpenChange }: QrPrintDialogProps) => {
   const print = () => {
     const nodes = ref.current?.querySelectorAll('.print-area');
     if (!nodes?.length) return;
+    const settings = readLabelSettings();
+    if (settings.printMode === 'network') {
+      printNodesNetwork(Array.from(nodes) as HTMLElement[], settings, 1, {
+        widthMm: 58,
+        heightMm: 40,
+        rotate90: false,
+        offsetXmm: 0,
+        offsetYmm: 0,
+      });
+      return;
+    }
     printNodeHtml(Array.from(nodes).map((n) => n.outerHTML).join(''), 58, 40);
   };
 

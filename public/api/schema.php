@@ -111,6 +111,25 @@ function schema_sql(string $driver): array
             total_price DECIMAL(12,2) NOT NULL DEFAULT 0,
             missing_price DECIMAL(12,2) NOT NULL DEFAULT 0
         )$tail",
+        "CREATE TABLE IF NOT EXISTS print_keys (
+            owner_id INT NOT NULL PRIMARY KEY,
+            print_key VARCHAR(64) NOT NULL,
+            printers $text NULL,
+            last_seen DATETIME NULL,
+            created_at DATETIME NULL
+        )$tail",
+        "CREATE TABLE IF NOT EXISTS print_jobs (
+            id $auto,
+            owner_id INT NOT NULL,
+            printer_ip VARCHAR(64) NOT NULL,
+            printer_port INT NOT NULL DEFAULT 9100,
+            data $text NOT NULL,
+            status VARCHAR(16) NOT NULL DEFAULT 'pending',
+            error $short NOT NULL DEFAULT '',
+            created_by INT NULL,
+            created_at DATETIME NULL,
+            taken_at DATETIME NULL
+        )$tail",
     ];
 }
 
@@ -123,6 +142,7 @@ const IMPORT_COLUMNS = [
     'user_meta' => ['user_id', 'seeded', 'created_at'],
     'shared_products' => ['id', 'name', 'category', 'categories', 'weight', 'composition', 'image', 'barcode', 'hit', 'shelf_life_hours', 'storage_text', 'author', 'created_at', 'updated_at'],
     'equipment' => ['user_id', 'id', 'name', 'code', 'price', 'location', 'note', 'image', 'serial', 'active', 'created_at', 'updated_at', 'qr_broken', 'written_off_at', 'write_off_reason'],
+    'print_keys' => ['owner_id', 'print_key', 'printers', 'last_seen', 'created_at'],
     'inventory_sessions' => ['id', 'user_id', 'started_by', 'started_at', 'finished_at', 'scanned', 'missing', 'total', 'total_price', 'missing_price'],
 ];
 
@@ -146,6 +166,9 @@ function import_data(PDO $db, array $tables, ?callable $mapImage = null): array
         $db->exec("DELETE FROM $table");
         $stmt = $db->prepare("INSERT INTO $table (" . implode(', ', $cols) . ') VALUES (' . implode(', ', array_fill(0, count($cols), '?')) . ')');
         foreach ($rows as $row) {
+            if ($table === 'print_keys' && !array_key_exists('print_key', $row)) {
+                $row['print_key'] = $row['key'] ?? '';
+            }
             if ($table === 'user_prefs' && !array_key_exists('pref_key', $row)) {
                 $row['pref_key'] = $row['key'] ?? '';
             }

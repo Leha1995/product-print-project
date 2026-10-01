@@ -195,6 +195,7 @@ EXPORT_TABLES = {
                        'shelf_life_hours, storage_text, author, created_at, updated_at',
     'equipment': 'user_id, id, name, code, price, location, note, image, serial, active, created_at, '
                  'updated_at, qr_broken, written_off_at, write_off_reason',
+    'print_keys': 'owner_id, key, printers, last_seen, created_at',
     'inventory_sessions': 'id, user_id, started_by, started_at, finished_at, scanned, missing, total, '
                           'total_price, missing_price',
 }

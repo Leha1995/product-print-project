@@ -1,0 +1,21 @@
+{
+  "tests": [
+    {
+      "name": "Настройки печати без входа запрещены",
+      "method": "GET",
+      "path": "/?action=config",
+      "expectedStatus": 401,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Помощник с неверным ключом",
+      "method": "GET",
+      "path": "/?action=poll",
+      "headers": {"X-Print-Key": "wrong"},
+      "expectedStatus": 403,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

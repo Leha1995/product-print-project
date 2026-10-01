@@ -44,7 +44,7 @@ function send_cors(): void
 {
     header('Access-Control-Allow-Origin: *');
     header('Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, X-Auth-Token, X-Target-User, X-Admin-Pin');
+    header('Access-Control-Allow-Headers: Content-Type, X-Auth-Token, X-Target-User, X-Admin-Pin, X-Print-Key');
     header('Access-Control-Max-Age: 86400');
 }
 

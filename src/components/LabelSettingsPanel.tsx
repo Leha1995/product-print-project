@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Icon from '@/components/ui/icon';
 import SoundPicker from '@/components/SoundPicker';
+import NetworkPrinterSettings from '@/components/NetworkPrinterSettings';
 import { LabelSettings, paperFormats } from '@/hooks/useLabelSettings';
 
 const staffFieldClass =
@@ -95,6 +96,7 @@ const LabelSettingsPanel = ({
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         {[
+          { value: 'network' as const, label: 'Принтер по IP', hint: 'Напрямую по Wi-Fi' },
           { value: 'browser' as const, label: 'Печать браузером', hint: 'Обычный принтер' },
           { value: 'bartender' as const, label: 'BarTender', hint: 'Файл задания в папку' },
         ].map((mode) => {
@@ -108,7 +110,7 @@ const LabelSettingsPanel = ({
               }`}
             >
               <Icon
-                name={mode.value === 'bartender' ? 'FileDown' : 'Printer'}
+                name={mode.value === 'bartender' ? 'FileDown' : mode.value === 'network' ? 'Wifi' : 'Printer'}
                 size={16}
                 strokeWidth={2.5}
                 className="shrink-0"
@@ -127,6 +129,10 @@ const LabelSettingsPanel = ({
           );
         })}
       </div>
+
+      {settings.printMode === 'network' && (
+        <NetworkPrinterSettings settings={settings} onChange={onChange} />
+      )}
 
       {settings.printMode === 'bartender' && (
         <div className="mt-3 grid gap-2 border-2 border-dashed border-primary p-3">
@@ -336,6 +342,24 @@ const LabelSettingsPanel = ({
         value={settings.expiredTune}
         onChange={(expiredTune) => onChange({ expiredTune })}
       />
+        </>
+      )}
+
+      {staffOnly && (
+        <>
+          <label className="mt-3 flex items-center gap-2 border-2 border-primary bg-card px-3 py-2 text-[13px] text-primary">
+            <input
+              type="checkbox"
+              checked={settings.printMode === 'network'}
+              onChange={(e) => onChange({ printMode: e.target.checked ? 'network' : 'browser' })}
+              className="h-4 w-4 accent-[hsl(var(--primary))]"
+            />
+            <Icon name="Wifi" size={15} strokeWidth={2.5} />
+            Печатать на принтер по IP
+          </label>
+          {settings.printMode === 'network' && (
+            <NetworkPrinterSettings settings={settings} onChange={onChange} />
+          )}
         </>
       )}
 

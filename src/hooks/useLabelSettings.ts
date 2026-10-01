@@ -47,7 +47,11 @@ export interface LabelSettings {
   shelfLifeHours: number;
   logo: string;
   shopName: string;
-  printMode: 'browser' | 'bartender';
+  printMode: 'browser' | 'bartender' | 'network';
+  netPrinterId: string;
+  netGapMm: number;
+  netDensity: number;
+  netFlip: boolean;
   bartenderTemplate: string;
   bartenderPrinter: string;
   offsetXmm: number;
@@ -74,6 +78,10 @@ export const defaultLabelSettings: LabelSettings = {
   logo: '',
   shopName: 'Автосуши Автопицца',
   printMode: 'browser',
+  netPrinterId: '',
+  netGapMm: 2,
+  netDensity: 8,
+  netFlip: false,
   bartenderTemplate: 'cennik.btw',
   bartenderPrinter: '',
   offsetXmm: 0,

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import ReceiptPreview from '@/components/ReceiptPreview';
 import { LabelSettings, getPaper } from '@/hooks/useLabelSettings';
 import { downloadBartenderJob } from '@/lib/bartender';
+import { printNodesNetwork } from '@/lib/netPrint';
 import { Product } from '@/data/products';
 
 interface DirectPrintAreaProps {
@@ -164,6 +165,14 @@ const DirectPrintArea = ({
 
     const node = ref.current?.firstElementChild as HTMLElement | undefined;
     if (!node) return;
+
+    if (settings.printMode === 'network') {
+      const id = window.setTimeout(() => {
+        printNodesNetwork([node], settings, Math.max(1, copies));
+        onDone(product);
+      }, 60);
+      return () => window.clearTimeout(id);
+    }
 
     const paper = getPaper(settings.paper);
     const id = window.setTimeout(() => {

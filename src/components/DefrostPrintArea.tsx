@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import DefrostLabel, { DefrostInfo } from '@/components/DefrostLabel';
 import { LabelSettings, getPaper } from '@/hooks/useLabelSettings';
 import { printNodeHtml } from '@/components/DirectPrintArea';
+import { printNodesNetwork } from '@/lib/netPrint';
 
 interface DefrostPrintAreaProps {
   info: DefrostInfo | null;
@@ -24,6 +25,14 @@ const DefrostPrintArea = ({
     if (!info) return;
     const node = ref.current?.firstElementChild as HTMLElement | undefined;
     if (!node) return;
+
+    if (settings.printMode === 'network') {
+      const id = window.setTimeout(() => {
+        printNodesNetwork([node], settings, Math.max(1, copies));
+        onDone(info);
+      }, 60);
+      return () => window.clearTimeout(id);
+    }
 
     const paper = getPaper(settings.paper);
     const id = window.setTimeout(() => {
