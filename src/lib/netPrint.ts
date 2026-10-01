@@ -212,6 +212,32 @@ const printNodesRawbt = async (
 
 const BATCH_BYTES = 1;
 
+export interface PrintProgress {
+  sent: number;
+  total: number;
+  status: 'preparing' | 'sending' | 'done' | 'failed';
+}
+
+type ProgressListener = (progress: PrintProgress | null) => void;
+
+const progressListeners = new Set<ProgressListener>();
+let progressHideTimer = 0;
+
+export const subscribePrintProgress = (fn: ProgressListener) => {
+  progressListeners.add(fn);
+  return () => {
+    progressListeners.delete(fn);
+  };
+};
+
+const emitProgress = (progress: PrintProgress | null) => {
+  window.clearTimeout(progressHideTimer);
+  progressListeners.forEach((fn) => fn(progress));
+  if (progress && (progress.status === 'done' || progress.status === 'failed')) {
+    progressHideTimer = window.setTimeout(() => emitProgress(null), progress.status === 'done' ? 2500 : 5000);
+  }
+};
+
 const joinParts = (list: Uint8Array[]) => {
   const bytes = new Uint8Array(list.reduce((s, p) => s + p.length, 0));
   let pos = 0;
@@ -256,22 +282,32 @@ export const printNodesNetwork = async (
     });
     return false;
   }
+  const track = nodes.length > 1;
+  if (track) emitProgress({ sent: 0, total: nodes.length, status: 'preparing' });
   let parts: Uint8Array[] = [];
   try {
     for (const node of nodes) {
       parts.push(await nodeToTspl(node, { ...networkOptions(settings, copies), ...override }));
     }
   } catch {
+    if (track) emitProgress({ sent: 0, total: nodes.length, status: 'failed' });
     toast({ title: 'Не удалось подготовить этикетку для печати' });
     return false;
   }
   const batches = splitBatches(parts);
   parts = [];
+  const total = batches.length;
+  if (track) emitProgress({ sent: 0, total, status: 'sending' });
   for (let i = 0; i < batches.length; i += 1) {
     try {
       const ok = await sendRaw(printer, batches[i], i === batches.length - 1);
-      if (!ok) return false;
+      if (!ok) {
+        if (track) emitProgress({ sent: i, total, status: 'failed' });
+        return false;
+      }
+      if (track) emitProgress({ sent: i + 1, total, status: i + 1 === total ? 'done' : 'sending' });
     } catch (e) {
+      if (track) emitProgress({ sent: i, total, status: 'failed' });
       toast({
         title: 'Не удалось отправить на принтер',
         description:

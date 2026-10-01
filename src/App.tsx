@@ -7,6 +7,7 @@ import { HashRouter as BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ErrorBoundary from "./components/ErrorBoundary";
+import PrintProgressBar from "./components/PrintProgressBar";
 
 const queryClient = new QueryClient();
 
@@ -17,6 +18,7 @@ const App = () => {
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <PrintProgressBar />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
