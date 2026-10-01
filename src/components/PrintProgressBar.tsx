@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Icon from '@/components/ui/icon';
 import { Progress } from '@/components/ui/progress';
-import { PrintProgress, subscribePrintProgress } from '@/lib/netPrint';
+import { PrintProgress, dismissPrintProgress, retryPendingPrint, subscribePrintProgress } from '@/lib/netPrint';
 
 const PrintProgressBar = () => {
   const [progress, setProgress] = useState<PrintProgress | null>(null);
@@ -10,7 +10,7 @@ const PrintProgressBar = () => {
 
   if (!progress) return null;
 
-  const { sent, total, status } = progress;
+  const { sent, total, status, retryCount = 0, retrying } = progress;
   const percent = total ? Math.round((sent / total) * 100) : 0;
   const failed = status === 'failed';
 
@@ -18,7 +18,9 @@ const PrintProgressBar = () => {
     status === 'preparing'
       ? `Готовим этикетки: ${total} шт.`
       : status === 'done'
-        ? `Отправлено ${total} из ${total}`
+        ? retrying
+          ? `Допечатано ${total} из ${total}`
+          : `Отправлено ${total} из ${total}`
         : failed
           ? `Печать прервана: отправлено ${sent} из ${total}`
           : `Отправлено ${sent} из ${total}`;
@@ -51,6 +53,26 @@ const PrintProgressBar = () => {
           value={status === 'preparing' ? 0 : percent}
           className={`h-2.5 rounded-none ${failed ? '[&>div]:bg-destructive' : ''}`}
         />
+        {failed && retryCount > 0 && (
+          <div className="pointer-events-auto mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => retryPendingPrint()}
+              className="flex flex-1 items-center justify-center gap-2 border-2 border-primary bg-primary px-3 py-2 font-head text-[0.8rem] font-bold uppercase tracking-[0.04em] text-primary-foreground active:translate-y-px"
+            >
+              <Icon name="RotateCw" size={16} strokeWidth={2.5} />
+              Допечатать остальные ({retryCount})
+            </button>
+            <button
+              type="button"
+              onClick={dismissPrintProgress}
+              aria-label="Закрыть"
+              className="flex items-center justify-center border-2 border-primary bg-card px-3 text-primary active:translate-y-px"
+            >
+              <Icon name="X" size={16} strokeWidth={2.5} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
