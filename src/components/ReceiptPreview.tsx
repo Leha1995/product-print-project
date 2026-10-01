@@ -1,4 +1,3 @@
-import Icon from '@/components/ui/icon';
 import { Product } from '@/data/products';
 import { LabelSettings, defaultLabelSettings, getPaper } from '@/hooks/useLabelSettings';
 
@@ -132,20 +131,14 @@ const ReceiptPreview = ({
 
       {settings.showStorage && (
         <div
-          className={`flex items-center justify-center gap-1 border border-primary font-head font-bold uppercase leading-tight ${
+          className={`flex items-center justify-center font-head font-bold uppercase leading-tight ${
             micro
               ? 'mt-1 px-1 py-px text-[7px]'
               : tiny
-                ? 'mt-1.5 border-2 px-1 py-0.5 text-[8px]'
-                : 'mt-3 border-2 px-2 py-1 text-[11px] tracking-[0.04em]'
+                ? 'mt-1.5 px-1 py-0.5 text-[8px]'
+                : 'mt-3 px-2 py-1 text-[11px] tracking-[0.04em]'
           }`}
         >
-          <Icon
-            name="Thermometer"
-            size={micro ? 8 : tiny ? 10 : 14}
-            strokeWidth={2.5}
-            className="shrink-0"
-          />
           <span>{product.storageText || settings.storageText}</span>
         </div>
       )}

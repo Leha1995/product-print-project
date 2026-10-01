@@ -1,4 +1,3 @@
-import Icon from '@/components/ui/icon';
 import { LabelSettings, getPaper } from '@/hooks/useLabelSettings';
 
 export interface DefrostInfo {
@@ -79,20 +78,14 @@ const DefrostLabel = ({ info, printedAt, settings }: DefrostLabelProps) => {
         </dl>
 
         <div
-          className={`flex items-center justify-center gap-1 border-primary font-head font-bold uppercase leading-tight ${
+          className={`flex items-center justify-center font-head font-bold uppercase leading-tight ${
             micro
-              ? 'border-2 px-1 py-0.5 text-[10px]'
+              ? 'px-1 py-0.5 text-[10px]'
               : tiny
-                ? 'mt-1.5 border-2 px-1 py-0.5 text-[9px]'
-                : 'mt-3 border-2 px-2 py-1.5 text-[13px] tracking-[0.04em]'
+                ? 'mt-1.5 px-1 py-0.5 text-[9px]'
+                : 'mt-3 px-2 py-1.5 text-[13px] tracking-[0.04em]'
           }`}
         >
-          <Icon
-            name="Thermometer"
-            size={micro ? 11 : tiny ? 11 : 15}
-            strokeWidth={2.5}
-            className="shrink-0"
-          />
           <span>{info.temp}</span>
         </div>
       </div>
