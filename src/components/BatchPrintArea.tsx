@@ -15,9 +15,13 @@ interface BatchPrintAreaProps {
 
 const BatchPrintArea = ({ products, settings, printedAt, onDone }: BatchPrintAreaProps) => {
   const ref = useRef<HTMLDivElement>(null);
+  const started = useRef<Product[] | null>(null);
+  const doneRef = useRef(onDone);
+  doneRef.current = onDone;
 
   useEffect(() => {
     if (!products || !products.length) return;
+    if (started.current === products) return;
 
     if (settings.printMode === 'bartender') {
       const id = window.setTimeout(() => {
@@ -30,7 +34,9 @@ const BatchPrintArea = ({ products, settings, printedAt, onDone }: BatchPrintAre
     const id = window.setTimeout(() => {
       const nodes = Array.from(ref.current?.querySelectorAll('.print-area') ?? []);
       if (nodes.length && isRawMode(settings)) {
-        printNodesNetwork(nodes as HTMLElement[], settings);
+        started.current = products;
+        printNodesNetwork(nodes as HTMLElement[], settings).finally(() => doneRef.current(products));
+        return;
       } else if (nodes.length) {
         const paper = getPaper(settings.paper);
         printNodeHtml(
