@@ -60,9 +60,13 @@ const DefrostLabel = ({ info, printedAt, settings }: DefrostLabelProps) => {
             <dd className="font-semibold">{stamp}</dd>
           </div>
           {bestBefore && (
-            <div className="flex justify-between gap-1">
+            <div
+              className={`flex items-baseline justify-between gap-1 font-head font-bold ${
+                large ? 'text-xl' : micro ? 'text-[12px]' : tiny ? 'text-[12px]' : 'text-base'
+              }`}
+            >
               <dt className="shrink-0">Годен до</dt>
-              <dd className="font-semibold">{bestBefore}</dd>
+              <dd>{bestBefore}</dd>
             </div>
           )}
           <div className="flex justify-between gap-1">
