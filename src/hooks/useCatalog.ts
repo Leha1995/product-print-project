@@ -66,9 +66,9 @@ export const useCatalog = (userId?: number | null, targetId?: number | null) => 
       try {
         let snap = await fetchCatalog();
         if (!snap.seeded) {
-          const res = await seedCatalog(seedProducts, seedCategories);
+          const res = await seedCatalog([], seedCategories);
           snap = {
-            products: res.products ?? seedProducts,
+            products: res.products ?? [],
             categories: res.categories ?? seedCategories,
             prefs: {},
             history: {},
