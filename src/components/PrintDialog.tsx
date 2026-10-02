@@ -8,6 +8,7 @@ import { printNodeHtml } from '@/components/DirectPrintArea';
 import { downloadBartenderJob } from '@/lib/bartender';
 import { isRawMode, printNodesNetwork } from '@/lib/netPrint';
 import { Product } from '@/data/products';
+import { productImage } from '@/lib/productImage';
 
 interface PrintDialogProps {
   product: Product | null;
@@ -80,7 +81,7 @@ const PrintDialog = ({
         <div className="grid gap-0 md:grid-cols-[1.15fr_1fr]">
           <div className="print-hide border-b-2 border-primary md:border-b-0 md:border-r-2">
             <div className="relative aspect-[4/3] w-full overflow-hidden bg-secondary">
-              <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+              <img src={productImage(product.image)} alt={product.name} className="h-full w-full object-cover" />
             </div>
 
             <div className="p-5">

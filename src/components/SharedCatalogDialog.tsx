@@ -4,6 +4,7 @@ import Icon from '@/components/ui/icon';
 import { Product } from '@/data/products';
 import useSharedCatalog, { SharedProduct } from '@/hooks/useSharedCatalog';
 import { getAdminPin } from '@/hooks/useAdmin';
+import { productImage } from '@/lib/productImage';
 
 interface SharedCatalogDialogProps {
   open: boolean;
@@ -173,13 +174,11 @@ const SharedCatalogDialog = ({
                     <Icon name="Check" size={16} strokeWidth={3} />
                   </button>
 
-                  {p.image ? (
-                    <img src={p.image} alt="" className="h-11 w-11 shrink-0 border-2 border-primary object-cover" />
-                  ) : (
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center border-2 border-primary text-muted-foreground">
-                      <Icon name="ImageOff" size={16} />
-                    </div>
-                  )}
+                  <img
+                    src={productImage(p.image)}
+                    alt=""
+                    className="h-11 w-11 shrink-0 border-2 border-primary object-cover"
+                  />
 
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-head text-[0.9rem] font-bold uppercase text-primary">

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
 import { Product } from '@/data/products';
+import { productImage } from '@/lib/productImage';
 
 interface BatchPrintDialogProps {
   products: Product[];
@@ -92,7 +93,7 @@ const BatchPrintDialog = ({
                   }`}
                 >
                   <img
-                    src={p.image}
+                    src={productImage(p.image)}
                     alt={p.name}
                     className="h-12 w-12 shrink-0 border-2 border-primary object-cover"
                   />

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
 import { Category, CategoryId, Product, productCategories, storagePresets } from '@/data/products';
+import { hasOwnPhoto, productImage } from '@/lib/productImage';
 
 interface ProductFormDialogProps {
   product: Product | null;
@@ -10,18 +11,6 @@ interface ProductFormDialogProps {
   onOpenChange: (open: boolean) => void;
   onSave: (product: Product) => void;
 }
-
-const DEFAULT_IMG =
-  'https://cdn.poehali.dev/projects/3ae3beb2-6f64-4c04-99be-0b8f386617e0/files/cbab4a1a-834a-470d-91c8-8ebdd00c9168.jpg';
-
-const CATEGORY_IMG: Record<string, string> = {
-  sushi:
-    'https://cdn.poehali.dev/projects/3ae3beb2-6f64-4c04-99be-0b8f386617e0/files/cbab4a1a-834a-470d-91c8-8ebdd00c9168.jpg',
-  pizza:
-    'https://cdn.poehali.dev/projects/3ae3beb2-6f64-4c04-99be-0b8f386617e0/files/b0382c00-473e-4cf3-839b-83fb3871e7ae.jpg',
-  drinks:
-    'https://cdn.poehali.dev/projects/3ae3beb2-6f64-4c04-99be-0b8f386617e0/files/49154051-03a6-4ed5-87d0-181e5dda8ca5.jpg',
-};
 
 const emptyForm = {
   name: '',
@@ -49,7 +38,6 @@ const ProductFormDialog = ({
   onSave,
 }: ProductFormDialogProps) => {
   const [form, setForm] = useState(emptyForm);
-  const fallbackImg = (cat: CategoryId) => CATEGORY_IMG[cat] ?? DEFAULT_IMG;
 
   useEffect(() => {
     if (!open) return;
@@ -61,7 +49,7 @@ const ProductFormDialog = ({
             categories: productCategories(product),
             weight: product.weight,
             composition: product.composition,
-            image: product.image,
+            image: hasOwnPhoto(product.image) ? product.image : '',
             barcode: product.barcode,
             shelfLifeHours: product.shelfLifeHours ? String(product.shelfLifeHours) : '',
             storageText: product.storageText || storagePresets[0],
@@ -102,7 +90,7 @@ const ProductFormDialog = ({
       categories: picked,
       weight: form.weight.trim() || '—',
       composition: form.composition.trim() || 'Состав не указан',
-      image: form.image.trim() || fallbackImg(picked[0] ?? ''),
+      image: form.image.trim(),
       barcode: form.barcode.trim() || String(4600000000000 + Math.floor(Math.random() * 999999)),
       shelfLifeHours: form.shelfLifeHours ? Number(form.shelfLifeHours) : undefined,
       storageText: form.storageText.trim() || undefined,
@@ -219,7 +207,7 @@ const ProductFormDialog = ({
               <div className="flex items-center gap-3">
                 <div className="h-[64px] w-[64px] shrink-0 overflow-hidden border-2 border-primary bg-muted">
                   <img
-                    src={form.image || fallbackImg(form.categories[0] ?? form.category)}
+                    src={productImage(form.image)}
                     alt=""
                     className="h-full w-full object-cover"
                   />
