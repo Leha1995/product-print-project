@@ -14,7 +14,7 @@ interface SharedCatalogDialogProps {
 
 const stripMeta = (p: SharedProduct): Product => {
   const { author: _a, updatedAt: _u, ...rest } = p;
-  return rest as Product;
+  return { ...(rest as Product), category: '', categories: [] };
 };
 
 const SharedCatalogDialog = ({

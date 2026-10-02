@@ -1,0 +1,1 @@
+UPDATE shared_products SET category = '', categories = '[]'::jsonb;

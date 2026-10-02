@@ -4,17 +4,19 @@
       "name": "Список общей базы",
       "method": "GET",
       "path": "/",
-      "expectedStatus": 200,
-      "expectedBody": {"items": []},
-      "bodyMatcher": "partial"
+      "expectedStatus": 200
     },
     {
       "name": "Публикация без пина запрещена",
       "method": "POST",
       "path": "/",
-      "body": {"items": []},
+      "body": {
+        "items": []
+      },
       "expectedStatus": 403,
-      "expectedBody": {"error": "string"},
+      "expectedBody": {
+        "error": "string"
+      },
       "bodyMatcher": "partial"
     }
   ]

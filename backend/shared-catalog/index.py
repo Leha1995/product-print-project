@@ -116,13 +116,13 @@ def handler(event: dict, context) -> dict:
             image = upload_image(image, pid)
         elif image.startswith('idb:'):
             image = ''
-        cats = json.dumps(p.get('categories') or [p.get('category')] if p.get('category') else [])
+        cats = '[]'
         shelf = p.get('shelfLifeHours')
         shelf_sql = str(int(shelf)) if isinstance(shelf, (int, float)) and shelf else 'NULL'
         cur.execute(
             'INSERT INTO shared_products (id, name, category, categories, weight, composition, '
             'image, barcode, hit, shelf_life_hours, storage_text, author, updated_at) VALUES ('
-            f"{q(pid)}, {q(p.get('name'))}, {q(p.get('category') or '')}, {q(cats)}::jsonb, "
+            f"{q(pid)}, {q(p.get('name'))}, '', {q(cats)}::jsonb, "
             f"{q(p.get('weight') or '')}, {q(p.get('composition') or '')}, {q(image)}, "
             f"{q(p.get('barcode') or '')}, {'TRUE' if p.get('hit') else 'FALSE'}, {shelf_sql}, "
             f"{q(p.get('storageText') or '')}, {q(author)}, NOW()) "
