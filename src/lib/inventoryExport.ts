@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx-js-style';
 import { Equipment, FinishResult } from '@/lib/equipmentApi';
+import { residualValue } from '@/lib/depreciation';
 
 const stamp = (iso?: string | null) => {
   const d = iso ? new Date(iso) : new Date();
@@ -44,6 +45,8 @@ const row = (item: Equipment, found: boolean, index: number) => ({
   Статус: statusText(item, found),
   Место: item.location || '',
   'Стоимость, ₽': item.price || 0,
+  'Амортизация, ₽/день': item.depreciationPerDay || 0,
+  'Остаточная стоимость, ₽': Math.round(residualValue(item)),
   'Серийный номер': item.serial || '',
   'В эксплуатации с': commissioned(item),
   'QR-код': item.code,
@@ -97,6 +100,8 @@ export const exportInventory = (result: FinishResult, finishedAt?: string | null
     { wch: 22 },
     { wch: 20 },
     { wch: 14 },
+    { wch: 14 },
+    { wch: 16 },
     { wch: 18 },
     { wch: 16 },
     { wch: 20 },
@@ -133,6 +138,8 @@ export const exportEquipmentList = (items: Equipment[]) => {
     Наименование: item.name,
     Место: item.location || '',
     'Стоимость, ₽': item.price || 0,
+  'Амортизация, ₽/день': item.depreciationPerDay || 0,
+  'Остаточная стоимость, ₽': Math.round(residualValue(item)),
     'Серийный номер': item.serial || '',
   'В эксплуатации с': commissioned(item),
     'QR-код': item.code,
@@ -149,6 +156,8 @@ export const exportEquipmentList = (items: Equipment[]) => {
     { wch: 34 },
     { wch: 20 },
     { wch: 14 },
+    { wch: 14 },
+    { wch: 16 },
     { wch: 18 },
     { wch: 16 },
     { wch: 20 },

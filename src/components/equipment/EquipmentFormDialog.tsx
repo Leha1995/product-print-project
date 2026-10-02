@@ -16,6 +16,7 @@ const empty = {
   location: '',
   serial: '',
   commissionedAt: '',
+  depreciation: '',
   note: '',
   image: '',
 };
@@ -61,6 +62,7 @@ const EquipmentFormDialog = ({ item, open, onOpenChange, onSave }: EquipmentForm
             location: item.location,
             serial: item.serial,
             commissionedAt: item.commissionedAt ? item.commissionedAt.slice(0, 10) : '',
+            depreciation: item.depreciationPerDay ? String(item.depreciationPerDay) : '',
             note: item.note,
             image: item.image || '',
           }
@@ -82,6 +84,7 @@ const EquipmentFormDialog = ({ item, open, onOpenChange, onSave }: EquipmentForm
       location: form.location.trim(),
       serial: form.serial.trim(),
       commissionedAt: form.commissionedAt || null,
+      depreciationPerDay: Math.max(0, Number(form.depreciation.replace(',', '.')) || 0),
       note: form.note.trim(),
       image: form.image,
       active: item?.active ?? true,
@@ -192,6 +195,35 @@ const EquipmentFormDialog = ({ item, open, onOpenChange, onSave }: EquipmentForm
               />
             </label>
           </div>
+
+          <label className="mt-3 block">
+            <span className={label}>Амортизация, ₽ в день</span>
+            <input
+              value={form.depreciation}
+              onChange={(e) => set('depreciation', e.target.value)}
+              inputMode="decimal"
+              placeholder="Например, 50"
+              className={field}
+            />
+            {(() => {
+              const price = Number(form.price.replace(',', '.')) || 0;
+              const perDay = Number(form.depreciation.replace(',', '.')) || 0;
+              if (!price || !perDay) {
+                return (
+                  <span className="mt-1 block text-[12px] text-muted-foreground">
+                    На сколько рублей оборудование дешевеет каждый день. Считается от даты ввода в эксплуатацию.
+                  </span>
+                );
+              }
+              const days = Math.ceil(price / perDay);
+              return (
+                <span className="mt-1 block text-[12px] text-muted-foreground">
+                  {`Полностью самортизируется за ${days.toLocaleString('ru-RU')} дн. (≈ ${(days / 365).toLocaleString('ru-RU', { maximumFractionDigits: 1 })} г.)`}
+                  {!form.commissionedAt && ' · укажи дату ввода, чтобы считать остаток'}
+                </span>
+              );
+            })()}
+          </label>
 
           <label className="mt-3 block">
             <span className={label}>Заметка</span>

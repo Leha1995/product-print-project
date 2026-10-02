@@ -1,0 +1,1 @@
+ALTER TABLE equipment ADD COLUMN IF NOT EXISTS depreciation_per_day NUMERIC(14,2) NOT NULL DEFAULT 0;

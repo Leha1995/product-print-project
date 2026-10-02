@@ -15,6 +15,7 @@ import {
   restoreEquipment,
 } from '@/lib/equipmentApi';
 import { toast } from '@/hooks/use-toast';
+import { hasDepreciation, residualValue } from '@/lib/depreciation';
 import { exportEquipmentList, exportInventory, pickEquipment } from '@/lib/inventoryExport';
 
 interface EquipmentSectionProps {
@@ -233,9 +234,29 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
               <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
                 {`${item.location || 'место не указано'}${item.serial ? ` · ${item.serial}` : ''}`}
               </p>
-              <p className="mt-1 font-head text-[0.95rem] font-bold text-primary">
-                {money(item.price)}
-              </p>
+              {hasDepreciation(item) ? (
+                <div className="mt-1">
+                  <p className="font-head text-[0.95rem] font-bold text-primary">
+                    {`Остаток ${money(residualValue(item))}`}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {`Куплено за ${money(item.price)} · −${(item.depreciationPerDay || 0).toLocaleString('ru-RU')} ₽/день`}
+                  </p>
+                  <div className="mt-1 h-1.5 w-full border border-primary bg-background">
+                    <div
+                      className="h-full bg-primary"
+                      style={{ width: `${Math.round((residualValue(item) / item.price) * 100)}%` }}
+                    />
+                  </div>
+                  {residualValue(item) <= 0 && (
+                    <p className="mt-1 text-[11px] font-bold text-destructive">Полностью самортизировано</p>
+                  )}
+                </div>
+              ) : (
+                <p className="mt-1 font-head text-[0.95rem] font-bold text-primary">
+                  {money(item.price)}
+                </p>
+              )}
               <p className="mt-1 flex items-center gap-1 text-[12px] text-muted-foreground">
                 <Icon name="CalendarCheck" size={13} strokeWidth={2.5} />
                 {item.commissionedAt

@@ -82,7 +82,7 @@ def can_manage(cur, me, target_id: int) -> bool:
 def read_items(cur, uid: int):
     cur.execute(
         'SELECT id, name, code, price, location, note, image, serial, active, created_at, '
-        'qr_broken, written_off_at, write_off_reason, commissioned_at '
+        'qr_broken, written_off_at, write_off_reason, commissioned_at, depreciation_per_day '
         f'FROM equipment WHERE user_id = {uid} ORDER BY active DESC, location, name'
     )
     return [
@@ -101,6 +101,7 @@ def read_items(cur, uid: int):
             'writtenOffAt': r[11].isoformat() if r[11] else None,
             'writeOffReason': r[12] or '',
             'commissionedAt': r[13].isoformat() if r[13] else None,
+            'depreciationPerDay': float(r[14] or 0),
         }
         for r in cur.fetchall()
     ]
@@ -148,14 +149,16 @@ def save_item(cur, uid: int, item: dict) -> int:
     if image.startswith('data:'):
         image = upload_image(image, eid)
     cur.execute(
-        'INSERT INTO equipment (user_id, id, name, code, price, location, note, image, serial, active, commissioned_at, updated_at) '
+        'INSERT INTO equipment (user_id, id, name, code, price, location, note, image, serial, active, commissioned_at, depreciation_per_day, updated_at) '
         f"VALUES ({uid}, {q(eid)}, {q(name)}, {q(code)}, {num(item.get('price'))}, "
         f"{q(item.get('location') or '')}, {q(item.get('note') or '')}, {q(image)}, "
-        f"{q(item.get('serial') or '')}, {'FALSE' if item.get('active') is False else 'TRUE'}, {date_sql(item.get('commissionedAt'))}, NOW()) "
+        f"{q(item.get('serial') or '')}, {'FALSE' if item.get('active') is False else 'TRUE'}, {date_sql(item.get('commissionedAt'))}, "
+        f"GREATEST(0, {num(item.get('depreciationPerDay'))}), NOW()) "
         'ON CONFLICT (user_id, id) DO UPDATE SET name = EXCLUDED.name, code = EXCLUDED.code, '
         'price = EXCLUDED.price, location = EXCLUDED.location, note = EXCLUDED.note, '
         'image = EXCLUDED.image, serial = EXCLUDED.serial, active = EXCLUDED.active, '
-        'commissioned_at = EXCLUDED.commissioned_at, updated_at = NOW()'
+        'commissioned_at = EXCLUDED.commissioned_at, '
+        'depreciation_per_day = EXCLUDED.depreciation_per_day, updated_at = NOW()'
     )
     return 1
 
