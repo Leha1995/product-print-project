@@ -1,5 +1,6 @@
 import Icon from '@/components/ui/icon';
 import { ManagedTarget } from '@/lib/authApi';
+import WorkspaceTreePicker from '@/components/WorkspaceTreePicker';
 
 interface WorkspaceSwitcherProps {
   managed: ManagedTarget[];
@@ -54,19 +55,15 @@ const WorkspaceSwitcher = ({
           {label}
         </span>
 
-        <select
-          value={allowEmpty && !picked ? '' : targetId}
-          onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
-          className="min-w-[220px] border-2 border-primary bg-background px-3 py-2 font-body text-[14px] text-primary outline-none"
-        >
-          {allowEmpty && <option value="">{placeholder || 'Выбери сотрудника'}</option>}
-          {managed.map((m) => (
-            <option key={m.id} value={m.id}>
-              {(m.fullName || m.username) + (m.id === currentId ? ' — мой' : '')} ·{' '}
-              {roleShort[m.role] || m.role}
-            </option>
-          ))}
-        </select>
+        <WorkspaceTreePicker
+          managed={managed}
+          currentId={currentId}
+          value={allowEmpty && !picked ? null : targetId}
+          onChange={onChange}
+          roleShort={roleShort}
+          placeholder={placeholder}
+          allowEmpty={allowEmpty}
+        />
 
         {foreign && (
           <>

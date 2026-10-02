@@ -24,6 +24,7 @@ export interface ManagedTarget {
   username: string;
   fullName: string;
   role: Role;
+  managerId?: number | null;
 }
 
 const TOKEN_KEY = 'asap-auth-token';

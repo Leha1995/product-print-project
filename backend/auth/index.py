@@ -309,13 +309,13 @@ def handler(event: dict, context) -> dict:
 
         if action == 'managed':
             cur.execute(
-                'SELECT id, username, full_name, role FROM app_users WHERE id IN ('
+                'SELECT id, username, full_name, role, manager_id FROM app_users WHERE id IN ('
                 + ', '.join(str(i) for i in managed_ids(cur, me))
                 + ') ORDER BY role, username'
             )
             return done({
                 'managed': [
-                    {'id': r[0], 'username': r[1], 'fullName': r[2], 'role': r[3]}
+                    {'id': r[0], 'username': r[1], 'fullName': r[2], 'role': r[3], 'managerId': r[4]}
                     for r in cur.fetchall()
                 ]
             })
