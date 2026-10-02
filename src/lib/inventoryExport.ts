@@ -28,6 +28,11 @@ export const pickEquipment = (items: Equipment[], ids: string[]) => {
   );
 };
 
+const commissioned = (item: Equipment) =>
+  item.commissionedAt
+    ? new Date(`${item.commissionedAt.slice(0, 10)}T00:00:00`).toLocaleDateString('ru-RU')
+    : '';
+
 const statusText = (item: Equipment, found: boolean) => {
   if (found && item.qrBroken) return 'Найдено, QR повреждён';
   return found ? 'Найдено' : 'Не найдено';
@@ -40,6 +45,7 @@ const row = (item: Equipment, found: boolean, index: number) => ({
   Место: item.location || '',
   'Стоимость, ₽': item.price || 0,
   'Серийный номер': item.serial || '',
+  'В эксплуатации с': commissioned(item),
   'QR-код': item.code,
   Сейчас: item.active ? 'В работе' : 'Списано',
   Заметка: item.note || '',
@@ -92,6 +98,7 @@ export const exportInventory = (result: FinishResult, finishedAt?: string | null
     { wch: 20 },
     { wch: 14 },
     { wch: 18 },
+    { wch: 16 },
     { wch: 20 },
     { wch: 11 },
     { wch: 28 },
@@ -127,6 +134,7 @@ export const exportEquipmentList = (items: Equipment[]) => {
     Место: item.location || '',
     'Стоимость, ₽': item.price || 0,
     'Серийный номер': item.serial || '',
+  'В эксплуатации с': commissioned(item),
     'QR-код': item.code,
     Статус: item.active ? (item.qrBroken ? 'В работе, заменить QR' : 'В работе') : 'Списано',
     'Причина списания': item.writeOffReason || '',
@@ -142,6 +150,7 @@ export const exportEquipmentList = (items: Equipment[]) => {
     { wch: 20 },
     { wch: 14 },
     { wch: 18 },
+    { wch: 16 },
     { wch: 20 },
     { wch: 20 },
     { wch: 24 },

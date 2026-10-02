@@ -1,4 +1,5 @@
 import base64
+import datetime
 import json
 import os
 import uuid
@@ -81,7 +82,7 @@ def can_manage(cur, me, target_id: int) -> bool:
 def read_items(cur, uid: int):
     cur.execute(
         'SELECT id, name, code, price, location, note, image, serial, active, created_at, '
-        'qr_broken, written_off_at, write_off_reason '
+        'qr_broken, written_off_at, write_off_reason, commissioned_at '
         f'FROM equipment WHERE user_id = {uid} ORDER BY active DESC, location, name'
     )
     return [
@@ -99,6 +100,7 @@ def read_items(cur, uid: int):
             'qrBroken': bool(r[10]),
             'writtenOffAt': r[11].isoformat() if r[11] else None,
             'writeOffReason': r[12] or '',
+            'commissionedAt': r[13].isoformat() if r[13] else None,
         }
         for r in cur.fetchall()
     ]
@@ -128,6 +130,14 @@ def make_code(uid: int) -> str:
     return f"EQ-{uid}-{uuid.uuid4().hex[:8].upper()}"
 
 
+def date_sql(value) -> str:
+    raw = str(value or '').strip()[:10]
+    try:
+        return f"'{datetime.date.fromisoformat(raw).isoformat()}'"
+    except ValueError:
+        return 'NULL'
+
+
 def save_item(cur, uid: int, item: dict) -> int:
     name = (item.get('name') or '').strip()
     if not name:
@@ -138,13 +148,14 @@ def save_item(cur, uid: int, item: dict) -> int:
     if image.startswith('data:'):
         image = upload_image(image, eid)
     cur.execute(
-        'INSERT INTO equipment (user_id, id, name, code, price, location, note, image, serial, active, updated_at) '
+        'INSERT INTO equipment (user_id, id, name, code, price, location, note, image, serial, active, commissioned_at, updated_at) '
         f"VALUES ({uid}, {q(eid)}, {q(name)}, {q(code)}, {num(item.get('price'))}, "
         f"{q(item.get('location') or '')}, {q(item.get('note') or '')}, {q(image)}, "
-        f"{q(item.get('serial') or '')}, {'FALSE' if item.get('active') is False else 'TRUE'}, NOW()) "
+        f"{q(item.get('serial') or '')}, {'FALSE' if item.get('active') is False else 'TRUE'}, {date_sql(item.get('commissionedAt'))}, NOW()) "
         'ON CONFLICT (user_id, id) DO UPDATE SET name = EXCLUDED.name, code = EXCLUDED.code, '
         'price = EXCLUDED.price, location = EXCLUDED.location, note = EXCLUDED.note, '
-        'image = EXCLUDED.image, serial = EXCLUDED.serial, active = EXCLUDED.active, updated_at = NOW()'
+        'image = EXCLUDED.image, serial = EXCLUDED.serial, active = EXCLUDED.active, '
+        'commissioned_at = EXCLUDED.commissioned_at, updated_at = NOW()'
     )
     return 1
 

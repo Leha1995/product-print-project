@@ -17,6 +17,7 @@ export interface Equipment {
   qrBroken?: boolean;
   writtenOffAt?: string | null;
   writeOffReason?: string;
+  commissionedAt?: string | null;
 }
 
 export interface InventorySession {

@@ -236,6 +236,12 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
               <p className="mt-1 font-head text-[0.95rem] font-bold text-primary">
                 {money(item.price)}
               </p>
+              <p className="mt-1 flex items-center gap-1 text-[12px] text-muted-foreground">
+                <Icon name="CalendarCheck" size={13} strokeWidth={2.5} />
+                {item.commissionedAt
+                  ? `В эксплуатации с ${new Date(`${item.commissionedAt.slice(0, 10)}T00:00:00`).toLocaleDateString('ru-RU')}`
+                  : 'Дата ввода не указана'}
+              </p>
               <p className="mt-1 truncate text-[11px] tracking-[0.04em] text-muted-foreground">
                 {item.code}
               </p>

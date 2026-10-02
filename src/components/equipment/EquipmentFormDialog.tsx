@@ -15,6 +15,7 @@ const empty = {
   price: '',
   location: '',
   serial: '',
+  commissionedAt: '',
   note: '',
   image: '',
 };
@@ -59,6 +60,7 @@ const EquipmentFormDialog = ({ item, open, onOpenChange, onSave }: EquipmentForm
             price: item.price ? String(item.price) : '',
             location: item.location,
             serial: item.serial,
+            commissionedAt: item.commissionedAt ? item.commissionedAt.slice(0, 10) : '',
             note: item.note,
             image: item.image || '',
           }
@@ -79,6 +81,7 @@ const EquipmentFormDialog = ({ item, open, onOpenChange, onSave }: EquipmentForm
       price: Number(form.price.replace(',', '.')) || 0,
       location: form.location.trim(),
       serial: form.serial.trim(),
+      commissionedAt: form.commissionedAt || null,
       note: form.note.trim(),
       image: form.image,
       active: item?.active ?? true,
@@ -168,15 +171,27 @@ const EquipmentFormDialog = ({ item, open, onOpenChange, onSave }: EquipmentForm
             </label>
           </div>
 
-          <label className="mt-3 block">
-            <span className={label}>Серийный номер</span>
-            <input
-              value={form.serial}
-              onChange={(e) => set('serial', e.target.value)}
-              placeholder="Необязательно"
-              className={field}
-            />
-          </label>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="block">
+              <span className={label}>Серийный номер</span>
+              <input
+                value={form.serial}
+                onChange={(e) => set('serial', e.target.value)}
+                placeholder="Необязательно"
+                className={field}
+              />
+            </label>
+            <label className="block">
+              <span className={label}>В эксплуатации с</span>
+              <input
+                type="date"
+                value={form.commissionedAt}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => set('commissionedAt', e.target.value)}
+                className={field}
+              />
+            </label>
+          </div>
 
           <label className="mt-3 block">
             <span className={label}>Заметка</span>

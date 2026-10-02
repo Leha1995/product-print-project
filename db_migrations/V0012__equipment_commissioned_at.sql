@@ -1,0 +1,1 @@
+ALTER TABLE equipment ADD COLUMN IF NOT EXISTS commissioned_at DATE;

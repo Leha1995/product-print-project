@@ -1,7 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Icon from '@/components/ui/icon';
+import { useCallback, useEffect, useState } from 'react';
 import TerminalHeader from '@/components/TerminalHeader';
-import MenuSection from '@/components/MenuSection';
 import PrintDialog from '@/components/PrintDialog';
 import ProductFormDialog from '@/components/ProductFormDialog';
 import useCatalog from '@/hooks/useCatalog';
@@ -19,16 +17,17 @@ import useLabelSettings from '@/hooks/useLabelSettings';
 import DirectPrintArea from '@/components/DirectPrintArea';
 import BatchPrintArea from '@/components/BatchPrintArea';
 import BatchPrintDialog from '@/components/BatchPrintDialog';
-import PrintLog, { PrintJob } from '@/components/PrintLog';
+import { PrintJob } from '@/components/PrintLog';
 import DefrostDialog from '@/components/DefrostDialog';
 import SharedCatalogDialog from '@/components/SharedCatalogDialog';
 import DefrostPrintArea from '@/components/DefrostPrintArea';
 import { DefrostInfo } from '@/components/DefrostLabel';
 import Footer from '@/components/Footer';
-import EquipmentSection from '@/components/equipment/EquipmentSection';
-import { Product, productCategories } from '@/data/products';
+import { Product } from '@/data/products';
 import { toast } from '@/hooks/use-toast';
-import { playAlertTune, playFuneralTune, unlockAudio } from '@/lib/chiptune';
+import IndexMain from '@/components/index/IndexMain';
+import useExpiryAlerts from '@/components/index/useExpiryAlerts';
+import useCatalogTransfer from '@/components/index/useCatalogTransfer';
 
 const Index = () => {
   const [selected, setSelected] = useState<Product | null>(null);
@@ -114,70 +113,14 @@ const Index = () => {
   const [defrostCopies, setDefrostCopies] = useState(1);
   const [defrostStamp, setDefrostStamp] = useState(() => new Date());
 
-  const expiredIds = useMemo(() => {
-    const set = new Set<string>();
-    items.forEach((p) => {
-      if (getExpiry(p).expired) set.add(p.id);
-    });
-    return set;
-  }, [items, getExpiry, now]);
-
-  const soonIds = useMemo(() => {
-    const set = new Set<string>();
-    items.forEach((p) => {
-      if (getStatus(p).soon) set.add(p.id);
-    });
-    return set;
-  }, [items, getStatus, now]);
-
-  const alertedRef = useRef<Set<string>>(new Set());
-  const deadRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    const unlock = () => unlockAudio();
-    window.addEventListener('pointerdown', unlock, { once: true });
-    window.addEventListener('keydown', unlock, { once: true });
-    return () => {
-      window.removeEventListener('pointerdown', unlock);
-      window.removeEventListener('keydown', unlock);
-    };
-  }, []);
-
-  useEffect(() => {
-    const fresh = Array.from(soonIds).filter((id) => !alertedRef.current.has(id));
-    alertedRef.current.forEach((id) => {
-      if (!soonIds.has(id) && !expiredIds.has(id)) alertedRef.current.delete(id);
-    });
-    if (!fresh.length) return;
-    fresh.forEach((id) => alertedRef.current.add(id));
-    playAlertTune(settings.alertTune, 10);
-    const names = fresh
-      .map((id) => items.find((p) => p.id === id)?.name)
-      .filter(Boolean)
-      .join(', ');
-    toast({
-      title: 'Меньше часа до конца срока',
-      description: names || `${fresh.length} позиций пора перепечатать`,
-    });
-  }, [soonIds, expiredIds, items, settings.alertTune]);
-
-  useEffect(() => {
-    deadRef.current.forEach((id) => {
-      if (!expiredIds.has(id)) deadRef.current.delete(id);
-    });
-    const fresh = Array.from(expiredIds).filter((id) => !deadRef.current.has(id));
-    if (!fresh.length) return;
-    fresh.forEach((id) => deadRef.current.add(id));
-    playFuneralTune(settings.expiredTune, 17);
-    const names = fresh
-      .map((id) => items.find((p) => p.id === id)?.name)
-      .filter(Boolean)
-      .join(', ');
-    toast({
-      title: 'Срок годности вышел',
-      description: names || `${fresh.length} позиций нужно снять и перепечатать`,
-    });
-  }, [expiredIds, items, settings.expiredTune]);
+  const { expiredIds } = useExpiryAlerts({
+    items,
+    getExpiry,
+    getStatus,
+    now,
+    alertTune: settings.alertTune,
+    expiredTune: settings.expiredTune,
+  });
 
   const scrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -188,57 +131,14 @@ const Index = () => {
     setOpen(true);
   };
 
-  const handleExport = () => {
-    const payload = {
-      type: 'asap-catalog',
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      categories,
-      products: items,
-      settings,
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `katalog-${new Date().toISOString().slice(0, 10)}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast({ title: 'Каталог выгружен', description: `${items.length} позиций в файле` });
-  };
-
-  const handleImport = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        const data = JSON.parse(String(reader.result));
-        const nextProducts = Array.isArray(data) ? data : data.products;
-        if (!Array.isArray(nextProducts) || !nextProducts.length) {
-          throw new Error('empty');
-        }
-        toast({
-          title: 'Загружаем каталог',
-          description: `${nextProducts.length} позиций, это займёт несколько секунд`,
-        });
-        if (Array.isArray(data.categories) && data.categories.length) {
-          replaceCategories(data.categories);
-        }
-        const ok = await replaceCatalog(nextProducts as Product[]);
-        if (!ok) return;
-        if (data.settings) update(data.settings);
-        toast({
-          title: 'Каталог загружен',
-          description: `${nextProducts.length} позиций перенесено`,
-        });
-      } catch {
-        toast({
-          title: 'Не удалось прочитать файл',
-          description: 'Нужен файл, выгруженный кнопкой «Выгрузить»',
-        });
-      }
-    };
-    reader.readAsText(file);
-  };
+  const { handleExport, handleImport } = useCatalogTransfer({
+    categories,
+    items,
+    settings,
+    replaceCategories,
+    replaceCatalog,
+    update,
+  });
 
   const handleQuickPrint = (product: Product) => {
     setQuickStamp(new Date());
@@ -386,74 +286,44 @@ const Index = () => {
           viewingName={viewingName}
         />
       )}
-      <main>
-        {inventoryOnly && !managerPicked && !activeTarget ? (
-          <div className="mx-auto flex max-w-[520px] flex-col items-center gap-2 px-4 py-16 text-center">
-            <Icon name="Store" size={34} strokeWidth={2} className="text-primary" />
-            <p className="font-head text-base font-black uppercase text-primary">
-              Выбери сотрудника
-            </p>
-            <p className="text-[13px] text-muted-foreground">
-              В строке выше укажи точку — откроется её оборудование и маркировка.
-            </p>
-          </div>
-        ) : (section === 'equipment' || (inventoryOnly && !managerPicked)) && canInventory ? (
-          <EquipmentSection userId={user?.id} targetId={activeTarget} isAdmin={isAdmin} />
-        ) : (
-        <MenuSection
-          products={items}
-          categories={categories}
-          onAddCategory={(label, icon) => {
-            addCategory(label, icon);
-            toast({ title: 'Категория добавлена', description: label });
-          }}
-          onRenameCategory={renameCategory}
-          onRemoveCategory={(category) => {
-            const used = items.filter((p) =>
-              productCategories(p).includes(category.id),
-            ).length;
-            if (used) {
-              toast({
-                title: 'Категория не пустая',
-                description: `Сначала удалите или перенесите продукты (${used} шт.)`,
-              });
-              return;
-            }
-            removeCategory(category.id);
-            toast({ title: 'Категория удалена', description: category.label });
-          }}
-          onResetCategories={resetCategories}
-          onExport={handleExport}
-          onImport={handleImport}
-          onSharedBase={() => setSharedOpen(true)}
-          onSelect={handleSelect}
-          onPrint={handleQuickPrint}
-          onPrintBatch={handlePrintBatch}
-          onDefrost={() => setDefrostOpen(true)}
-          onAdd={() => {
-            setEditing(null);
-            setFormOpen(true);
-          }}
-          onEdit={(product) => {
-            setEditing(product);
-            setFormOpen(true);
-          }}
-          onDelete={(product) => {
-            removeProduct(product.id);
-            toast({ title: 'Продукт удалён', description: product.name });
-          }}
-          isAdmin={isAdmin}
-          prefs={prefs}
-          onPrefsChange={savePrefs}
-          onRequestAdmin={() => setAdminOpen(true)}
-          expiredIds={expiredIds}
-          getStatus={getStatus}
-        />
-        )}
-        {(!inventoryOnly || managerPicked) && (section === 'labels' || !canInventory) && (
-          <PrintLog jobs={jobs} onClear={() => setJobs([])} />
-        )}
-      </main>
+      <IndexMain
+        inventoryOnly={inventoryOnly}
+        managerPicked={managerPicked}
+        activeTarget={activeTarget}
+        section={section}
+        canInventory={canInventory}
+        userId={user?.id}
+        isAdmin={isAdmin}
+        items={items}
+        categories={categories}
+        addCategory={addCategory}
+        renameCategory={renameCategory}
+        removeCategory={removeCategory}
+        resetCategories={resetCategories}
+        onExport={handleExport}
+        onImport={handleImport}
+        onSharedBase={() => setSharedOpen(true)}
+        onSelect={handleSelect}
+        onPrint={handleQuickPrint}
+        onPrintBatch={handlePrintBatch}
+        onDefrost={() => setDefrostOpen(true)}
+        onAdd={() => {
+          setEditing(null);
+          setFormOpen(true);
+        }}
+        onEdit={(product) => {
+          setEditing(product);
+          setFormOpen(true);
+        }}
+        removeProduct={removeProduct}
+        prefs={prefs}
+        onPrefsChange={savePrefs}
+        onRequestAdmin={() => setAdminOpen(true)}
+        expiredIds={expiredIds}
+        getStatus={getStatus}
+        jobs={jobs}
+        onClearJobs={() => setJobs([])}
+      />
       <Footer />
       <PrintDialog
         product={selected}
