@@ -127,7 +127,14 @@ const UsersDialog = ({
   useEffect(() => {
     if (!open) return;
     apiUsers()
-      .then((r) => setUsers(r.users))
+      .then((r) => {
+        setUsers(r.users);
+        setCollapsed(
+          r.users
+            .filter((u) => u.role !== 'user' && r.users.some((s) => s.managerId === u.id))
+            .map((u) => u.id),
+        );
+      })
       .catch(() => toast({ title: 'Не удалось загрузить пользователей' }));
   }, [open]);
 
