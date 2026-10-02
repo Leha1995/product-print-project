@@ -15,7 +15,7 @@ import {
   restoreEquipment,
 } from '@/lib/equipmentApi';
 import { toast } from '@/hooks/use-toast';
-import { hasDepreciation, residualValue } from '@/lib/depreciation';
+import { hasDepreciation, residualValue, totalResidual } from '@/lib/depreciation';
 import { exportEquipmentList, exportInventory, pickEquipment } from '@/lib/inventoryExport';
 
 interface EquipmentSectionProps {
@@ -53,6 +53,7 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
   }, [items, query]);
 
   const totalPrice = items.reduce((sum, i) => (i.active ? sum + i.price : sum), 0);
+  const residualTotal = totalResidual(items.filter((i) => i.active));
   const lastSession = sessions[0];
 
   const handleFinish = async (scanned: string[]) => {
@@ -104,9 +105,17 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
             Инвентаризация
           </h2>
           <p className="mt-1 text-[13px] text-muted-foreground">
-            {`Оборудование кухни · ${items.filter((i) => i.active).length} в работе · ${money(
+            {`Оборудование кухни · ${items.filter((i) => i.active).length} в работе · куплено на ${money(
               totalPrice,
             )}`}
+          </p>
+          <p className="mt-0.5 font-head text-[0.85rem] font-bold text-primary">
+            {`Остаточная стоимость: ${money(residualTotal)}`}
+            {totalPrice > residualTotal && (
+              <span className="ml-1.5 font-body text-[12px] font-normal text-muted-foreground">
+                {`(−${money(totalPrice - residualTotal)} амортизация)`}
+              </span>
+            )}
           </p>
         </div>
 

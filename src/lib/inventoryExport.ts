@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx-js-style';
 import { Equipment, FinishResult } from '@/lib/equipmentApi';
-import { residualValue } from '@/lib/depreciation';
+import { residualValue, totalResidual } from '@/lib/depreciation';
 
 const stamp = (iso?: string | null) => {
   const d = iso ? new Date(iso) : new Date();
@@ -84,6 +84,7 @@ const paintRows = (sheet: XLSX.WorkSheet, colors: (string | null)[]) => {
 };
 
 export const exportInventory = (result: FinishResult, finishedAt?: string | null) => {
+  const checkedAt = finishedAt ? new Date(finishedAt) : new Date();
   const all = [
     ...result.found.map((item) => ({ item, found: true })),
     ...result.missing.map((item) => ({ item, found: false })),
@@ -124,6 +125,14 @@ export const exportInventory = (result: FinishResult, finishedAt?: string | null
     { Показатель: 'Не найдено', Значение: result.missing.length },
     { Показатель: 'Стоимость всего, ₽', Значение: Math.round(result.totalPrice) },
     { Показатель: 'Стоимость недостачи, ₽', Значение: Math.round(result.missingPrice) },
+    {
+      Показатель: 'Остаточная стоимость всего, ₽',
+      Значение: Math.round(totalResidual([...result.found, ...result.missing], checkedAt)),
+    },
+    {
+      Показатель: 'Остаточная стоимость недостачи, ₽',
+      Значение: Math.round(totalResidual(result.missing, checkedAt)),
+    },
   ]);
   summary['!cols'] = [{ wch: 26 }, { wch: 24 }];
 

@@ -5,7 +5,8 @@ const DAY = 24 * 60 * 60 * 1000;
 export const daysInService = (item: Equipment, at = new Date()) => {
   if (!item.commissionedAt) return 0;
   const start = new Date(`${item.commissionedAt.slice(0, 10)}T00:00:00`);
-  const end = item.active === false && item.writtenOffAt ? new Date(item.writtenOffAt) : at;
+  const off = item.active === false && item.writtenOffAt ? new Date(item.writtenOffAt) : null;
+  const end = off && off < at ? off : at;
   return Math.max(0, Math.floor((end.getTime() - start.getTime()) / DAY));
 };
 
@@ -23,3 +24,6 @@ export const depreciationDaysLeft = (item: Equipment, at = new Date()) => {
   if (!hasDepreciation(item)) return null;
   return Math.ceil(residualValue(item, at) / (item.depreciationPerDay || 1));
 };
+
+export const totalResidual = (items: Equipment[], at = new Date()) =>
+  items.reduce((sum, i) => sum + residualValue(i, at), 0);
