@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Icon from '@/components/ui/icon';
 import EquipmentFormDialog from '@/components/equipment/EquipmentFormDialog';
 import QrPrintDialog from '@/components/equipment/QrPrintDialog';
@@ -8,6 +8,9 @@ import InventoryHistoryDialog from '@/components/equipment/InventoryHistoryDialo
 import RepairReturnDialog from '@/components/equipment/RepairReturnDialog';
 import RepairSendDialog from '@/components/equipment/RepairSendDialog';
 import RepairHistory from '@/components/equipment/RepairHistory';
+import FindQrDialog from '@/components/equipment/FindQrDialog';
+import useHardwareScanner from '@/hooks/useHardwareScanner';
+import { playScanSound } from '@/lib/scanSound';
 import useEquipment from '@/hooks/useEquipment';
 import {
   Equipment,
@@ -45,6 +48,9 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
   const [resultOpen, setResultOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [findOpen, setFindOpen] = useState(false);
+  const [foundId, setFoundId] = useState<string | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const [repairItem, setRepairItem] = useState<Equipment | null>(null);
   const [repairOpen, setRepairOpen] = useState(false);
   const [sendItem, setSendItem] = useState<Equipment | null>(null);
@@ -52,14 +58,38 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      (i) =>
-        i.name.toLowerCase().includes(q) ||
-        i.location.toLowerCase().includes(q) ||
-        i.code.toLowerCase().includes(q),
+    const list = q
+      ? items.filter(
+          (i) =>
+            i.name.toLowerCase().includes(q) ||
+            i.location.toLowerCase().includes(q) ||
+            i.code.toLowerCase().includes(q),
+        )
+      : items;
+    if (!foundId) return list;
+    const hit = items.find((i) => i.id === foundId);
+    return hit ? [hit, ...list.filter((i) => i.id !== foundId)] : list;
+  }, [items, query, foundId]);
+
+  const findByCode = (raw: string) => {
+    const code = raw.trim().toLowerCase();
+    const hit = items.find((i) => i.code.toLowerCase() === code);
+    setFindOpen(false);
+    playScanSound(Boolean(hit));
+    if (!hit) {
+      toast({ title: 'Оборудование не найдено', description: `Код: ${raw.trim()}` });
+      return;
+    }
+    setQuery('');
+    setFoundId(hit.id);
+    requestAnimationFrame(() =>
+      listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
     );
-  }, [items, query]);
+  };
+
+  const anyDialogOpen =
+    formOpen || qrOpen || scanOpen || resultOpen || historyOpen || repairOpen || sendOpen || findOpen;
+  useHardwareScanner(!anyDialogOpen && items.length > 0, findByCode);
 
   const totalPrice = items.reduce((sum, i) => (i.active ? sum + i.price : sum), 0);
   const residualTotal = totalResidual(items.filter((i) => i.active));
@@ -249,23 +279,52 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
         </button>
       )}
 
-      {items.length > 4 && (
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Поиск по названию, месту или коду"
-          className="mt-4 w-full border-2 border-primary bg-background px-3 py-2.5 font-body text-[14px] text-primary outline-none"
-        />
+      {items.length > 0 && (
+        <div className="mt-4 flex gap-2">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return;
+              const code = query.trim().toLowerCase();
+              if (code && items.some((i) => i.code.toLowerCase() === code)) findByCode(query);
+            }}
+            placeholder="Поиск по названию, месту или коду"
+            className="min-w-0 flex-1 border-2 border-primary bg-background px-3 py-2.5 font-body text-[14px] text-primary outline-none"
+          />
+          <button
+            onClick={() => setFindOpen(true)}
+            className="flex shrink-0 items-center gap-2 border-2 border-primary bg-accent px-3 py-2.5 font-head text-[0.72rem] font-bold uppercase text-accent-foreground transition-transform hover:-translate-y-0.5"
+          >
+            <Icon name="ScanQrCode" fallback="QrCode" size={18} strokeWidth={2.5} />
+            <span className="hidden sm:inline">Найти по QR</span>
+          </button>
+        </div>
       )}
 
-      <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+      <div ref={listRef} className="mt-4 grid scroll-mt-4 gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {filtered.map((item) => (
           <div
             key={item.id}
-            className={`flex flex-col justify-between gap-3 border-2 bg-card p-3 ${
+            className={`relative flex flex-col justify-between gap-3 border-2 bg-card p-3 ${
               item.active ? 'border-primary' : 'border-muted-foreground opacity-60'
-            }`}
+            } ${item.id === foundId ? 'animate-fade-in ring-4 ring-accent sm:col-span-2 xl:col-span-3' : ''}`}
           >
+            {item.id === foundId && (
+              <div className="-mx-3 -mt-3 flex items-center justify-between gap-2 border-b-2 border-primary bg-accent px-3 py-1.5">
+                <span className="flex items-center gap-1.5 font-head text-[0.68rem] font-bold uppercase text-accent-foreground">
+                  <Icon name="ScanQrCode" fallback="QrCode" size={14} strokeWidth={2.5} />
+                  Найдено по QR-коду
+                </span>
+                <button
+                  onClick={() => setFoundId(null)}
+                  aria-label="Убрать отметку"
+                  className="flex h-6 w-6 items-center justify-center text-accent-foreground hover:opacity-70"
+                >
+                  <Icon name="X" size={14} strokeWidth={2.5} />
+                </button>
+              </div>
+            )}
             <div className="flex min-w-0 gap-3">
               {item.image && (
                 <img
@@ -462,6 +521,7 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
           });
         }}
       />
+      <FindQrDialog open={findOpen} onOpenChange={setFindOpen} onCode={findByCode} />
       <RepairSendDialog
         item={sendItem}
         open={sendOpen}
