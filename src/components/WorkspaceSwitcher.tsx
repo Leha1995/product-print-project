@@ -19,6 +19,7 @@ const roleShort: Record<string, string> = {
   admin: 'Админ',
   manager: 'Управляющий',
   superadmin: 'Супер-админ',
+  technician: 'Техник',
 };
 
 const WorkspaceSwitcher = ({

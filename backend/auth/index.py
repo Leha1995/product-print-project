@@ -16,7 +16,7 @@ CORS = {
 }
 
 SESSION_DAYS = 365
-ROLES = ('user', 'admin', 'manager', 'superadmin')
+ROLES = ('user', 'admin', 'manager', 'superadmin', 'technician')
 GLOBAL_ROLES = ('manager', 'superadmin')
 
 

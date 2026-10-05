@@ -28,6 +28,7 @@ import { toast } from '@/hooks/use-toast';
 import IndexMain from '@/components/index/IndexMain';
 import useExpiryAlerts from '@/components/index/useExpiryAlerts';
 import useCatalogTransfer from '@/components/index/useCatalogTransfer';
+import TechnicianScreen from '@/components/technician/TechnicianScreen';
 
 const Index = () => {
   const [selected, setSelected] = useState<Product | null>(null);
@@ -50,6 +51,7 @@ const Index = () => {
   } =
     useAuth();
   const { managed, refreshManaged } = useManagedUsers(isAdmin);
+  const isTechnician = user?.role === 'technician';
   const [targetId, setTargetId] = useState<number | null>(null);
   const activeTarget = targetId ?? (inventoryOnly ? null : (user?.id ?? null));
   const managerPicked = inventoryOnly && targetId !== null;
@@ -69,7 +71,7 @@ const Index = () => {
     replaceCatalog,
     saveCategories,
     savePrefs,
-  } = useCatalog(user?.id, activeTarget);
+  } = useCatalog(isTechnician ? null : user?.id, isTechnician ? null : activeTarget);
   const {
     categories,
     addCategory,
@@ -250,6 +252,15 @@ const Index = () => {
 
   if (!isAuthed) {
     return <LoginScreen onLogin={login} kicked={kicked} />;
+  }
+
+  if (isTechnician) {
+    return (
+      <TechnicianScreen
+        userName={user?.fullName || user?.username || ''}
+        onLogout={() => logout()}
+      />
+    );
   }
 
   return (

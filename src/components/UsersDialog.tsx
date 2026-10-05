@@ -25,6 +25,7 @@ const roleLabel: Record<Role, string> = {
   admin: 'Админ',
   manager: 'Управляющий',
   superadmin: 'Супер-админ',
+  technician: 'Техник',
 };
 
 const inputClass =
@@ -150,7 +151,7 @@ const UsersDialog = ({
         password,
         fullName,
         role,
-        managerId: role === 'user' || role === 'admin' ? managerId || null : null,
+        managerId: role === 'user' || role === 'admin' || role === 'technician' ? managerId || null : null,
         accessDays: role === 'admin' ? accessDays || null : null,
       });
       apply(r.users);
@@ -292,19 +293,21 @@ const UsersDialog = ({
                 <option value="user">Сотрудник</option>
                 <option value="admin">Админ</option>
                 <option value="manager">Управляющий</option>
+                <option value="technician">Техник</option>
                 <option value="superadmin">Супер-админ</option>
               </select>
             )}
-            {isSuperAdmin && role === 'user' && (
+            {isSuperAdmin && (role === 'user' || role === 'technician') && (
               <select
                 value={managerId}
                 onChange={(e) => setManagerId(e.target.value ? Number(e.target.value) : '')}
                 className={`${inputClass} md:col-span-2`}
               >
-                <option value="">Без руководителя</option>
-                {admins.map((a) => (
+                <option value="">{role === 'technician' ? 'Все точки' : 'Без руководителя'}</option>
+                {(role === 'technician' ? [...managers, ...admins] : admins).map((a) => (
                   <option key={a.id} value={a.id}>
                     Закрепить за: {a.fullName || a.username}
+                    {role === 'technician' && a.role === 'manager' ? ' (управляющий)' : ''}
                   </option>
                 ))}
               </select>
@@ -445,10 +448,11 @@ const UsersDialog = ({
                     <option value="user">Сотрудник</option>
                     <option value="admin">Админ</option>
                     <option value="manager">Управляющий</option>
+                    <option value="technician">Техник</option>
                     <option value="superadmin">Супер-админ</option>
                   </select>
                 )}
-                {isSuperAdmin && u.role === 'user' && (
+                {isSuperAdmin && (u.role === 'user' || u.role === 'technician') && (
                   <select
                     value={u.managerId ?? ''}
                     onChange={(e) =>
@@ -459,10 +463,11 @@ const UsersDialog = ({
                     }
                     className="border-2 border-primary bg-background px-2 py-1 font-body text-[13px] text-primary outline-none"
                   >
-                    <option value="">Без руководителя</option>
-                    {admins.map((a) => (
+                    <option value="">{u.role === 'technician' ? 'Все точки' : 'Без руководителя'}</option>
+                    {(u.role === 'technician' ? [...managers, ...admins] : admins).map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.fullName || a.username}
+                        {u.role === 'technician' && a.role === 'manager' ? ' (управляющий)' : ''}
                       </option>
                     ))}
                   </select>

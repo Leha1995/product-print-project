@@ -90,7 +90,8 @@ const repairsSheet = (items: Equipment[]) => {
   const records = items
     .flatMap((item) => (item.repairs || []).map((r) => ({ item, r })))
     .sort((a, b) => (b.r.sentAt || '').localeCompare(a.r.sentAt || ''));
-  const rows = records.length
+  type RepairRow = Record<string, string | number>;
+  const rows: RepairRow[] = records.length
     ? records.map(({ item, r }, i) => ({
         '№': i + 1,
         Оборудование: item.name,
@@ -117,7 +118,7 @@ const repairsSheet = (items: Equipment[]) => {
       'Дата возврата': '',
       'Сумма, ₽': Math.round(records.reduce((sum, { r }) => sum + (r.returnedAt ? r.cost : 0), 0)),
       'Описание поломки': '',
-    } as (typeof rows)[number]);
+    });
   }
   const sheet = XLSX.utils.json_to_sheet(rows);
   paintRows(

@@ -118,3 +118,27 @@ export const sendToRepair = (id: string, description = '') =>
 
 export const returnFromRepair = (id: string, cost: number, description?: string) =>
   send({ action: 'return_repair', id, cost, description }) as Promise<{ items: Equipment[] }>;
+
+export interface TechRepair {
+  ownerId: number;
+  ownerName: string;
+  id: string;
+  name: string;
+  code: string;
+  location: string;
+  serial: string;
+  image: string;
+  repairSentAt: string | null;
+  repairCost: number;
+  description: string;
+}
+
+export const fetchTechRepairs = async (): Promise<TechRepair[]> => {
+  const res = await fetch(API, { headers: authHeaders() });
+  if (!res.ok) throw new Error(String(res.status));
+  const data = await res.json();
+  return Array.isArray(data.repairs) ? (data.repairs as TechRepair[]) : [];
+};
+
+export const techReturnRepair = (ownerId: number, id: string, cost: number, description: string) =>
+  send({ action: 'return_repair', ownerId, id, cost, description }) as Promise<{ repairs: TechRepair[] }>;

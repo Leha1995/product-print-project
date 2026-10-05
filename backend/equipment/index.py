@@ -45,14 +45,61 @@ def session_user(cur, token: str):
     if not token:
         return None
     cur.execute(
-        'SELECT u.id, u.username, u.role, u.active FROM app_sessions s '
+        'SELECT u.id, u.username, u.role, u.active, u.manager_id FROM app_sessions s '
         f'JOIN app_users u ON u.id = s.user_id WHERE s.token = {q(token)} '
         'AND s.expires_at > NOW()'
     )
     row = cur.fetchone()
     if not row or not row[3]:
         return None
-    return {'id': row[0], 'username': row[1], 'role': row[2]}
+    return {'id': row[0], 'username': row[1], 'role': row[2], 'managerId': row[4]}
+
+
+def technician_owners(cur, me):
+    """Владельцы оборудования, ремонты которых видит техник. None — все."""
+    head = me.get('managerId')
+    if not head:
+        return None
+    cur.execute(f'SELECT role FROM app_users WHERE id = {int(head)}')
+    row = cur.fetchone()
+    if not row:
+        return [int(head)]
+    if row[0] == 'superadmin':
+        return None
+    owners = [int(head)]
+    if row[0] == 'manager':
+        cur.execute(f"SELECT id FROM app_users WHERE role = 'admin' AND manager_id = {int(head)}")
+        owners.extend(r[0] for r in cur.fetchall())
+    return owners
+
+
+def technician_items(cur, me):
+    owners = technician_owners(cur, me)
+    scope = '' if owners is None else f" AND e.user_id IN ({', '.join(str(o) for o in owners)})"
+    cur.execute(
+        'SELECT e.user_id, e.id, e.name, e.code, e.location, e.serial, e.image, e.repair_sent_at, '
+        'e.repair_cost, COALESCE(NULLIF(u.full_name, \'\'), u.username), '
+        "(SELECT r.description FROM equipment_repairs r WHERE r.user_id = e.user_id AND r.equipment_id = e.id "
+        'AND r.returned_at IS NULL ORDER BY r.sent_at DESC LIMIT 1) '
+        'FROM equipment e LEFT JOIN app_users u ON u.id = e.user_id '
+        f'WHERE e.in_repair = TRUE AND e.active = TRUE{scope} ORDER BY e.repair_sent_at'
+    )
+    return [
+        {
+            'ownerId': r[0],
+            'id': r[1],
+            'name': r[2],
+            'code': r[3],
+            'location': r[4] or '',
+            'serial': r[5] or '',
+            'image': r[6] or '',
+            'repairSentAt': r[7].isoformat() if r[7] else None,
+            'repairCost': float(r[8] or 0),
+            'ownerName': r[9] or '',
+            'description': r[10] or '',
+        }
+        for r in cur.fetchall()
+    ]
 
 
 def can_manage(cur, me, target_id: int) -> bool:
@@ -188,6 +235,36 @@ def save_item(cur, uid: int, item: dict) -> int:
     return 1
 
 
+def return_repair(cur, uid: int, body: dict) -> None:
+    cost = max(0.0, float(num(body.get('cost'))))
+    eid = str(body.get('id') or '')
+    description = body.get('description')
+    desc_sql = (
+        f", description = {q(str(description).strip()[:1000])}" if description is not None else ''
+    )
+    cur.execute(
+        f'SELECT id FROM equipment_repairs WHERE user_id = {uid} AND equipment_id = {q(eid)} '
+        'AND returned_at IS NULL ORDER BY sent_at DESC LIMIT 1'
+    )
+    open_row = cur.fetchone()
+    if open_row:
+        cur.execute(
+            f'UPDATE equipment_repairs SET returned_at = NOW(), cost = {num(cost)}{desc_sql} '
+            f'WHERE id = {int(open_row[0])}'
+        )
+    else:
+        cur.execute(
+            'INSERT INTO equipment_repairs (user_id, equipment_id, sent_at, returned_at, cost, description) '
+            f"SELECT {uid}, {q(eid)}, COALESCE(repair_sent_at, NOW()), NOW(), {num(cost)}, "
+            f"{q(str(description or '').strip()[:1000])} FROM equipment WHERE user_id = {uid} AND id = {q(eid)}"
+        )
+    cur.execute(
+        'UPDATE equipment SET in_repair = FALSE, repair_sent_at = NULL, '
+        f'repair_cost = COALESCE(repair_cost, 0) + {num(cost)}, updated_at = NOW() '
+        f"WHERE user_id = {uid} AND id = {q(body.get('id', ''))}"
+    )
+
+
 def handler(event: dict, context) -> dict:
     """Инвентаризация оборудования кухни: карточки с QR-кодом, стоимостью и расходами на ремонт, сессии сканирования."""
     method = event.get('httpMethod', 'GET')
@@ -209,6 +286,25 @@ def handler(event: dict, context) -> dict:
     me = session_user(cur, token)
     if not me:
         return finish({'error': 'unauthorized'}, 401)
+    if me['role'] == 'technician':
+        if method == 'GET':
+            return finish({'repairs': technician_items(cur, me)})
+        tbody = json.loads(event.get('body') or '{}')
+        if tbody.get('action') != 'return_repair':
+            return finish({'error': 'forbidden'}, 403)
+        owner = int(tbody.get('ownerId') or 0)
+        owners = technician_owners(cur, me)
+        if not owner or (owners is not None and owner not in owners):
+            return finish({'error': 'forbidden'}, 403)
+        cur.execute(
+            f"SELECT 1 FROM equipment WHERE user_id = {owner} AND id = {q(tbody.get('id', ''))} "
+            'AND in_repair = TRUE'
+        )
+        if not cur.fetchone():
+            return finish({'error': 'not_in_repair', 'repairs': technician_items(cur, me)}, 409)
+        return_repair(cur, owner, tbody)
+        return finish({'ok': True, 'repairs': technician_items(cur, me)})
+
     if me['role'] not in ('superadmin', 'manager'):
         return finish({'error': 'forbidden'}, 403)
 
@@ -317,33 +413,7 @@ def handler(event: dict, context) -> dict:
         return finish({'ok': True, 'items': read_items(cur, uid)})
 
     if action == 'return_repair':
-        cost = max(0.0, float(num(body.get('cost'))))
-        eid = str(body.get('id') or '')
-        description = body.get('description')
-        desc_sql = (
-            f", description = {q(str(description).strip()[:1000])}" if description is not None else ''
-        )
-        cur.execute(
-            f'SELECT id FROM equipment_repairs WHERE user_id = {uid} AND equipment_id = {q(eid)} '
-            'AND returned_at IS NULL ORDER BY sent_at DESC LIMIT 1'
-        )
-        open_row = cur.fetchone()
-        if open_row:
-            cur.execute(
-                f'UPDATE equipment_repairs SET returned_at = NOW(), cost = {num(cost)}{desc_sql} '
-                f'WHERE id = {int(open_row[0])}'
-            )
-        else:
-            cur.execute(
-                'INSERT INTO equipment_repairs (user_id, equipment_id, sent_at, returned_at, cost, description) '
-                f"SELECT {uid}, {q(eid)}, COALESCE(repair_sent_at, NOW()), NOW(), {num(cost)}, "
-                f"{q(str(description or '').strip()[:1000])} FROM equipment WHERE user_id = {uid} AND id = {q(eid)}"
-            )
-        cur.execute(
-            'UPDATE equipment SET in_repair = FALSE, repair_sent_at = NULL, '
-            f'repair_cost = COALESCE(repair_cost, 0) + {num(cost)}, updated_at = NOW() '
-            f"WHERE user_id = {uid} AND id = {q(body.get('id', ''))}"
-        )
+        return_repair(cur, uid, body)
         return finish({'ok': True, 'items': read_items(cur, uid)})
 
     if action == 'restore':
