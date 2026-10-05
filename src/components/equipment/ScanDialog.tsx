@@ -5,6 +5,7 @@ import Icon from '@/components/ui/icon';
 import { Equipment } from '@/lib/equipmentApi';
 import { cameraSupported, openCamera } from '@/lib/cameraPermission';
 import useHardwareScanner from '@/hooks/useHardwareScanner';
+import { playScanSound, unlockScanSound } from '@/lib/scanSound';
 
 interface ScanDialogProps {
   open: boolean;
@@ -31,10 +32,16 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
   const codeMapRef = useRef(new Map<string, Equipment>());
   codeMapRef.current = new Map(active.map((i) => [i.code, i]));
 
+  const lastHitRef = useRef<{ code: string; at: number }>({ code: '', at: 0 });
+
   const accept = useCallback((raw: string) => {
     const code = raw.trim();
     if (!code) return;
     const found = codeMapRef.current.get(code);
+    const now = Date.now();
+    const repeat = lastHitRef.current.code === code && now - lastHitRef.current.at < 1500;
+    lastHitRef.current = { code, at: now };
+    if (!repeat) playScanSound(Boolean(found));
     setLast({ name: found ? found.name : `Чужой код: ${code}`, ok: Boolean(found) });
     if (!found) return;
     setScanned((prev) => (prev.includes(code) ? prev : [...prev, code]));
@@ -44,6 +51,8 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
 
   useEffect(() => {
     if (!open) return;
+    unlockScanSound();
+    lastHitRef.current = { code: '', at: 0 };
     setScanned([]);
     setLast(null);
     setError('');
