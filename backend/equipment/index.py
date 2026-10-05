@@ -79,7 +79,27 @@ def can_manage(cur, me, target_id: int) -> bool:
     return False
 
 
+def read_repairs(cur, uid: int) -> dict:
+    cur.execute(
+        'SELECT id, equipment_id, sent_at, returned_at, cost, description FROM equipment_repairs '
+        f'WHERE user_id = {uid} ORDER BY sent_at DESC, id DESC'
+    )
+    out: dict = {}
+    for r in cur.fetchall():
+        out.setdefault(r[1], []).append(
+            {
+                'id': r[0],
+                'sentAt': r[2].isoformat() if r[2] else None,
+                'returnedAt': r[3].isoformat() if r[3] else None,
+                'cost': float(r[4] or 0),
+                'description': r[5] or '',
+            }
+        )
+    return out
+
+
 def read_items(cur, uid: int):
+    repairs = read_repairs(cur, uid)
     cur.execute(
         'SELECT id, name, code, price, location, note, image, serial, active, created_at, '
         'qr_broken, written_off_at, write_off_reason, commissioned_at, depreciation_per_day, repair_cost, '
@@ -106,6 +126,7 @@ def read_items(cur, uid: int):
             'repairCost': float(r[15] or 0),
             'inRepair': bool(r[16]),
             'repairSentAt': r[17].isoformat() if r[17] else None,
+            'repairs': repairs.get(r[0], []),
         }
         for r in cur.fetchall()
     ]
@@ -282,14 +303,42 @@ def handler(event: dict, context) -> dict:
         return finish({'ok': True, 'items': read_items(cur, uid)})
 
     if action == 'send_repair':
+        eid = str(body.get('id') or '')
+        description = str(body.get('description') or '').strip()[:1000]
         cur.execute(
             'UPDATE equipment SET in_repair = TRUE, repair_sent_at = NOW(), updated_at = NOW() '
-            f"WHERE user_id = {uid} AND id = {q(body.get('id', ''))} AND active = TRUE"
+            f"WHERE user_id = {uid} AND id = {q(eid)} AND active = TRUE AND in_repair = FALSE RETURNING id"
         )
+        if cur.fetchone():
+            cur.execute(
+                'INSERT INTO equipment_repairs (user_id, equipment_id, sent_at, description) '
+                f'VALUES ({uid}, {q(eid)}, NOW(), {q(description)})'
+            )
         return finish({'ok': True, 'items': read_items(cur, uid)})
 
     if action == 'return_repair':
         cost = max(0.0, float(num(body.get('cost'))))
+        eid = str(body.get('id') or '')
+        description = body.get('description')
+        desc_sql = (
+            f", description = {q(str(description).strip()[:1000])}" if description is not None else ''
+        )
+        cur.execute(
+            f'SELECT id FROM equipment_repairs WHERE user_id = {uid} AND equipment_id = {q(eid)} '
+            'AND returned_at IS NULL ORDER BY sent_at DESC LIMIT 1'
+        )
+        open_row = cur.fetchone()
+        if open_row:
+            cur.execute(
+                f'UPDATE equipment_repairs SET returned_at = NOW(), cost = {num(cost)}{desc_sql} '
+                f'WHERE id = {int(open_row[0])}'
+            )
+        else:
+            cur.execute(
+                'INSERT INTO equipment_repairs (user_id, equipment_id, sent_at, returned_at, cost, description) '
+                f"SELECT {uid}, {q(eid)}, COALESCE(repair_sent_at, NOW()), NOW(), {num(cost)}, "
+                f"{q(str(description or '').strip()[:1000])} FROM equipment WHERE user_id = {uid} AND id = {q(eid)}"
+            )
         cur.execute(
             'UPDATE equipment SET in_repair = FALSE, repair_sent_at = NULL, '
             f'repair_cost = COALESCE(repair_cost, 0) + {num(cost)}, updated_at = NOW() '

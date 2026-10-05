@@ -3,6 +3,14 @@ import { getToken } from '@/lib/authApi';
 
 const API = apiUrl('equipment');
 
+export interface RepairRecord {
+  id: number;
+  sentAt: string | null;
+  returnedAt: string | null;
+  cost: number;
+  description: string;
+}
+
 export interface Equipment {
   id: string;
   name: string;
@@ -22,6 +30,7 @@ export interface Equipment {
   repairCost?: number;
   inRepair?: boolean;
   repairSentAt?: string | null;
+  repairs?: RepairRecord[];
 }
 
 export interface InventorySession {
@@ -104,8 +113,8 @@ export const markQrFixed = (id: string) =>
 
 export const restoreEquipment = (id: string) =>
   send({ action: 'restore', id }) as Promise<{ items: Equipment[] }>;
-export const sendToRepair = (id: string) =>
-  send({ action: 'send_repair', id }) as Promise<{ items: Equipment[] }>;
+export const sendToRepair = (id: string, description = '') =>
+  send({ action: 'send_repair', id, description }) as Promise<{ items: Equipment[] }>;
 
-export const returnFromRepair = (id: string, cost: number) =>
-  send({ action: 'return_repair', id, cost }) as Promise<{ items: Equipment[] }>;
+export const returnFromRepair = (id: string, cost: number, description?: string) =>
+  send({ action: 'return_repair', id, cost, description }) as Promise<{ items: Equipment[] }>;

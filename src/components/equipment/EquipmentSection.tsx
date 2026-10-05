@@ -6,6 +6,8 @@ import ScanDialog from '@/components/equipment/ScanDialog';
 import ScanResultDialog from '@/components/equipment/ScanResultDialog';
 import InventoryHistoryDialog from '@/components/equipment/InventoryHistoryDialog';
 import RepairReturnDialog from '@/components/equipment/RepairReturnDialog';
+import RepairSendDialog from '@/components/equipment/RepairSendDialog';
+import RepairHistory from '@/components/equipment/RepairHistory';
 import useEquipment from '@/hooks/useEquipment';
 import {
   Equipment,
@@ -45,6 +47,8 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
   const [query, setQuery] = useState('');
   const [repairItem, setRepairItem] = useState<Equipment | null>(null);
   const [repairOpen, setRepairOpen] = useState(false);
+  const [sendItem, setSendItem] = useState<Equipment | null>(null);
+  const [sendOpen, setSendOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -62,19 +66,20 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
   const lastSession = sessions[0];
   const inRepairCount = items.filter((i) => i.active && i.inRepair).length;
 
-  const handleSendRepair = async (item: Equipment) => {
+  const handleSendRepair = async (item: Equipment, description: string) => {
     try {
-      const res = await sendToRepair(item.id);
+      const res = await sendToRepair(item.id, description);
       setItems(res.items);
       toast({ title: 'Отправлено в ремонт', description: `${item.name} — не участвует в инвентаризации` });
     } catch {
       toast({ title: 'Не удалось сохранить', description: 'Проверь интернет и повтори' });
+      throw new Error('save_failed');
     }
   };
 
-  const handleReturnRepair = async (item: Equipment, cost: number) => {
+  const handleReturnRepair = async (item: Equipment, cost: number, description: string) => {
     try {
-      const res = await returnFromRepair(item.id, cost);
+      const res = await returnFromRepair(item.id, cost, description);
       setItems(res.items);
       toast({
         title: 'Принято с ремонта',
@@ -335,19 +340,7 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
               </div>
             </div>
 
-            <div
-              className={`flex items-center justify-between gap-2 border-2 px-2.5 py-1.5 ${
-                (item.repairCost || 0) > 0 ? 'border-primary bg-background' : 'border-dashed border-muted-foreground'
-              }`}
-            >
-              <span className="flex items-center gap-1.5 font-head text-[0.65rem] font-bold uppercase text-muted-foreground">
-                <Icon name="Wrench" size={13} strokeWidth={2.5} />
-                Ремонт
-              </span>
-              <span className="font-head text-[0.85rem] font-black text-primary">
-                {money(item.repairCost || 0)}
-              </span>
-            </div>
+            <RepairHistory item={item} />
 
             <div className="flex flex-wrap gap-1.5">
               {item.qrBroken && item.active && isAdmin && (
@@ -382,7 +375,10 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
                   </button>
                 ) : (
                   <button
-                    onClick={() => handleSendRepair(item)}
+                    onClick={() => {
+                      setSendItem(item);
+                      setSendOpen(true);
+                    }}
                     className="flex w-full items-center justify-center gap-1.5 border-2 border-primary bg-card px-2 py-2 font-head text-[0.68rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
                   >
                     <Icon name="Wrench" size={14} strokeWidth={2.5} />
@@ -465,6 +461,12 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
             description: item.name,
           });
         }}
+      />
+      <RepairSendDialog
+        item={sendItem}
+        open={sendOpen}
+        onOpenChange={setSendOpen}
+        onConfirm={handleSendRepair}
       />
       <RepairReturnDialog
         item={repairItem}
