@@ -7,6 +7,8 @@ import uuid
 import boto3
 import psycopg2
 
+from notify import notify_new_task, notify_repair, notify_task_done
+
 CORS = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
@@ -508,9 +510,13 @@ def handler(event: dict, context) -> dict:
                 "UPDATE equipment_tasks SET status = 'done', done_at = NOW(), "
                 f"cost = {task_cost(tbody.get('cost'))}, "
                 f"done_by = {int(me['id'])}, done_comment = {q(str(tbody.get('comment') or '').strip()[:1000])} "
-                f"WHERE id = {tid} AND status = 'open'"
+                f"WHERE id = {tid} AND status = 'open' RETURNING id"
             )
-            return finish({'ok': True, 'tasks': technician_tasks(cur, me)})
+            closed = cur.fetchone()
+            tasks_now = technician_tasks(cur, me)
+            if closed:
+                notify_task_done(cur, tid)
+            return finish({'ok': True, 'tasks': tasks_now})
         if tbody.get('action') != 'return_repair':
             return finish({'error': 'forbidden'}, 403)
         owner = int(tbody.get('ownerId') or 0)
@@ -580,9 +586,18 @@ def handler(event: dict, context) -> dict:
         photos = upload_photos(body.get('photos'), f'{uid}-{uuid.uuid4().hex[:6]}')
         cur.execute(
             'INSERT INTO equipment_tasks (user_id, equipment_id, technician_id, created_by, description, photos, priority) '
-            f"VALUES ({uid}, {eq_sql}, {tech_sql}, {int(me['id'])}, {q(description)}, {q(json.dumps(photos))}::jsonb, {q(priority)})"
+            f"VALUES ({uid}, {eq_sql}, {tech_sql}, {int(me['id'])}, {q(description)}, {q(json.dumps(photos))}::jsonb, {q(priority)}) "
+            'RETURNING id'
         )
-        return finish({'ok': True, 'tasks': owner_tasks(cur, uid)})
+        new_id = cur.fetchone()[0]
+        tasks_now = owner_tasks(cur, uid)
+        notify_new_task(
+            cur, uid, new_id, description, priority,
+            eid if eq_sql != 'NULL' else None,
+            int(tech_id) if tech_sql != 'NULL' else None,
+            techs,
+        )
+        return finish({'ok': True, 'tasks': tasks_now})
 
     if action == 'cancel_task':
         cur.execute(
@@ -680,6 +695,9 @@ def handler(event: dict, context) -> dict:
                 'INSERT INTO equipment_repairs (user_id, equipment_id, sent_at, description, photos) '
                 f'VALUES ({uid}, {q(eid)}, NOW(), {q(description)}, {q(json.dumps(photos))}::jsonb)'
             )
+            items_now = read_items(cur, uid)
+            notify_repair(cur, uid, eid, description, owner_technicians(cur, uid))
+            return finish({'ok': True, 'items': items_now})
         return finish({'ok': True, 'items': read_items(cur, uid)})
 
     if action == 'return_repair':
