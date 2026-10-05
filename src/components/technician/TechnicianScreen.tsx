@@ -101,9 +101,9 @@ const TechnicianScreen = ({ userName, onLogout }: TechnicianScreenProps) => {
   const openTasks = tasks.filter((t) => t.status === 'open');
   const closedTasks = tasks.filter((t) => t.status !== 'open');
 
-  const confirmDone = async (task: EquipmentTask, comment: string) => {
+  const confirmDone = async (task: EquipmentTask, comment: string, cost: number) => {
     try {
-      const res = await techTaskDone(task.id, comment);
+      const res = await techTaskDone(task.id, comment, cost);
       setTasks(res.tasks);
       toast({ title: 'Задача закрыта', description: `№${task.id}` });
     } catch {

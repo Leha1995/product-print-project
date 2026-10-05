@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx-js-style';
-import { Equipment, FinishResult } from '@/lib/equipmentApi';
+import { Equipment, EquipmentTask, FinishResult, fetchTasksReport } from '@/lib/equipmentApi';
+import { priorityOf } from '@/lib/taskPriority';
 import { residualValue, totalResidual } from '@/lib/depreciation';
 
 const stamp = (iso?: string | null) => {
@@ -144,11 +145,118 @@ const repairsSheet = (items: Equipment[]) => {
   return sheet;
 };
 
-export const exportInventory = (
+const dateTimeText = (iso: string | null) =>
+  iso
+    ? new Date(iso).toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '';
+
+const taskTitle = (t: EquipmentTask) => {
+  const first = (t.description || '').split('\n')[0].trim();
+  return first.length > 80 ? `${first.slice(0, 80)}…` : first;
+};
+
+const TASK_HEADER = [
+  '№',
+  'Задача',
+  'Оборудование',
+  'Срочность',
+  'Создана',
+  'Выполнена',
+  'Потрачено, ₽',
+  'Техник',
+  'Что сделано',
+  'Описание',
+];
+
+const tasksSheet = (tasks: EquipmentTask[], from: string | null, to: string | null) => {
+  const period = `Период: ${from ? dateTimeText(from) : 'с начала учёта'} — ${to ? dateTimeText(to) : 'сейчас'}`;
+  const width = TASK_HEADER.length;
+  const done = tasks.filter((t) => t.status === 'done');
+  const total = done.reduce((sum, t) => sum + (t.cost || 0), 0);
+  const aoa: (string | number)[][] = [[period], TASK_HEADER];
+  tasks.forEach((t, i) => {
+    const isDone = t.status === 'done';
+    aoa.push([
+      i + 1,
+      taskTitle(t),
+      [t.equipmentName, t.location].filter(Boolean).join(' · ') || '—',
+      priorityOf(t.priority).label,
+      dateTimeText(t.createdAt),
+      isDone ? dateTimeText(t.doneAt) : 'Не выполнена',
+      isDone ? Math.round(t.cost || 0) : '',
+      isDone ? t.doneByName || t.technicianName || '' : t.technicianName || 'любой закреплённый',
+      t.doneComment || '',
+      t.description || '',
+    ]);
+  });
+  if (tasks.length) {
+    aoa.push(['', `Итого: задач ${tasks.length}, выполнено ${done.length}`, '', '', '', '', Math.round(total), '', '', '']);
+  } else {
+    aoa.push(['', 'За период задач не было']);
+  }
+
+  const sheet = XLSX.utils.aoa_to_sheet(aoa);
+  const at = (r: number, c: number) => {
+    const ref = XLSX.utils.encode_cell({ r, c });
+    if (!sheet[ref]) sheet[ref] = { t: 's', v: '' };
+    return sheet[ref];
+  };
+  at(0, 0).s = { font: { bold: true, sz: 12 } };
+  for (let c = 0; c < width; c += 1) {
+    at(1, c).s = { font: { bold: true }, fill: { patternType: 'solid', fgColor: { rgb: 'D9D9D9' } } };
+  }
+  tasks.forEach((t, i) => {
+    const color = t.status === 'done' ? COLORS.green : COLORS.yellow;
+    for (let c = 0; c < width; c += 1) {
+      at(i + 2, c).s = {
+        fill: { patternType: 'solid', fgColor: { rgb: color } },
+        alignment: { wrapText: c === 1 || c >= 8, vertical: 'top' },
+      };
+    }
+  });
+  if (tasks.length) {
+    const last = tasks.length + 2;
+    for (let c = 0; c < width; c += 1) at(last, c).s = { font: { bold: true } };
+    sheet['!autofilter'] = {
+      ref: XLSX.utils.encode_range({ s: { r: 1, c: 0 }, e: { r: last - 1, c: width - 1 } }),
+    };
+  }
+  sheet['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: width - 1 } }];
+  sheet['!cols'] = [
+    { wch: 5 },
+    { wch: 40 },
+    { wch: 26 },
+    { wch: 14 },
+    { wch: 17 },
+    { wch: 17 },
+    { wch: 13 },
+    { wch: 20 },
+    { wch: 34 },
+    { wch: 50 },
+  ];
+  return sheet;
+};
+
+const loadTasks = async (sessionId?: number | null) => {
+  try {
+    return await fetchTasksReport(sessionId);
+  } catch {
+    return null;
+  }
+};
+
+export const exportInventory = async (
   result: FinishResult,
   finishedAt?: string | null,
   allItems?: Equipment[],
 ) => {
+  const report = await loadTasks(result.sessionId);
   const checkedAt = finishedAt ? new Date(finishedAt) : new Date();
   const all = [
     ...result.found.map((item) => ({ item, found: true })),
@@ -205,10 +313,12 @@ export const exportInventory = (
   XLSX.utils.book_append_sheet(book, summary, 'Итоги');
   XLSX.utils.book_append_sheet(book, sheet, 'Оборудование');
   XLSX.utils.book_append_sheet(book, repairsSheet(allItems || [...result.found, ...result.missing]), 'Ремонты');
+  if (report) XLSX.utils.book_append_sheet(book, tasksSheet(report.tasks, report.from, report.to), 'Прочие задачи');
   XLSX.writeFile(book, `Инвентаризация_${stamp(finishedAt)}.xlsx`);
 };
 
-export const exportEquipmentList = (items: Equipment[]) => {
+export const exportEquipmentList = async (items: Equipment[]) => {
+  const report = await loadTasks(null);
   const rows = items.map((item) => ({
     Наименование: item.name,
     Место: item.location || '',
@@ -244,5 +354,6 @@ export const exportEquipmentList = (items: Equipment[]) => {
   const book = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(book, sheet, 'Оборудование');
   XLSX.utils.book_append_sheet(book, repairsSheet(items), 'Ремонты');
+  if (report) XLSX.utils.book_append_sheet(book, tasksSheet(report.tasks, report.from, report.to), 'Прочие задачи');
   XLSX.writeFile(book, `Оборудование_${stamp()}.xlsx`);
 };

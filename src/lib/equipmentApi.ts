@@ -95,6 +95,7 @@ export interface EquipmentTask {
   createdByName: string;
   doneByName: string;
   priority?: 'urgent' | 'soon' | 'normal';
+  cost?: number;
 }
 
 export interface TechnicianRef {
@@ -186,8 +187,23 @@ export const fetchTechRepairs = async (): Promise<{ repairs: TechRepair[]; tasks
   };
 };
 
-export const techTaskDone = (taskId: number, comment: string) =>
-  send({ action: 'task_done', taskId, comment }) as Promise<{ tasks: EquipmentTask[] }>;
+export const fetchTasksReport = async (
+  sessionId?: number | null,
+): Promise<{ tasks: EquipmentTask[]; from: string | null; to: string | null }> => {
+  const params = new URLSearchParams({ report: 'tasks' });
+  if (sessionId) params.set('sessionId', String(sessionId));
+  const res = await fetch(`${API}?${params}`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(String(res.status));
+  const data = await res.json();
+  return {
+    tasks: Array.isArray(data.tasks) ? (data.tasks as EquipmentTask[]) : [],
+    from: data.from ?? null,
+    to: data.to ?? null,
+  };
+};
+
+export const techTaskDone = (taskId: number, comment: string, cost = 0) =>
+  send({ action: 'task_done', taskId, comment, cost }) as Promise<{ tasks: EquipmentTask[] }>;
 
 export const techReturnRepair = (ownerId: number, id: string, cost: number, description: string) =>
   send({ action: 'return_repair', ownerId, id, cost, description }) as Promise<{ repairs: TechRepair[] }>;

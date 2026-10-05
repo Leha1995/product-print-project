@@ -7,16 +7,18 @@ interface TaskDoneDialogProps {
   task: EquipmentTask | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (task: EquipmentTask, comment: string) => Promise<void>;
+  onConfirm: (task: EquipmentTask, comment: string, cost: number) => Promise<void>;
 }
 
 const TaskDoneDialog = ({ task, open, onOpenChange, onConfirm }: TaskDoneDialogProps) => {
   const [comment, setComment] = useState('');
+  const [cost, setCost] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (open) {
       setComment('');
+      setCost('');
       setBusy(false);
     }
   }, [open]);
@@ -28,7 +30,8 @@ const TaskDoneDialog = ({ task, open, onOpenChange, onConfirm }: TaskDoneDialogP
     if (busy) return;
     setBusy(true);
     try {
-      await onConfirm(task, comment.trim());
+      const value = Number(cost.replace(',', '.').replace(/\s/g, ''));
+      await onConfirm(task, comment.trim(), Number.isFinite(value) && value > 0 ? value : 0);
       onOpenChange(false);
     } finally {
       setBusy(false);
@@ -43,10 +46,21 @@ const TaskDoneDialog = ({ task, open, onOpenChange, onConfirm }: TaskDoneDialogP
           <p className="mt-1 line-clamp-2 text-[13px] text-muted-foreground">{task.description}</p>
           <label className="mt-4 block">
             <span className="font-head text-[0.68rem] font-bold uppercase tracking-[0.06em] text-primary">
+              Потрачено на ремонт, ₽
+            </span>
+            <input
+              inputMode="decimal"
+              value={cost}
+              onChange={(e) => setCost(e.target.value.replace(/[^\d.,\s]/g, ''))}
+              placeholder="0 — если без затрат"
+              className="mt-1 w-full border-2 border-primary bg-card px-3 py-2.5 font-body text-[16px] text-primary outline-none"
+            />
+          </label>
+          <label className="mt-3 block">
+            <span className="font-head text-[0.68rem] font-bold uppercase tracking-[0.06em] text-primary">
               Что сделано (необязательно)
             </span>
             <textarea
-              autoFocus
               rows={3}
               value={comment}
               onChange={(e) => setComment(e.target.value)}

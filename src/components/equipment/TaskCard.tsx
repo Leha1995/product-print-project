@@ -64,6 +64,11 @@ const TaskCard = ({ task, showOwner = false, action }: TaskCardProps) => {
         {!open && (
           <p className="mt-1 text-[12px] text-muted-foreground">
             {`${task.status === 'done' ? 'Выполнил' : 'Отменил'}: ${task.doneByName || '—'} · ${dateTime(task.doneAt)}`}
+            {task.status === 'done' && (
+              <span className="mt-0.5 block font-bold text-primary">
+                {`Потрачено: ${Math.round(task.cost || 0).toLocaleString('ru-RU')} ₽`}
+              </span>
+            )}
             {task.doneComment && (
               <span className="mt-0.5 block whitespace-pre-line text-primary">{task.doneComment}</span>
             )}

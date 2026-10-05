@@ -27,6 +27,16 @@ def num(value) -> str:
         return '0'
 
 
+def task_cost(value) -> str:
+    try:
+        val = float(value)
+    except (TypeError, ValueError):
+        return '0'
+    if val != val or val < 0 or val > 1e9:
+        return '0'
+    return str(round(val, 2))
+
+
 def upload_image(data_url: str, item_id: str, folder: str = 'equipment') -> str:
     header, _, payload = data_url.partition(',')
     ext = 'png' if 'png' in header else 'webp' if 'webp' in header else 'jpg'
@@ -339,7 +349,7 @@ TASK_COLS = (
     't.created_at, t.done_at, t.done_comment, e.name, e.location, e.code, '
     "COALESCE(NULLIF(o.full_name, ''), o.username), COALESCE(NULLIF(tu.full_name, ''), tu.username), "
     "COALESCE(NULLIF(cu.full_name, ''), cu.username), COALESCE(NULLIF(du.full_name, ''), du.username), "
-    't.priority'
+    't.priority, t.cost'
 )
 PRIORITIES = ('urgent', 'soon', 'normal')
 TASK_JOINS = (
@@ -380,9 +390,42 @@ def task_rows(cur, where: str, limit: int = 200):
             'createdByName': r[15] or '',
             'doneByName': r[16] or '',
             'priority': r[17] if r[17] in PRIORITIES else 'normal',
+            'cost': float(r[18] or 0),
         }
         for r in cur.fetchall()
     ]
+
+
+def tasks_report(cur, uid: int, session_id: int):
+    """Задачи за период между предыдущей и текущей инвентаризацией."""
+    end_sql = 'NOW()'
+    if session_id:
+        cur.execute(
+            f'SELECT finished_at FROM inventory_sessions WHERE user_id = {uid} AND id = {int(session_id)}'
+        )
+        row = cur.fetchone()
+        if row and row[0]:
+            end_sql = q(row[0].isoformat()) + '::timestamp'
+    cur.execute(
+        f'SELECT MAX(finished_at) FROM inventory_sessions WHERE user_id = {uid} '
+        f'AND finished_at IS NOT NULL AND finished_at < {end_sql} '
+        + (f'AND id <> {int(session_id)}' if session_id else '')
+    )
+    prev = cur.fetchone()[0]
+    start_sql = (q(prev.isoformat()) + '::timestamp') if prev else "'-infinity'::timestamp"
+    cur.execute(f'SELECT {start_sql}, {end_sql}')
+    start, end = cur.fetchone()
+    tasks = task_rows(
+        cur,
+        f"t.user_id = {uid} AND t.status <> 'cancelled' AND t.created_at <= {end_sql} "
+        f'AND (t.done_at IS NULL OR t.done_at > {start_sql})',
+        2000,
+    )
+    return {
+        'tasks': tasks,
+        'from': start.isoformat() if prev else None,
+        'to': end.isoformat() if end else None,
+    }
 
 
 def owner_tasks(cur, uid: int):
@@ -444,6 +487,7 @@ def handler(event: dict, context) -> dict:
                 return finish({'error': 'not_found', 'tasks': technician_tasks(cur, me)}, 409)
             cur.execute(
                 "UPDATE equipment_tasks SET status = 'done', done_at = NOW(), "
+                f"cost = {task_cost(tbody.get('cost'))}, "
                 f"done_by = {int(me['id'])}, done_comment = {q(str(tbody.get('comment') or '').strip()[:1000])} "
                 f"WHERE id = {tid} AND status = 'open'"
             )
@@ -473,6 +517,11 @@ def handler(event: dict, context) -> dict:
         if not can_manage(cur, me, target):
             return finish({'error': 'forbidden'}, 403)
         uid = target
+
+    qs = event.get('queryStringParameters') or {}
+    if method == 'GET' and qs.get('report') == 'tasks':
+        sid = str(qs.get('sessionId') or '')
+        return finish(tasks_report(cur, uid, int(sid) if sid.isdigit() else 0))
 
     if method == 'GET':
         return finish(
