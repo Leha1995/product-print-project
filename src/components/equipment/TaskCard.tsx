@@ -1,6 +1,7 @@
 import Icon from '@/components/ui/icon';
 import RepairPhotos from '@/components/equipment/RepairPhotos';
 import { EquipmentTask } from '@/lib/equipmentApi';
+import { priorityOf } from '@/lib/taskPriority';
 
 interface TaskCardProps {
   task: EquipmentTask;
@@ -15,16 +16,23 @@ const dateTime = (iso: string | null) =>
 
 const TaskCard = ({ task, showOwner = false, action }: TaskCardProps) => {
   const open = task.status === 'open';
+  const pr = priorityOf(task.priority);
   const where = [showOwner ? task.ownerName : '', task.equipmentName, task.location].filter(Boolean).join(' · ');
 
   return (
     <div
       className={`flex flex-col justify-between gap-3 border-2 bg-card p-3 ${
-        open ? 'border-primary' : 'border-muted-foreground opacity-70'
+        open ? `${pr.border} border-l-[10px]` : 'border-muted-foreground opacity-70'
       }`}
     >
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-1.5">
+          <span
+            className={`inline-flex items-center gap-1 border-2 px-1.5 py-0.5 font-head text-[0.6rem] font-bold uppercase ${pr.chip}`}
+          >
+            <Icon name={pr.icon} fallback="Flag" size={12} strokeWidth={2.5} />
+            {pr.label}
+          </span>
           <span
             className={`inline-flex items-center gap-1 border-2 px-1.5 py-0.5 font-head text-[0.6rem] font-bold uppercase ${
               open

@@ -3,12 +3,14 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
 import PhotoPicker from '@/components/equipment/PhotoPicker';
 import { Equipment, TechnicianRef } from '@/lib/equipmentApi';
+import { PRIORITY_OPTIONS, TaskPriority } from '@/lib/taskPriority';
 
 export interface TaskDraft {
   description: string;
   photos: string[];
   equipmentId: string | null;
   technicianId: number | null;
+  priority: TaskPriority;
 }
 
 interface TaskCreateDialogProps {
@@ -36,6 +38,7 @@ const TaskCreateDialog = ({
   const [photos, setPhotos] = useState<string[]>([]);
   const [equipmentId, setEquipmentId] = useState('');
   const [technicianId, setTechnicianId] = useState('');
+  const [priority, setPriority] = useState<TaskPriority>('normal');
   const [busy, setBusy] = useState(false);
   const [reading, setReading] = useState(false);
 
@@ -43,6 +46,7 @@ const TaskCreateDialog = ({
     if (!open) return;
     setDescription('');
     setPhotos([]);
+    setPriority('normal');
     setEquipmentId(presetItem?.id || '');
     setTechnicianId(technicians.length === 1 ? String(technicians[0].id) : '');
     setBusy(false);
@@ -58,6 +62,7 @@ const TaskCreateDialog = ({
         photos,
         equipmentId: equipmentId || null,
         technicianId: technicianId ? Number(technicianId) : null,
+        priority,
       });
       onOpenChange(false);
     } finally {
@@ -84,6 +89,32 @@ const TaskCreateDialog = ({
               className={`${field} resize-none`}
             />
           </label>
+
+          <div className="mt-3">
+            <span className={label}>Срочность</span>
+            <div className="mt-1 grid grid-cols-3 gap-2">
+              {PRIORITY_OPTIONS.map((p) => {
+                const on = priority === p.value;
+                return (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => setPriority(p.value)}
+                    aria-pressed={on}
+                    className={`flex min-h-[64px] flex-col items-center justify-center gap-1 border-2 px-1 py-2 text-center transition-all ${
+                      on ? `${p.chip} scale-[1.03] shadow-[3px_3px_0_0_hsl(var(--primary))]` : `${p.border} bg-card text-primary opacity-70 hover:opacity-100`
+                    }`}
+                  >
+                    <Icon name={p.icon} fallback="Flag" size={20} strokeWidth={2.5} />
+                    <span className="font-head text-[0.68rem] font-black uppercase leading-tight">{p.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1 text-[12px] text-muted-foreground">
+              {PRIORITY_OPTIONS.find((p) => p.value === priority)?.hint}
+            </p>
+          </div>
 
           <label className="mt-3 block">
             <span className={label}>Оборудование</span>

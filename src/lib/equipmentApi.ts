@@ -94,6 +94,7 @@ export interface EquipmentTask {
   technicianName: string;
   createdByName: string;
   doneByName: string;
+  priority?: 'urgent' | 'soon' | 'normal';
 }
 
 export interface TechnicianRef {
@@ -123,6 +124,7 @@ export const createTask = (payload: {
   photos: string[];
   equipmentId?: string | null;
   technicianId?: number | null;
+  priority?: 'urgent' | 'soon' | 'normal';
 }) => send({ action: 'create_task', ...payload }) as Promise<{ tasks: EquipmentTask[] }>;
 
 export const cancelTask = (taskId: number) =>

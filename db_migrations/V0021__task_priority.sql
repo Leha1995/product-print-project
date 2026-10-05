@@ -1,0 +1,1 @@
+ALTER TABLE equipment_tasks ADD COLUMN IF NOT EXISTS priority TEXT NOT NULL DEFAULT 'normal';

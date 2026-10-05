@@ -338,8 +338,10 @@ TASK_COLS = (
     't.id, t.user_id, t.equipment_id, t.technician_id, t.description, t.photos, t.status, '
     't.created_at, t.done_at, t.done_comment, e.name, e.location, e.code, '
     "COALESCE(NULLIF(o.full_name, ''), o.username), COALESCE(NULLIF(tu.full_name, ''), tu.username), "
-    "COALESCE(NULLIF(cu.full_name, ''), cu.username), COALESCE(NULLIF(du.full_name, ''), du.username)"
+    "COALESCE(NULLIF(cu.full_name, ''), cu.username), COALESCE(NULLIF(du.full_name, ''), du.username), "
+    't.priority'
 )
+PRIORITIES = ('urgent', 'soon', 'normal')
 TASK_JOINS = (
     'FROM equipment_tasks t '
     'LEFT JOIN equipment e ON e.user_id = t.user_id AND e.id = t.equipment_id '
@@ -353,7 +355,9 @@ TASK_JOINS = (
 def task_rows(cur, where: str, limit: int = 200):
     cur.execute(
         f'SELECT {TASK_COLS} {TASK_JOINS} WHERE {where} '
-        "ORDER BY (t.status = 'open') DESC, t.created_at DESC "
+        "ORDER BY (t.status = 'open') DESC, "
+        "CASE WHEN t.status = 'open' THEN CASE t.priority WHEN 'urgent' THEN 0 WHEN 'soon' THEN 1 ELSE 2 END ELSE 0 END, "
+        't.created_at DESC '
         f'LIMIT {int(limit)}'
     )
     return [
@@ -375,6 +379,7 @@ def task_rows(cur, where: str, limit: int = 200):
             'technicianName': r[14] or '',
             'createdByName': r[15] or '',
             'doneByName': r[16] or '',
+            'priority': r[17] if r[17] in PRIORITIES else 'normal',
         }
         for r in cur.fetchall()
     ]
@@ -503,10 +508,11 @@ def handler(event: dict, context) -> dict:
             cur.execute(f'SELECT 1 FROM equipment WHERE user_id = {uid} AND id = {q(eid)}')
             if cur.fetchone():
                 eq_sql = q(eid)
+        priority = body.get('priority') if body.get('priority') in PRIORITIES else 'normal'
         photos = upload_photos(body.get('photos'), f'{uid}-{uuid.uuid4().hex[:6]}')
         cur.execute(
-            'INSERT INTO equipment_tasks (user_id, equipment_id, technician_id, created_by, description, photos) '
-            f"VALUES ({uid}, {eq_sql}, {tech_sql}, {int(me['id'])}, {q(description)}, {q(json.dumps(photos))}::jsonb)"
+            'INSERT INTO equipment_tasks (user_id, equipment_id, technician_id, created_by, description, photos, priority) '
+            f"VALUES ({uid}, {eq_sql}, {tech_sql}, {int(me['id'])}, {q(description)}, {q(json.dumps(photos))}::jsonb, {q(priority)})"
         )
         return finish({'ok': True, 'tasks': owner_tasks(cur, uid)})
 
