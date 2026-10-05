@@ -316,6 +316,24 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
                   <Icon name="ScanQrCode" fallback="QrCode" size={14} strokeWidth={2.5} />
                   Найдено по QR-коду
                 </span>
+                <div className="flex items-center gap-1.5">
+                {item.active && isAdmin && (
+                  <button
+                    onClick={() => {
+                      if (item.inRepair) {
+                        setRepairItem(item);
+                        setRepairOpen(true);
+                      } else {
+                        setSendItem(item);
+                        setSendOpen(true);
+                      }
+                    }}
+                    className="flex items-center gap-1.5 border-2 border-primary bg-card px-2.5 py-1 font-head text-[0.65rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
+                  >
+                    <Icon name={item.inRepair ? 'CircleCheck' : 'Wrench'} size={13} strokeWidth={2.5} />
+                    {item.inRepair ? 'Принять с ремонта' : 'Отправить в ремонт'}
+                  </button>
+                )}
                 <button
                   onClick={() => setFoundId(null)}
                   aria-label="Убрать отметку"
@@ -323,6 +341,7 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
                 >
                   <Icon name="X" size={14} strokeWidth={2.5} />
                 </button>
+                </div>
               </div>
             )}
             <div className="flex min-w-0 gap-3">
