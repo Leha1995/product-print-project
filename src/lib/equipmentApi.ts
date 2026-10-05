@@ -177,8 +177,11 @@ export interface TechRepair {
   photos?: string[];
 }
 
-export const fetchTechRepairs = async (): Promise<{ repairs: TechRepair[]; tasks: EquipmentTask[] }> => {
-  const res = await fetch(API, { headers: authHeaders() });
+export const fetchTechRepairs = async (
+  viewTechId?: number | null,
+): Promise<{ repairs: TechRepair[]; tasks: EquipmentTask[] }> => {
+  const url = viewTechId ? `${API}?viewTech=${viewTechId}` : API;
+  const res = await fetch(url, { headers: authHeaders() });
   if (!res.ok) throw new Error(String(res.status));
   const data = await res.json();
   return {

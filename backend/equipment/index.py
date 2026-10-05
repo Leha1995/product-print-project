@@ -476,6 +476,25 @@ def handler(event: dict, context) -> dict:
         return finish({'error': 'unauthorized'}, 401)
     if method == 'GET':
         cleanup_repair_photos(cur)
+    view_tech = str((event.get('queryStringParameters') or {}).get('viewTech') or '')
+    if method == 'GET' and view_tech:
+        if me['role'] != 'superadmin' or not view_tech.isdigit():
+            return finish({'error': 'forbidden'}, 403)
+        cur.execute(
+            'SELECT id, username, role, COALESCE(NULLIF(full_name, \'\'), username) FROM app_users '
+            f"WHERE id = {int(view_tech)} AND role = 'technician'"
+        )
+        row = cur.fetchone()
+        if not row:
+            return finish({'error': 'not_found'}, 404)
+        tech = {'id': row[0], 'username': row[1], 'role': row[2]}
+        return finish(
+            {
+                'repairs': technician_items(cur, tech),
+                'tasks': technician_tasks(cur, tech),
+                'technicianName': row[3],
+            }
+        )
     if me['role'] == 'technician':
         if method == 'GET':
             return finish({'repairs': technician_items(cur, me), 'tasks': technician_tasks(cur, me)})

@@ -19,6 +19,7 @@ interface UsersDialogProps {
   isSuperAdmin?: boolean;
   readOnly?: boolean;
   onChanged?: () => void;
+  onViewTechnician?: (id: number, name: string) => void;
 }
 
 const roleLabel: Record<Role, string> = {
@@ -66,6 +67,7 @@ const UsersDialog = ({
   isSuperAdmin = false,
   readOnly = false,
   onChanged,
+  onViewTechnician,
 }: UsersDialogProps) => {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [username, setUsername] = useState('');
@@ -477,6 +479,16 @@ const UsersDialog = ({
                     <option value="technician">Техник</option>
                     <option value="superadmin">Супер-админ</option>
                   </select>
+                )}
+                {isSuperAdmin && u.role === 'technician' && onViewTechnician && (
+                  <button
+                    type="button"
+                    onClick={() => onViewTechnician(u.id, u.fullName || u.username)}
+                    className="flex items-center gap-1.5 border-2 border-primary bg-accent px-2 py-1 font-head text-[0.68rem] font-bold uppercase text-accent-foreground transition-transform hover:-translate-y-0.5"
+                  >
+                    <Icon name="Eye" size={14} strokeWidth={2.5} />
+                    Кабинет
+                  </button>
                 )}
                 {isSuperAdmin && u.role === 'technician' && (
                   <TechScopePicker

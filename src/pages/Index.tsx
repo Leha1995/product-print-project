@@ -81,6 +81,7 @@ const Index = () => {
     replaceCategories,
   } = useCategories(catList, saveCategories);
   const [usersOpen, setUsersOpen] = useState(false);
+  const [viewTech, setViewTech] = useState<{ id: number; name: string } | null>(null);
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [alertCount, setAlertCount] = useState(0);
   const { markPrinted, getExpiry, getStatus, now } = usePrintHistory(history, saveHistory);
@@ -432,7 +433,19 @@ const Index = () => {
         isSuperAdmin={isSuperAdmin}
         readOnly={user?.role === 'manager'}
         onChanged={refreshManaged}
+        onViewTechnician={(id, name) => {
+          setUsersOpen(false);
+          setViewTech({ id, name });
+        }}
       />
+      {viewTech && isSuperAdmin && (
+        <TechnicianScreen
+          key={viewTech.id}
+          userName={viewTech.name}
+          viewTechId={viewTech.id}
+          onLogout={() => setViewTech(null)}
+        />
+      )}
     </div>
   );
 };

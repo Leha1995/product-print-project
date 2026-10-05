@@ -19,6 +19,7 @@ import RepairPhotos from '@/components/equipment/RepairPhotos';
 interface TechnicianScreenProps {
   userName: string;
   onLogout: () => void;
+  viewTechId?: number | null;
 }
 
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('ru-RU') : '—');
@@ -43,7 +44,8 @@ const asEquipment = (r: TechRepair): Equipment => ({
   ],
 });
 
-const TechnicianScreen = ({ userName, onLogout }: TechnicianScreenProps) => {
+const TechnicianScreen = ({ userName, onLogout, viewTechId = null }: TechnicianScreenProps) => {
+  const viewOnly = Boolean(viewTechId);
   const [list, setList] = useState<TechRepair[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
@@ -57,7 +59,7 @@ const TechnicianScreen = ({ userName, onLogout }: TechnicianScreenProps) => {
 
   const load = useCallback(async () => {
     try {
-      const data = await fetchTechRepairs();
+      const data = await fetchTechRepairs(viewTechId);
       setList(data.repairs);
       setTasks(data.tasks);
     } catch {
@@ -65,7 +67,7 @@ const TechnicianScreen = ({ userName, onLogout }: TechnicianScreenProps) => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [viewTechId]);
 
   useEffect(() => {
     load();
@@ -88,7 +90,7 @@ const TechnicianScreen = ({ userName, onLogout }: TechnicianScreenProps) => {
     setDialogOpen(true);
   };
 
-  useHardwareScanner(!dialogOpen && !doneOpen, (code) => {
+  useHardwareScanner(!viewOnly && !dialogOpen && !doneOpen, (code) => {
     const hit = list.find((r) => r.code.toLowerCase() === code.trim().toLowerCase());
     playScanSound(Boolean(hit));
     if (hit) {
@@ -127,7 +129,13 @@ const TechnicianScreen = ({ userName, onLogout }: TechnicianScreenProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className={viewOnly ? 'fixed inset-0 z-50 overflow-y-auto bg-background' : 'min-h-screen bg-background'}>
+      {viewOnly && (
+        <div className="flex items-center justify-center gap-2 border-b-2 border-primary bg-warning px-4 py-2 text-center font-head text-[0.72rem] font-bold uppercase text-warning-foreground">
+          <Icon name="Eye" size={15} strokeWidth={2.5} />
+          Режим просмотра — так кабинет видит техник
+        </div>
+      )}
       <header className="flex items-center justify-between gap-3 border-b-2 border-primary bg-card px-4 py-3 md:px-8">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center border-2 border-primary bg-accent text-accent-foreground">
@@ -142,8 +150,8 @@ const TechnicianScreen = ({ userName, onLogout }: TechnicianScreenProps) => {
           onClick={onLogout}
           className="flex shrink-0 items-center gap-1.5 border-2 border-primary bg-background px-3 py-2 font-head text-[0.7rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
         >
-          <Icon name="LogOut" size={15} strokeWidth={2.5} />
-          <span className="hidden sm:inline">Выйти</span>
+          <Icon name={viewOnly ? 'X' : 'LogOut'} size={15} strokeWidth={2.5} />
+          <span className="hidden sm:inline">{viewOnly ? 'Закрыть' : 'Выйти'}</span>
         </button>
       </header>
 
@@ -194,7 +202,7 @@ const TechnicianScreen = ({ userName, onLogout }: TechnicianScreenProps) => {
                   task={t}
                   showOwner
                   action={
-                    t.status === 'open' ? (
+                    t.status === 'open' && !viewOnly ? (
                       <button
                         onClick={() => {
                           setDoneTask(t);
@@ -279,6 +287,7 @@ const TechnicianScreen = ({ userName, onLogout }: TechnicianScreenProps) => {
                   <RepairPhotos photos={r.photos || []} size={64} />
                 </div>
               </div>
+              {!viewOnly && (
               <button
                 onClick={() => openReturn(r)}
                 className="flex w-full items-center justify-center gap-1.5 border-2 border-primary bg-accent px-2 py-2.5 font-head text-[0.72rem] font-bold uppercase text-accent-foreground transition-transform hover:-translate-y-0.5"
@@ -286,6 +295,7 @@ const TechnicianScreen = ({ userName, onLogout }: TechnicianScreenProps) => {
                 <Icon name="CircleCheck" size={15} strokeWidth={2.5} />
                 Вернуть из ремонта
               </button>
+              )}
             </div>
           ))}
         </div>
