@@ -9,6 +9,7 @@ export interface RepairRecord {
   returnedAt: string | null;
   cost: number;
   description: string;
+  photos?: string[];
 }
 
 export interface Equipment {
@@ -113,8 +114,8 @@ export const markQrFixed = (id: string) =>
 
 export const restoreEquipment = (id: string) =>
   send({ action: 'restore', id }) as Promise<{ items: Equipment[] }>;
-export const sendToRepair = (id: string, description = '') =>
-  send({ action: 'send_repair', id, description }) as Promise<{ items: Equipment[] }>;
+export const sendToRepair = (id: string, description = '', photos: string[] = []) =>
+  send({ action: 'send_repair', id, description, photos }) as Promise<{ items: Equipment[] }>;
 
 export const returnFromRepair = (id: string, cost: number, description?: string) =>
   send({ action: 'return_repair', id, cost, description }) as Promise<{ items: Equipment[] }>;
@@ -131,6 +132,7 @@ export interface TechRepair {
   repairSentAt: string | null;
   repairCost: number;
   description: string;
+  photos?: string[];
 }
 
 export const fetchTechRepairs = async (): Promise<TechRepair[]> => {

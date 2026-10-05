@@ -5,6 +5,7 @@ import { Equipment, TechRepair, fetchTechRepairs, techReturnRepair } from '@/lib
 import { toast } from '@/hooks/use-toast';
 import useHardwareScanner from '@/hooks/useHardwareScanner';
 import { playScanSound } from '@/lib/scanSound';
+import RepairPhotos from '@/components/equipment/RepairPhotos';
 
 interface TechnicianScreenProps {
   userName: string;
@@ -29,7 +30,7 @@ const asEquipment = (r: TechRepair): Equipment => ({
   inRepair: true,
   repairCost: r.repairCost,
   repairs: [
-    { id: 0, sentAt: r.repairSentAt, returnedAt: null, cost: 0, description: r.description },
+    { id: 0, sentAt: r.repairSentAt, returnedAt: null, cost: 0, description: r.description, photos: r.photos },
   ],
 });
 
@@ -167,6 +168,7 @@ const TechnicianScreen = ({ userName, onLogout }: TechnicianScreenProps) => {
                   <p className="mt-2 whitespace-pre-line text-[13px] text-primary">
                     {r.description || <span className="text-muted-foreground">Описание поломки не указано</span>}
                   </p>
+                  <RepairPhotos photos={r.photos || []} size={64} />
                 </div>
               </div>
               <button

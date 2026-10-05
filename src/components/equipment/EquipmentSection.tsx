@@ -96,9 +96,9 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
   const lastSession = sessions[0];
   const inRepairCount = items.filter((i) => i.active && i.inRepair).length;
 
-  const handleSendRepair = async (item: Equipment, description: string) => {
+  const handleSendRepair = async (item: Equipment, description: string, photos: string[]) => {
     try {
-      const res = await sendToRepair(item.id, description);
+      const res = await sendToRepair(item.id, description, photos);
       setItems(res.items);
       setFoundId((cur) => (cur === item.id ? null : cur));
       toast({ title: 'Отправлено в ремонт', description: `${item.name} — не участвует в инвентаризации` });

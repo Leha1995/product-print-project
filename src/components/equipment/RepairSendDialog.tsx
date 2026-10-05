@@ -2,20 +2,26 @@ import { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
 import { Equipment } from '@/lib/equipmentApi';
+import { readFile, shrink } from '@/lib/imageFile';
+
+const MAX_PHOTOS = 4;
 
 interface RepairSendDialogProps {
   item: Equipment | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (item: Equipment, description: string) => Promise<void>;
+  onConfirm: (item: Equipment, description: string, photos: string[]) => Promise<void>;
 }
 
 const RepairSendDialog = ({ item, open, onOpenChange, onConfirm }: RepairSendDialogProps) => {
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [reading, setReading] = useState(false);
 
   useEffect(() => {
     if (open) {
+      setPhotos([]);
       setDescription('');
       setBusy(false);
     }
@@ -23,12 +29,26 @@ const RepairSendDialog = ({ item, open, onOpenChange, onConfirm }: RepairSendDia
 
   if (!item) return null;
 
+  const addFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setReading(true);
+    try {
+      const list = Array.from(files)
+        .filter((f) => f.type.startsWith('image/'))
+        .slice(0, MAX_PHOTOS - photos.length);
+      const ready = await Promise.all(list.map(async (f) => shrink(await readFile(f), 1280, 0.8)));
+      setPhotos((prev) => [...prev, ...ready].slice(0, MAX_PHOTOS));
+    } finally {
+      setReading(false);
+    }
+  };
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (busy) return;
     setBusy(true);
     try {
-      await onConfirm(item, description.trim());
+      await onConfirm(item, description.trim(), photos);
       onOpenChange(false);
     } finally {
       setBusy(false);
@@ -55,7 +75,44 @@ const RepairSendDialog = ({ item, open, onOpenChange, onConfirm }: RepairSendDia
               className="mt-1 w-full resize-none border-2 border-primary bg-card px-3 py-2.5 font-body text-[14px] text-primary outline-none"
             />
           </label>
-          <p className="mt-1 text-[12px] text-muted-foreground">
+          <div className="mt-3">
+            <span className="font-head text-[0.68rem] font-bold uppercase tracking-[0.06em] text-primary">
+              {`Фото поломки · ${photos.length} из ${MAX_PHOTOS}`}
+            </span>
+            <div className="mt-1 flex flex-wrap gap-2">
+              {photos.map((src, i) => (
+                <div key={i} className="relative h-16 w-16 border-2 border-primary">
+                  <img src={src} alt="" className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setPhotos((prev) => prev.filter((_, j) => j !== i))}
+                    aria-label="Убрать фото"
+                    className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center border-2 border-primary bg-destructive text-destructive-foreground"
+                  >
+                    <Icon name="X" size={12} strokeWidth={3} />
+                  </button>
+                </div>
+              ))}
+              {photos.length < MAX_PHOTOS && (
+                <label className="flex h-16 w-16 cursor-pointer flex-col items-center justify-center gap-0.5 border-2 border-dashed border-primary bg-card text-primary transition-colors hover:bg-muted">
+                  <Icon name={reading ? 'Loader2' : 'Camera'} size={18} strokeWidth={2.5} className={reading ? 'animate-spin' : ''} />
+                  <span className="font-head text-[0.55rem] font-bold uppercase">Добавить</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      addFiles(e.target.files);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+          </div>
+
+          <p className="mt-2 text-[12px] text-muted-foreground">
             На время ремонта позиция не участвует в инвентаризации
           </p>
 
@@ -69,7 +126,7 @@ const RepairSendDialog = ({ item, open, onOpenChange, onConfirm }: RepairSendDia
             </button>
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || reading}
               className="flex flex-1 items-center justify-center gap-2 border-2 border-primary bg-accent px-4 py-2.5 font-head text-[0.75rem] font-bold uppercase text-accent-foreground transition-transform hover:-translate-y-0.5 disabled:opacity-50"
             >
               <Icon name={busy ? 'Loader2' : 'Wrench'} size={16} strokeWidth={2.5} className={busy ? 'animate-spin' : ''} />

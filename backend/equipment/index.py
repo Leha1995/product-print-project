@@ -27,10 +27,10 @@ def num(value) -> str:
         return '0'
 
 
-def upload_image(data_url: str, item_id: str) -> str:
+def upload_image(data_url: str, item_id: str, folder: str = 'equipment') -> str:
     header, _, payload = data_url.partition(',')
     ext = 'png' if 'png' in header else 'webp' if 'webp' in header else 'jpg'
-    key = f"equipment/{item_id}-{uuid.uuid4().hex[:8]}.{ext}"
+    key = f"{folder}/{item_id}-{uuid.uuid4().hex[:8]}.{ext}"
     s3 = boto3.client(
         's3',
         endpoint_url='https://bucket.poehali.dev',
@@ -82,6 +82,8 @@ def technician_items(cur, me):
         'SELECT e.user_id, e.id, e.name, e.code, e.location, e.serial, e.image, e.repair_sent_at, '
         'e.repair_cost, COALESCE(NULLIF(u.full_name, \'\'), u.username), '
         "(SELECT r.description FROM equipment_repairs r WHERE r.user_id = e.user_id AND r.equipment_id = e.id "
+        'AND r.returned_at IS NULL ORDER BY r.sent_at DESC LIMIT 1), '
+        "(SELECT r.photos FROM equipment_repairs r WHERE r.user_id = e.user_id AND r.equipment_id = e.id "
         'AND r.returned_at IS NULL ORDER BY r.sent_at DESC LIMIT 1) '
         'FROM equipment e LEFT JOIN app_users u ON u.id = e.user_id '
         f'WHERE e.in_repair = TRUE AND e.active = TRUE{scope} ORDER BY e.repair_sent_at'
@@ -99,6 +101,7 @@ def technician_items(cur, me):
             'repairCost': float(r[8] or 0),
             'ownerName': r[9] or '',
             'description': r[10] or '',
+            'photos': r[11] or [],
         }
         for r in cur.fetchall()
     ]
@@ -130,7 +133,7 @@ def can_manage(cur, me, target_id: int) -> bool:
 
 def read_repairs(cur, uid: int) -> dict:
     cur.execute(
-        'SELECT id, equipment_id, sent_at, returned_at, cost, description FROM equipment_repairs '
+        'SELECT id, equipment_id, sent_at, returned_at, cost, description, photos FROM equipment_repairs '
         f'WHERE user_id = {uid} ORDER BY sent_at DESC, id DESC'
     )
     out: dict = {}
@@ -142,6 +145,7 @@ def read_repairs(cur, uid: int) -> dict:
                 'returnedAt': r[3].isoformat() if r[3] else None,
                 'cost': float(r[4] or 0),
                 'description': r[5] or '',
+                'photos': r[6] or [],
             }
         )
     return out
@@ -408,9 +412,13 @@ def handler(event: dict, context) -> dict:
             f"WHERE user_id = {uid} AND id = {q(eid)} AND active = TRUE AND in_repair = FALSE RETURNING id"
         )
         if cur.fetchone():
+            photos = []
+            for raw in (body.get('photos') or [])[:4]:
+                if isinstance(raw, str) and raw.startswith('data:image/'):
+                    photos.append(upload_image(raw, f'{uid}-{eid}', 'repairs'))
             cur.execute(
-                'INSERT INTO equipment_repairs (user_id, equipment_id, sent_at, description) '
-                f'VALUES ({uid}, {q(eid)}, NOW(), {q(description)})'
+                'INSERT INTO equipment_repairs (user_id, equipment_id, sent_at, description, photos) '
+                f'VALUES ({uid}, {q(eid)}, NOW(), {q(description)}, {q(json.dumps(photos))}::jsonb)'
             )
         return finish({'ok': True, 'items': read_items(cur, uid)})
 

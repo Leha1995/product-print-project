@@ -1,0 +1,1 @@
+ALTER TABLE equipment_repairs ADD COLUMN IF NOT EXISTS photos JSONB NOT NULL DEFAULT '[]'::jsonb;

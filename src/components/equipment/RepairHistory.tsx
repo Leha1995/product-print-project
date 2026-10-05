@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Icon from '@/components/ui/icon';
 import { Equipment } from '@/lib/equipmentApi';
+import RepairPhotos from '@/components/equipment/RepairPhotos';
 
 const money = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`;
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('ru-RU') : '');
@@ -52,6 +53,7 @@ const RepairHistory = ({ item }: { item: Equipment }) => {
               <p className="mt-1 whitespace-pre-line text-[12px] text-primary">
                 {r.description || <span className="text-muted-foreground">Описание не указано</span>}
               </p>
+              <RepairPhotos photos={r.photos || []} size={44} />
             </li>
           ))}
         </ul>
