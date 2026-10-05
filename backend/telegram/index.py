@@ -14,6 +14,7 @@ CORS = {
     'Content-Type': 'application/json',
 }
 WEBHOOK_PREFIX = 'https://functions.poehali.dev/'
+ALLOWED_ROLES = ('admin', 'manager', 'technician', 'superadmin')
 
 
 def q(value) -> str:
@@ -49,10 +50,11 @@ def session_user(cur, token: str):
     return {'id': row[0], 'role': row[1], 'name': row[2]} if row else None
 
 
-def link_status(cur, uid: int) -> dict:
+def link_status(cur, uid: int, role: str) -> dict:
     cur.execute(f'SELECT tg_name, linked_at FROM telegram_links WHERE user_id = {int(uid)}')
     row = cur.fetchone()
     return {
+        'allowed': role in ALLOWED_ROLES,
         'configured': bool(bot_token()),
         'linked': bool(row),
         'tgName': row[0] if row else '',
@@ -84,6 +86,11 @@ def handle_update(cur, update: dict) -> None:
             tg('sendMessage', {'chat_id': chat_id, 'text': 'Ссылка устарела. Нажмите «Подключить Telegram» в приложении ещё раз.'})
             return
         uid = int(row[0])
+        cur.execute(f'SELECT role FROM app_users WHERE id = {uid} AND active')
+        role_row = cur.fetchone()
+        if not role_row or role_row[0] not in ALLOWED_ROLES:
+            tg('sendMessage', {'chat_id': chat_id, 'text': 'Уведомления доступны только админам, управляющим, техникам и супер-админу.'})
+            return
         cur.execute(f'DELETE FROM telegram_links WHERE chat_id = {int(chat_id)} AND user_id <> {uid}')
         cur.execute(
             'INSERT INTO telegram_links (user_id, chat_id, tg_name, linked_at) '
@@ -130,7 +137,7 @@ def handler(event: dict, context) -> dict:
         return finish({'error': 'unauthorized'}, 401)
 
     if method == 'GET':
-        return finish(link_status(cur, me['id']))
+        return finish(link_status(cur, me['id'], me['role']))
 
     body = json.loads(event.get('body') or '{}')
     action = body.get('action')
@@ -144,9 +151,11 @@ def handler(event: dict, context) -> dict:
                 tg('sendMessage', {'chat_id': row[0], 'text': 'Уведомления отключены в приложении.'}, 3)
             except Exception as err:
                 print(f'unlink notify failed: {err}')
-        return finish(link_status(cur, me['id']))
+        return finish(link_status(cur, me['id'], me['role']))
 
     if action == 'link':
+        if me['role'] not in ALLOWED_ROLES:
+            return finish({'error': 'forbidden_role'}, 403)
         if not bot_token():
             return finish({'error': 'not_configured'}, 400)
         hook_url = str(body.get('webhookUrl') or '')

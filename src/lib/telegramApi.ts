@@ -3,6 +3,7 @@ import { apiUrl } from '@/lib/apiBase';
 import { getToken } from '@/lib/authApi';
 
 export interface TelegramStatus {
+  allowed?: boolean;
   configured: boolean;
   linked: boolean;
   tgName: string;

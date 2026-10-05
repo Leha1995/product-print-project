@@ -39,7 +39,8 @@ def send_to_users(cur, user_ids, text: str) -> None:
         return
     cur.execute(
         'SELECT l.chat_id FROM telegram_links l JOIN app_users u ON u.id = l.user_id '
-        f"WHERE u.active AND l.user_id IN ({', '.join(str(i) for i in ids)})"
+        "WHERE u.active AND u.role IN ('admin', 'manager', 'technician', 'superadmin') "
+        f"AND l.user_id IN ({', '.join(str(i) for i in ids)})"
     )
     chats = sorted({r[0] for r in cur.fetchall()})
     if not chats:

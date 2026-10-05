@@ -16,6 +16,7 @@ interface TelegramConnectProps {
 const errorText: Record<string, string> = {
   not_configured: 'Бот ещё не настроен — нужен токен бота в настройках проекта',
   bad_token: 'Токен бота неверный — проверьте его в настройках проекта',
+  forbidden_role: 'Уведомления доступны только админам, управляющим, техникам и супер-админу',
   telegram_unavailable: 'Telegram не отвечает, попробуйте через минуту',
 };
 
@@ -82,7 +83,7 @@ const TelegramConnect = ({ hint, compact = false }: TelegramConnectProps) => {
     }
   };
 
-  if (!status) return null;
+  if (!status || status.allowed === false) return null;
 
   const linked = status.linked;
 
