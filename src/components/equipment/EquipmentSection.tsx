@@ -100,6 +100,7 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
     try {
       const res = await sendToRepair(item.id, description);
       setItems(res.items);
+      setFoundId((cur) => (cur === item.id ? null : cur));
       toast({ title: 'Отправлено в ремонт', description: `${item.name} — не участвует в инвентаризации` });
     } catch {
       toast({ title: 'Не удалось сохранить', description: 'Проверь интернет и повтори' });
@@ -111,6 +112,7 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
     try {
       const res = await returnFromRepair(item.id, cost, description);
       setItems(res.items);
+      setFoundId((cur) => (cur === item.id ? null : cur));
       toast({
         title: 'Принято с ремонта',
         description: cost > 0 ? `${item.name} · ${money(cost)}` : item.name,
