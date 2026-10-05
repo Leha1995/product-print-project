@@ -306,8 +306,26 @@ export const exportInventory = async (
       Показатель: 'Остаточная стоимость недостачи, ₽',
       Значение: Math.round(totalResidual(result.missing, checkedAt)),
     },
+    ...(report
+      ? [
+          {
+            Показатель: 'Прочие задачи: период',
+            Значение: `${report.from ? dateTimeText(report.from) : 'с начала учёта'} — ${
+              report.to ? dateTimeText(report.to) : 'сейчас'
+            }`,
+          },
+          { Показатель: 'Задач выполнено', Значение: report.tasks.filter((t) => t.status === 'done').length },
+          { Показатель: 'Задач не выполнено', Значение: report.tasks.filter((t) => t.status !== 'done').length },
+          {
+            Показатель: 'Затраты на прочие задачи, ₽',
+            Значение: Math.round(
+              report.tasks.reduce((sum, t) => sum + (t.status === 'done' ? t.cost || 0 : 0), 0),
+            ),
+          },
+        ]
+      : []),
   ]);
-  summary['!cols'] = [{ wch: 26 }, { wch: 24 }];
+  summary['!cols'] = [{ wch: 34 }, { wch: 36 }];
 
   const book = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(book, summary, 'Итоги');
