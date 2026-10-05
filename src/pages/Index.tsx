@@ -437,6 +437,7 @@ const Index = () => {
       <StaffOverviewDialog
         open={overviewOpen}
         onOpenChange={setOverviewOpen}
+        managed={managed}
         onOpenStaff={(id) => {
           setTargetId(id);
           scrollTo('menu');
