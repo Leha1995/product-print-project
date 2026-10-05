@@ -200,9 +200,9 @@ const TechnicianScreen = ({ userName, onLogout }: TechnicianScreenProps) => {
                           setDoneTask(t);
                           setDoneOpen(true);
                         }}
-                        className="flex w-full items-center justify-center gap-1.5 border-2 border-primary bg-accent px-2 py-2.5 font-head text-[0.72rem] font-bold uppercase text-accent-foreground transition-transform hover:-translate-y-0.5"
+                        className="flex min-h-[56px] w-full items-center justify-center gap-2.5 border-2 border-primary bg-success px-4 py-3.5 font-head text-base font-black uppercase tracking-[0.04em] text-success-foreground shadow-[3px_3px_0_0_hsl(var(--primary))] transition-transform hover:-translate-y-0.5 active:translate-y-0.5 active:shadow-none"
                       >
-                        <Icon name="CircleCheck" size={15} strokeWidth={2.5} />
+                        <Icon name="CircleCheck" size={24} strokeWidth={2.5} />
                         Выполнено
                       </button>
                     ) : undefined

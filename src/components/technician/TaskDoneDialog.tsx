@@ -65,11 +65,11 @@ const TaskDoneDialog = ({ task, open, onOpenChange, onConfirm }: TaskDoneDialogP
             <button
               type="submit"
               disabled={busy}
-              className="flex flex-1 items-center justify-center gap-2 border-2 border-primary bg-accent px-4 py-2.5 font-head text-[0.75rem] font-bold uppercase text-accent-foreground transition-transform hover:-translate-y-0.5 disabled:opacity-50"
+              className="flex min-h-[52px] flex-1 items-center justify-center gap-2 border-2 border-primary bg-success px-4 py-3 font-head text-[0.9rem] font-black uppercase text-success-foreground transition-transform hover:-translate-y-0.5 disabled:opacity-50"
             >
               <Icon
                 name={busy ? 'Loader2' : 'CircleCheck'}
-                size={16}
+                size={20}
                 strokeWidth={2.5}
                 className={busy ? 'animate-spin' : ''}
               />
