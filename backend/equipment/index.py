@@ -82,7 +82,7 @@ def can_manage(cur, me, target_id: int) -> bool:
 def read_items(cur, uid: int):
     cur.execute(
         'SELECT id, name, code, price, location, note, image, serial, active, created_at, '
-        'qr_broken, written_off_at, write_off_reason, commissioned_at, depreciation_per_day '
+        'qr_broken, written_off_at, write_off_reason, commissioned_at, depreciation_per_day, repair_cost '
         f'FROM equipment WHERE user_id = {uid} ORDER BY active DESC, location, name'
     )
     return [
@@ -102,6 +102,7 @@ def read_items(cur, uid: int):
             'writeOffReason': r[12] or '',
             'commissionedAt': r[13].isoformat() if r[13] else None,
             'depreciationPerDay': float(r[14] or 0),
+            'repairCost': float(r[15] or 0),
         }
         for r in cur.fetchall()
     ]
@@ -149,22 +150,22 @@ def save_item(cur, uid: int, item: dict) -> int:
     if image.startswith('data:'):
         image = upload_image(image, eid)
     cur.execute(
-        'INSERT INTO equipment (user_id, id, name, code, price, location, note, image, serial, active, commissioned_at, depreciation_per_day, updated_at) '
+        'INSERT INTO equipment (user_id, id, name, code, price, location, note, image, serial, active, commissioned_at, depreciation_per_day, repair_cost, updated_at) '
         f"VALUES ({uid}, {q(eid)}, {q(name)}, {q(code)}, {num(item.get('price'))}, "
         f"{q(item.get('location') or '')}, {q(item.get('note') or '')}, {q(image)}, "
         f"{q(item.get('serial') or '')}, {'FALSE' if item.get('active') is False else 'TRUE'}, {date_sql(item.get('commissionedAt'))}, "
-        f"GREATEST(0, {num(item.get('depreciationPerDay'))}), NOW()) "
+        f"GREATEST(0, {num(item.get('depreciationPerDay'))}), GREATEST(0, {num(item.get('repairCost'))}), NOW()) "
         'ON CONFLICT (user_id, id) DO UPDATE SET name = EXCLUDED.name, code = EXCLUDED.code, '
         'price = EXCLUDED.price, location = EXCLUDED.location, note = EXCLUDED.note, '
         'image = EXCLUDED.image, serial = EXCLUDED.serial, active = EXCLUDED.active, '
         'commissioned_at = EXCLUDED.commissioned_at, '
-        'depreciation_per_day = EXCLUDED.depreciation_per_day, updated_at = NOW()'
+        'depreciation_per_day = EXCLUDED.depreciation_per_day, repair_cost = EXCLUDED.repair_cost, updated_at = NOW()'
     )
     return 1
 
 
 def handler(event: dict, context) -> dict:
-    """Инвентаризация оборудования кухни: карточки с QR-кодом и стоимостью, сессии сканирования."""
+    """Инвентаризация оборудования кухни: карточки с QR-кодом, стоимостью и расходами на ремонт, сессии сканирования."""
     method = event.get('httpMethod', 'GET')
     if method == 'OPTIONS':
         return {'statusCode': 200, 'headers': CORS, 'body': ''}

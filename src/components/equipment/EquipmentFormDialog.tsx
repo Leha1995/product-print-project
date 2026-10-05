@@ -17,6 +17,7 @@ const empty = {
   serial: '',
   commissionedAt: '',
   depreciation: '',
+  repairCost: '',
   note: '',
   image: '',
 };
@@ -63,6 +64,7 @@ const EquipmentFormDialog = ({ item, open, onOpenChange, onSave }: EquipmentForm
             serial: item.serial,
             commissionedAt: item.commissionedAt ? item.commissionedAt.slice(0, 10) : '',
             depreciation: item.depreciationPerDay ? String(item.depreciationPerDay) : '',
+            repairCost: item.repairCost ? String(item.repairCost) : '',
             note: item.note,
             image: item.image || '',
           }
@@ -85,6 +87,7 @@ const EquipmentFormDialog = ({ item, open, onOpenChange, onSave }: EquipmentForm
       serial: form.serial.trim(),
       commissionedAt: form.commissionedAt || null,
       depreciationPerDay: Math.max(0, Number(form.depreciation.replace(',', '.')) || 0),
+      repairCost: Math.max(0, Number(form.repairCost.replace(/\s/g, '').replace(',', '.')) || 0),
       note: form.note.trim(),
       image: form.image,
       active: item?.active ?? true,
@@ -163,6 +166,19 @@ const EquipmentFormDialog = ({ item, open, onOpenChange, onSave }: EquipmentForm
                 className={field}
               />
             </label>
+            <label className="block">
+              <span className={label}>Потрачено на ремонт, ₽</span>
+              <input
+                value={form.repairCost}
+                onChange={(e) => set('repairCost', e.target.value)}
+                inputMode="decimal"
+                placeholder="0"
+                className={field}
+              />
+            </label>
+          </div>
+
+          <div className="mt-3 grid gap-3">
             <label className="block">
               <span className={label}>Место</span>
               <input

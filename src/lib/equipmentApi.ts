@@ -19,6 +19,7 @@ export interface Equipment {
   writeOffReason?: string;
   commissionedAt?: string | null;
   depreciationPerDay?: number;
+  repairCost?: number;
 }
 
 export interface InventorySession {

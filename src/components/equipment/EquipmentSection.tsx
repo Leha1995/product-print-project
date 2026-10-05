@@ -293,6 +293,20 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
               </div>
             </div>
 
+            <div
+              className={`flex items-center justify-between gap-2 border-2 px-2.5 py-1.5 ${
+                (item.repairCost || 0) > 0 ? 'border-primary bg-background' : 'border-dashed border-muted-foreground'
+              }`}
+            >
+              <span className="flex items-center gap-1.5 font-head text-[0.65rem] font-bold uppercase text-muted-foreground">
+                <Icon name="Wrench" size={13} strokeWidth={2.5} />
+                Ремонт
+              </span>
+              <span className="font-head text-[0.85rem] font-black text-primary">
+                {money(item.repairCost || 0)}
+              </span>
+            </div>
+
             <div className="flex flex-wrap gap-1.5">
               {item.qrBroken && item.active && isAdmin && (
                 <button
