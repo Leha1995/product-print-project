@@ -28,9 +28,11 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
   const [hasTorch, setHasTorch] = useState(false);
   const [torch, setTorch] = useState(false);
 
-  const active = items.filter((i) => i.active);
+  const active = items.filter((i) => i.active && !i.inRepair);
   const codeMapRef = useRef(new Map<string, Equipment>());
   codeMapRef.current = new Map(active.map((i) => [i.code, i]));
+  const repairMapRef = useRef(new Map<string, Equipment>());
+  repairMapRef.current = new Map(items.filter((i) => i.active && i.inRepair).map((i) => [i.code, i]));
 
   const lastHitRef = useRef<{ code: string; at: number }>({ code: '', at: 0 });
 
@@ -42,7 +44,11 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
     const repeat = lastHitRef.current.code === code && now - lastHitRef.current.at < 1500;
     lastHitRef.current = { code, at: now };
     if (!repeat) playScanSound(Boolean(found));
-    setLast({ name: found ? found.name : `Чужой код: ${code}`, ok: Boolean(found) });
+    const inRepair = found ? null : repairMapRef.current.get(code);
+    setLast({
+      name: found ? found.name : inRepair ? `В ремонте: ${inRepair.name}` : `Чужой код: ${code}`,
+      ok: Boolean(found),
+    });
     if (!found) return;
     setScanned((prev) => (prev.includes(code) ? prev : [...prev, code]));
   }, []);

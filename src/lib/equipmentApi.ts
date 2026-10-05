@@ -20,6 +20,8 @@ export interface Equipment {
   commissionedAt?: string | null;
   depreciationPerDay?: number;
   repairCost?: number;
+  inRepair?: boolean;
+  repairSentAt?: string | null;
 }
 
 export interface InventorySession {
@@ -102,3 +104,8 @@ export const markQrFixed = (id: string) =>
 
 export const restoreEquipment = (id: string) =>
   send({ action: 'restore', id }) as Promise<{ items: Equipment[] }>;
+export const sendToRepair = (id: string) =>
+  send({ action: 'send_repair', id }) as Promise<{ items: Equipment[] }>;
+
+export const returnFromRepair = (id: string, cost: number) =>
+  send({ action: 'return_repair', id, cost }) as Promise<{ items: Equipment[] }>;

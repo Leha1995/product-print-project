@@ -82,7 +82,8 @@ def can_manage(cur, me, target_id: int) -> bool:
 def read_items(cur, uid: int):
     cur.execute(
         'SELECT id, name, code, price, location, note, image, serial, active, created_at, '
-        'qr_broken, written_off_at, write_off_reason, commissioned_at, depreciation_per_day, repair_cost '
+        'qr_broken, written_off_at, write_off_reason, commissioned_at, depreciation_per_day, repair_cost, '
+        'in_repair, repair_sent_at '
         f'FROM equipment WHERE user_id = {uid} ORDER BY active DESC, location, name'
     )
     return [
@@ -103,6 +104,8 @@ def read_items(cur, uid: int):
             'commissionedAt': r[13].isoformat() if r[13] else None,
             'depreciationPerDay': float(r[14] or 0),
             'repairCost': float(r[15] or 0),
+            'inRepair': bool(r[16]),
+            'repairSentAt': r[17].isoformat() if r[17] else None,
         }
         for r in cur.fetchall()
     ]
@@ -278,6 +281,22 @@ def handler(event: dict, context) -> dict:
         )
         return finish({'ok': True, 'items': read_items(cur, uid)})
 
+    if action == 'send_repair':
+        cur.execute(
+            'UPDATE equipment SET in_repair = TRUE, repair_sent_at = NOW(), updated_at = NOW() '
+            f"WHERE user_id = {uid} AND id = {q(body.get('id', ''))} AND active = TRUE"
+        )
+        return finish({'ok': True, 'items': read_items(cur, uid)})
+
+    if action == 'return_repair':
+        cost = max(0.0, float(num(body.get('cost'))))
+        cur.execute(
+            'UPDATE equipment SET in_repair = FALSE, repair_sent_at = NULL, '
+            f'repair_cost = COALESCE(repair_cost, 0) + {num(cost)}, updated_at = NOW() '
+            f"WHERE user_id = {uid} AND id = {q(body.get('id', ''))}"
+        )
+        return finish({'ok': True, 'items': read_items(cur, uid)})
+
     if action == 'restore':
         cur.execute(
             'UPDATE equipment SET active = TRUE, written_off_at = NULL, '
@@ -289,7 +308,7 @@ def handler(event: dict, context) -> dict:
     if action == 'finish':
         scanned = [str(c) for c in (body.get('scanned') or [])]
         items = read_items(cur, uid)
-        active = [i for i in items if i['active']]
+        active = [i for i in items if i['active'] and not i['inRepair']]
         found = [i for i in active if i['code'] in scanned]
         missing = [i for i in active if i['code'] not in scanned]
         total_price = sum(i['price'] for i in active)

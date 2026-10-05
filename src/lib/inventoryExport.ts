@@ -51,7 +51,7 @@ const row = (item: Equipment, found: boolean, index: number) => ({
   'Серийный номер': item.serial || '',
   'В эксплуатации с': commissioned(item),
   'QR-код': item.code,
-  Сейчас: item.active ? 'В работе' : 'Списано',
+  Сейчас: item.active ? (item.inRepair ? 'В ремонте' : 'В работе') : 'Списано',
   Заметка: item.note || '',
 });
 
@@ -154,7 +154,7 @@ export const exportEquipmentList = (items: Equipment[]) => {
     'Серийный номер': item.serial || '',
   'В эксплуатации с': commissioned(item),
     'QR-код': item.code,
-    Статус: item.active ? (item.qrBroken ? 'В работе, заменить QR' : 'В работе') : 'Списано',
+    Статус: item.active ? (item.inRepair ? 'В ремонте' : item.qrBroken ? 'В работе, заменить QR' : 'В работе') : 'Списано',
     'Причина списания': item.writeOffReason || '',
     Заметка: item.note || '',
   }));

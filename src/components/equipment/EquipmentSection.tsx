@@ -5,6 +5,7 @@ import QrPrintDialog from '@/components/equipment/QrPrintDialog';
 import ScanDialog from '@/components/equipment/ScanDialog';
 import ScanResultDialog from '@/components/equipment/ScanResultDialog';
 import InventoryHistoryDialog from '@/components/equipment/InventoryHistoryDialog';
+import RepairReturnDialog from '@/components/equipment/RepairReturnDialog';
 import useEquipment from '@/hooks/useEquipment';
 import {
   Equipment,
@@ -13,6 +14,8 @@ import {
   markQrFixed,
   resolveMissing,
   restoreEquipment,
+  returnFromRepair,
+  sendToRepair,
 } from '@/lib/equipmentApi';
 import { toast } from '@/hooks/use-toast';
 import { hasDepreciation, residualValue, totalResidual } from '@/lib/depreciation';
@@ -40,6 +43,8 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
   const [resultOpen, setResultOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [repairItem, setRepairItem] = useState<Equipment | null>(null);
+  const [repairOpen, setRepairOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -55,6 +60,31 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
   const totalPrice = items.reduce((sum, i) => (i.active ? sum + i.price : sum), 0);
   const residualTotal = totalResidual(items.filter((i) => i.active));
   const lastSession = sessions[0];
+  const inRepairCount = items.filter((i) => i.active && i.inRepair).length;
+
+  const handleSendRepair = async (item: Equipment) => {
+    try {
+      const res = await sendToRepair(item.id);
+      setItems(res.items);
+      toast({ title: 'Отправлено в ремонт', description: `${item.name} — не участвует в инвентаризации` });
+    } catch {
+      toast({ title: 'Не удалось сохранить', description: 'Проверь интернет и повтори' });
+    }
+  };
+
+  const handleReturnRepair = async (item: Equipment, cost: number) => {
+    try {
+      const res = await returnFromRepair(item.id, cost);
+      setItems(res.items);
+      toast({
+        title: 'Принято с ремонта',
+        description: cost > 0 ? `${item.name} · ${money(cost)}` : item.name,
+      });
+    } catch {
+      toast({ title: 'Не удалось сохранить', description: 'Проверь интернет и повтори' });
+      throw new Error('save_failed');
+    }
+  };
 
   const handleFinish = async (scanned: string[]) => {
     try {
@@ -107,7 +137,7 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
           <p className="mt-1 text-[13px] text-muted-foreground">
             {`Оборудование кухни · ${items.filter((i) => i.active).length} в работе · куплено на ${money(
               totalPrice,
-            )}`}
+            )}${inRepairCount ? ` · ${inRepairCount} в ремонте` : ''}`}
           </p>
           <p className="mt-0.5 font-head text-[0.85rem] font-bold text-primary">
             {`Остаточная стоимость: ${money(residualTotal)}`}
@@ -181,6 +211,10 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
             onClick={() => {
               if (!items.some((i) => i.active)) {
                 toast({ title: 'Сначала добавь оборудование' });
+                return;
+              }
+              if (!items.some((i) => i.active && !i.inRepair)) {
+                toast({ title: 'Всё оборудование в ремонте', description: 'Проверять нечего' });
                 return;
               }
               setScanOpen(true);
@@ -284,6 +318,14 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
                   Заменить QR
                 </p>
               )}
+              {item.inRepair && item.active && (
+                <p className="mt-1.5 inline-flex items-center gap-1 border-2 border-warning bg-warning px-1.5 py-0.5 font-head text-[0.6rem] font-bold uppercase text-warning-foreground">
+                  <Icon name="Wrench" size={12} strokeWidth={2.5} />
+                  {item.repairSentAt
+                    ? `В ремонте с ${new Date(item.repairSentAt).toLocaleDateString('ru-RU')}`
+                    : 'В ремонте'}
+                </p>
+              )}
               {!item.active && (
                 <p className="mt-1.5 inline-flex items-center gap-1 border-2 border-destructive bg-destructive px-1.5 py-0.5 font-head text-[0.6rem] font-bold uppercase text-destructive-foreground">
                   <Icon name="Archive" size={12} strokeWidth={2.5} />
@@ -325,6 +367,28 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
                   <Icon name="RefreshCw" size={14} strokeWidth={2.5} />
                   Новый QR и печать
                 </button>
+              )}
+              {item.active && isAdmin && (
+                item.inRepair ? (
+                  <button
+                    onClick={() => {
+                      setRepairItem(item);
+                      setRepairOpen(true);
+                    }}
+                    className="flex w-full items-center justify-center gap-1.5 border-2 border-primary bg-accent px-2 py-2 font-head text-[0.68rem] font-bold uppercase text-accent-foreground transition-transform hover:-translate-y-0.5"
+                  >
+                    <Icon name="CircleCheck" size={14} strokeWidth={2.5} />
+                    Принять с ремонта
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleSendRepair(item)}
+                    className="flex w-full items-center justify-center gap-1.5 border-2 border-primary bg-card px-2 py-2 font-head text-[0.68rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
+                  >
+                    <Icon name="Wrench" size={14} strokeWidth={2.5} />
+                    Отправить в ремонт
+                  </button>
+                )
               )}
               {!item.active && isAdmin && (
                 <button
@@ -401,6 +465,12 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
             description: item.name,
           });
         }}
+      />
+      <RepairReturnDialog
+        item={repairItem}
+        open={repairOpen}
+        onOpenChange={setRepairOpen}
+        onConfirm={handleReturnRepair}
       />
       <QrPrintDialog items={qrItems} open={qrOpen} onOpenChange={setQrOpen} />
       <ScanDialog
