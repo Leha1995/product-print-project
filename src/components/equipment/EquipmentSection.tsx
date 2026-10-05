@@ -211,6 +211,18 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
 
   return (
     <section id="equipment" className="px-4 py-6 md:px-8">
+      {isAdmin && (
+        <button
+          onClick={() => {
+            setTaskItem(null);
+            setTaskOpen(true);
+          }}
+          className="mb-5 flex w-full items-center justify-center gap-3 border-2 border-primary bg-success px-6 py-4 font-head text-base font-black uppercase tracking-[0.04em] text-success-foreground shadow-[4px_4px_0_0_hsl(var(--primary))] transition-transform hover:-translate-y-0.5 active:translate-y-0 md:text-lg"
+        >
+          <Icon name="ClipboardPlus" fallback="ClipboardList" size={26} strokeWidth={2.5} />
+          Создать задачу технику
+        </button>
+      )}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="font-head text-2xl font-black uppercase text-primary md:text-3xl">
@@ -242,18 +254,6 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
             >
               <Icon name="Plus" size={16} strokeWidth={2.5} />
               Добавить
-            </button>
-          )}
-          {isAdmin && (
-            <button
-              onClick={() => {
-                setTaskItem(null);
-                setTaskOpen(true);
-              }}
-              className="flex items-center gap-2 border-2 border-primary bg-card px-3 py-2.5 font-head text-[0.75rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
-            >
-              <Icon name="ClipboardPlus" fallback="ClipboardList" size={16} strokeWidth={2.5} />
-              Создать задачу
             </button>
           )}
           {sessions.some((s) => s.finishedAt) && (
