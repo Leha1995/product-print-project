@@ -57,20 +57,22 @@ def session_user(cur, token: str):
 
 def technician_owners(cur, me):
     """Владельцы оборудования, ремонты которых видит техник. None — все."""
-    head = me.get('managerId')
-    if not head:
+    cur.execute(
+        'SELECT s.head_id, u.role FROM technician_scopes s LEFT JOIN app_users u ON u.id = s.head_id '
+        f"WHERE s.technician_id = {int(me['id'])}"
+    )
+    heads = cur.fetchall()
+    if not heads:
         return None
-    cur.execute(f'SELECT role FROM app_users WHERE id = {int(head)}')
-    row = cur.fetchone()
-    if not row:
-        return [int(head)]
-    if row[0] == 'superadmin':
-        return None
-    owners = [int(head)]
-    if row[0] == 'manager':
-        cur.execute(f"SELECT id FROM app_users WHERE role = 'admin' AND manager_id = {int(head)}")
-        owners.extend(r[0] for r in cur.fetchall())
-    return owners
+    owners = set()
+    for head_id, role in heads:
+        if role == 'superadmin':
+            return None
+        owners.add(int(head_id))
+        if role == 'manager':
+            cur.execute(f"SELECT id FROM app_users WHERE role = 'admin' AND manager_id = {int(head_id)}")
+            owners.update(r[0] for r in cur.fetchall())
+    return sorted(owners)
 
 
 def technician_items(cur, me):

@@ -10,6 +10,7 @@ import {
   Role,
 } from '@/lib/authApi';
 import { toast } from '@/hooks/use-toast';
+import TechScopePicker from '@/components/users/TechScopePicker';
 
 interface UsersDialogProps {
   open: boolean;
@@ -72,6 +73,7 @@ const UsersDialog = ({
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>('user');
   const [managerId, setManagerId] = useState<number | ''>('');
+  const [scopeIds, setScopeIds] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState('');
@@ -86,6 +88,7 @@ const UsersDialog = ({
 
   const admins = users.filter((u) => u.role === 'admin' || u.role === 'superadmin');
   const managers = users.filter((u) => u.role === 'manager');
+  const scopeHeads = users.filter((u) => u.role === 'manager' || u.role === 'admin');
 
   const treeMode = isSuperAdmin || readOnly;
 
@@ -151,7 +154,8 @@ const UsersDialog = ({
         password,
         fullName,
         role,
-        managerId: role === 'user' || role === 'admin' || role === 'technician' ? managerId || null : null,
+        managerId: role === 'user' || role === 'admin' ? managerId || null : null,
+        scopeIds: role === 'technician' ? scopeIds : undefined,
         accessDays: role === 'admin' ? accessDays || null : null,
       });
       apply(r.users);
@@ -160,6 +164,7 @@ const UsersDialog = ({
       setPassword('');
       setRole('user');
       setManagerId('');
+      setScopeIds([]);
       setAccessDays('');
       toast({ title: 'Пользователь добавлен' });
     } catch (e) {
@@ -297,17 +302,24 @@ const UsersDialog = ({
                 <option value="superadmin">Супер-админ</option>
               </select>
             )}
-            {isSuperAdmin && (role === 'user' || role === 'technician') && (
+            {isSuperAdmin && role === 'technician' && (
+              <TechScopePicker
+                heads={scopeHeads}
+                value={scopeIds}
+                onChange={setScopeIds}
+                className="md:col-span-2"
+              />
+            )}
+            {isSuperAdmin && role === 'user' && (
               <select
                 value={managerId}
                 onChange={(e) => setManagerId(e.target.value ? Number(e.target.value) : '')}
                 className={`${inputClass} md:col-span-2`}
               >
-                <option value="">{role === 'technician' ? 'Все точки' : 'Без руководителя'}</option>
-                {(role === 'technician' ? [...managers, ...admins] : admins).map((a) => (
+                <option value="">Без руководителя</option>
+                {admins.map((a) => (
                   <option key={a.id} value={a.id}>
                     Закрепить за: {a.fullName || a.username}
-                    {role === 'technician' && a.role === 'manager' ? ' (управляющий)' : ''}
                   </option>
                 ))}
               </select>
@@ -426,9 +438,23 @@ const UsersDialog = ({
                             '—'
                           }`
                         : ''
+                    }${
+                      u.role === 'technician'
+                        ? ` · ${
+                            u.scopeIds?.length
+                              ? u.scopeIds
+                                  .map((id) => {
+                                    const h = users.find((x) => x.id === id);
+                                    return h ? h.fullName || h.username : null;
+                                  })
+                                  .filter(Boolean)
+                                  .join(', ')
+                              : 'все точки'
+                          }`
+                        : ''
                     }`}
                   </p>
-                  {u.role !== 'superadmin' && (
+                  {u.role !== 'superadmin' && u.role !== 'technician' && (
                     <p
                       className={`truncate text-[12px] font-bold ${toneClass[accessInfo(u.accessUntil, !u.accessOwn).tone]}`}
                     >
@@ -452,7 +478,15 @@ const UsersDialog = ({
                     <option value="superadmin">Супер-админ</option>
                   </select>
                 )}
-                {isSuperAdmin && (u.role === 'user' || u.role === 'technician') && (
+                {isSuperAdmin && u.role === 'technician' && (
+                  <TechScopePicker
+                    heads={scopeHeads}
+                    value={u.scopeIds || []}
+                    onChange={(ids) => patch({ id: u.id, scopeIds: ids }, 'Точки техника обновлены')}
+                    className="max-w-[260px] py-1 text-[13px]"
+                  />
+                )}
+                {isSuperAdmin && u.role === 'user' && (
                   <select
                     value={u.managerId ?? ''}
                     onChange={(e) =>
@@ -463,11 +497,10 @@ const UsersDialog = ({
                     }
                     className="border-2 border-primary bg-background px-2 py-1 font-body text-[13px] text-primary outline-none"
                   >
-                    <option value="">{u.role === 'technician' ? 'Все точки' : 'Без руководителя'}</option>
-                    {(u.role === 'technician' ? [...managers, ...admins] : admins).map((a) => (
+                    <option value="">Без руководителя</option>
+                    {admins.map((a) => (
                       <option key={a.id} value={a.id}>
                         {a.fullName || a.username}
-                        {u.role === 'technician' && a.role === 'manager' ? ' (управляющий)' : ''}
                       </option>
                     ))}
                   </select>

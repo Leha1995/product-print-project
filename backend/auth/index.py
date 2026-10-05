@@ -121,6 +121,7 @@ def list_users(cur, me=None):
         f'FROM app_users {where} ORDER BY id'
     )
     rows = cur.fetchall()
+    scopes = read_scopes(cur)
     own = {r[0]: r[7] for r in rows}
     result = []
     for r in rows:
@@ -145,9 +146,29 @@ def list_users(cur, me=None):
                 'managerId': r[6],
                 'accessUntil': until.isoformat() if until else None,
                 'accessOwn': r[3] == 'admin',
+                'scopeIds': scopes.get(r[0], []) if r[3] == 'technician' else [],
             }
         )
     return result
+
+
+def read_scopes(cur) -> dict:
+    cur.execute('SELECT technician_id, head_id FROM technician_scopes ORDER BY head_id')
+    out: dict = {}
+    for tid, hid in cur.fetchall():
+        out.setdefault(tid, []).append(hid)
+    return out
+
+
+def save_scopes(cur, tech_id: int, heads) -> None:
+    ids = sorted({int(h) for h in (heads or []) if str(h).isdigit() and int(h) != tech_id})
+    cur.execute(f'DELETE FROM technician_scopes WHERE technician_id = {int(tech_id)}')
+    if ids:
+        cur.execute(
+            'INSERT INTO technician_scopes (technician_id, head_id) '
+            f"SELECT {int(tech_id)}, id FROM app_users WHERE id IN ({', '.join(str(i) for i in ids)}) "
+            "AND role IN ('admin', 'manager')"
+        )
 
 
 def manager_branch_ids(cur, manager_id: int):
@@ -384,8 +405,12 @@ def handler(event: dict, context) -> dict:
                 until_sql = 'NULL'
             cur.execute(
                 'INSERT INTO app_users (username, full_name, password_hash, role, manager_id, access_until) VALUES '
-                f'({q(username)}, {q(full_name)}, {q(hash_password(password))}, {q(role)}, {manager_sql}, {until_sql})'
+                f'({q(username)}, {q(full_name)}, {q(hash_password(password))}, {q(role)}, {manager_sql}, {until_sql}) '
+                'RETURNING id'
             )
+            new_id = cur.fetchone()[0]
+            if role == 'technician':
+                save_scopes(cur, new_id, body.get('scopeIds'))
             return done({'users': list_users(cur, me)})
 
         if action == 'update_user':
@@ -430,6 +455,8 @@ def handler(event: dict, context) -> dict:
                     until = datetime.utcnow() + timedelta(days=int(days))
                     sets.append(f"access_until = {q(until.isoformat(sep=' ', timespec='seconds'))}")
                     renew_branch = True
+            if 'scopeIds' in body:
+                save_scopes(cur, user_id, body.get('scopeIds'))
             if not sets:
                 return done({'users': list_users(cur, me)})
             cur.execute(f'UPDATE app_users SET {", ".join(sets)} WHERE id = {user_id}')
@@ -456,6 +483,9 @@ def handler(event: dict, context) -> dict:
                 if cur.fetchone()[0] <= 1:
                     return done({'error': 'last_superadmin'}, 400)
             cur.execute(f'DELETE FROM app_sessions WHERE user_id = {user_id}')
+            cur.execute(
+                f'DELETE FROM technician_scopes WHERE technician_id = {user_id} OR head_id = {user_id}'
+            )
             cur.execute(f'UPDATE app_users SET manager_id = NULL WHERE manager_id = {user_id}')
             cur.execute(f'DELETE FROM app_users WHERE id = {user_id}')
             return done({'users': list_users(cur, me)})

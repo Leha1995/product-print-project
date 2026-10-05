@@ -17,6 +17,7 @@ export interface ManagedUser extends AuthUser {
   managerId: number | null;
   accessUntil: string | null;
   accessOwn?: boolean;
+  scopeIds?: number[];
 }
 
 export interface ManagedTarget {
@@ -187,6 +188,7 @@ export const apiCreateUser = (payload: {
   role: Role;
   managerId?: number | null;
   accessDays?: number | null;
+  scopeIds?: number[];
 }) => call<{ users: ManagedUser[] }>({ action: 'create_user', ...payload });
 
 export const apiUpdateUser = (payload: {
@@ -198,6 +200,7 @@ export const apiUpdateUser = (payload: {
   active?: boolean;
   managerId?: number | null;
   accessDays?: number | null;
+  scopeIds?: number[];
 }) => call<{ users: ManagedUser[] }>({ action: 'update_user', ...payload });
 
 export const apiDeleteUser = (id: number) =>
