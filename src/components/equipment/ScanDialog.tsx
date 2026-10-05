@@ -4,6 +4,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
 import { Equipment } from '@/lib/equipmentApi';
 import { cameraSupported, openCamera } from '@/lib/cameraPermission';
+import useHardwareScanner from '@/hooks/useHardwareScanner';
 
 interface ScanDialogProps {
   open: boolean;
@@ -38,6 +39,8 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
     if (!found) return;
     setScanned((prev) => (prev.includes(code) ? prev : [...prev, code]));
   }, []);
+
+  useHardwareScanner(open, accept);
 
   useEffect(() => {
     if (!open) return;
@@ -166,7 +169,7 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
           </h3>
           <p className="mt-0.5 text-[13px] text-muted-foreground">
             {status === 'idle'
-              ? `Включи камеру или вводи коды вручную. Отмечено ${scanned.length} из ${total}`
+              ? `Сканируй сканером, включи камеру или вводи коды вручную. Отмечено ${scanned.length} из ${total}`
               : status === 'off'
                 ? `Камера недоступна — вводи коды вручную. Отмечено ${scanned.length} из ${total}`
                 : `Наведи камеру на QR-код. Отмечено ${scanned.length} из ${total}`}
@@ -175,10 +178,12 @@ const ScanDialog = ({ open, onOpenChange, items, onFinish }: ScanDialogProps) =>
 
         {status === 'idle' ? (
           <div className="mx-3 flex flex-1 flex-col items-center justify-center gap-3 overflow-y-auto border-2 border-dashed border-primary bg-card px-4 py-6 text-center sm:mx-0 sm:mt-3 sm:flex-none">
-            <Icon name="ScanLine" size={32} strokeWidth={2} className="text-primary" />
+            <Icon name="ScanBarcode" size={32} strokeWidth={2} className="text-primary" />
+            <p className="max-w-[320px] font-head text-[0.78rem] font-bold uppercase text-primary">
+              Сканер готов — просто сканируй QR-коды
+            </p>
             <p className="max-w-[320px] text-[13px] text-muted-foreground">
-              Нажми кнопку — браузер спросит разрешение на камеру. Подтверди его, и сканирование
-              начнётся.
+              Или включи камеру: браузер спросит разрешение, подтверди его, и сканирование начнётся.
             </p>
             <button
               onClick={() => setAttempt((n) => n + 1)}
