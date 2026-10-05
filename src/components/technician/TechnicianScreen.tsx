@@ -15,7 +15,6 @@ import { toast } from '@/hooks/use-toast';
 import useHardwareScanner from '@/hooks/useHardwareScanner';
 import { playScanSound } from '@/lib/scanSound';
 import RepairPhotos from '@/components/equipment/RepairPhotos';
-import TelegramConnect from '@/components/TelegramConnect';
 
 interface TechnicianScreenProps {
   userName: string;
@@ -162,11 +161,6 @@ const TechnicianScreen = ({ userName, onLogout, viewTechId = null, inline = fals
       </header>
 
       <main className="px-4 py-6 md:px-8">
-        {!viewOnly && (
-          <div className="mb-4">
-            <TelegramConnect hint="Новые задачи и поломки будут приходить в Telegram" />
-          </div>
-        )}
         <div className="mb-4 grid grid-cols-2 border-2 border-primary sm:inline-grid sm:w-auto">
           {(
             [
