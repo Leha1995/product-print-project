@@ -10,6 +10,7 @@ interface ScanResultDialogProps {
   onOpenChange: (open: boolean) => void;
   onRescan: () => void;
   onResolve: (item: Equipment, mode: 'qr_broken' | 'write_off') => Promise<void> | void;
+  items?: Equipment[];
 }
 
 const money = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`;
@@ -20,6 +21,7 @@ const ScanResultDialog = ({
   onOpenChange,
   onRescan,
   onResolve,
+  items,
 }: ScanResultDialogProps) => {
   const [busyId, setBusyId] = useState('');
   const [askId, setAskId] = useState('');
@@ -162,7 +164,7 @@ const ScanResultDialog = ({
         </p>
 
         <button
-          onClick={() => exportInventory(result)}
+          onClick={() => exportInventory(result, null, items)}
           className="mt-4 flex w-full items-center justify-center gap-2 border-2 border-primary bg-card px-4 py-3 font-head text-[0.78rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
         >
           <Icon name="FileSpreadsheet" size={18} strokeWidth={2.5} />

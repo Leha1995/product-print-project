@@ -84,7 +84,70 @@ const paintRows = (sheet: XLSX.WorkSheet, colors: (string | null)[]) => {
   });
 };
 
-export const exportInventory = (result: FinishResult, finishedAt?: string | null) => {
+const dateText = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('ru-RU') : '');
+
+const repairsSheet = (items: Equipment[]) => {
+  const records = items
+    .flatMap((item) => (item.repairs || []).map((r) => ({ item, r })))
+    .sort((a, b) => (b.r.sentAt || '').localeCompare(a.r.sentAt || ''));
+  const rows = records.length
+    ? records.map(({ item, r }, i) => ({
+        '№': i + 1,
+        Оборудование: item.name,
+        'Дата отправки': dateText(r.sentAt),
+        'Дата возврата': r.returnedAt ? dateText(r.returnedAt) : 'В ремонте',
+        'Сумма, ₽': r.returnedAt ? Math.round(r.cost) : '',
+        'Описание поломки': r.description || '',
+      }))
+    : [
+        {
+          '№': '',
+          Оборудование: 'Ремонтов пока не было',
+          'Дата отправки': '',
+          'Дата возврата': '',
+          'Сумма, ₽': '',
+          'Описание поломки': '',
+        },
+      ];
+  if (records.length) {
+    rows.push({
+      '№': '',
+      Оборудование: 'Итого',
+      'Дата отправки': '',
+      'Дата возврата': '',
+      'Сумма, ₽': Math.round(records.reduce((sum, { r }) => sum + (r.returnedAt ? r.cost : 0), 0)),
+      'Описание поломки': '',
+    } as (typeof rows)[number]);
+  }
+  const sheet = XLSX.utils.json_to_sheet(rows);
+  paintRows(
+    sheet,
+    records.map(({ r }) => (r.returnedAt ? null : COLORS.yellow)),
+  );
+  if (records.length) {
+    const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+    for (let c = range.s.c; c <= range.e.c; c += 1) {
+      const ref = XLSX.utils.encode_cell({ r: range.e.r, c });
+      if (sheet[ref]) sheet[ref].s = { font: { bold: true } };
+    }
+    sheet['!autofilter'] = {
+      ref: XLSX.utils.encode_range({ s: range.s, e: { r: range.e.r - 1, c: range.e.c } }),
+    };
+  }
+  for (const ref of Object.keys(sheet)) {
+    if (ref.startsWith('F') && ref !== 'F1' && sheet[ref]) {
+      sheet[ref].s = { ...(sheet[ref].s || {}), alignment: { wrapText: true, vertical: 'top' } };
+    }
+  }
+  sheet['!cols'] = [{ wch: 5 }, { wch: 32 }, { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 50 }];
+  return sheet;
+};
+
+export const exportInventory = (
+  result: FinishResult,
+  finishedAt?: string | null,
+  allItems?: Equipment[],
+) => {
   const checkedAt = finishedAt ? new Date(finishedAt) : new Date();
   const all = [
     ...result.found.map((item) => ({ item, found: true })),
@@ -140,6 +203,7 @@ export const exportInventory = (result: FinishResult, finishedAt?: string | null
   const book = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(book, summary, 'Итоги');
   XLSX.utils.book_append_sheet(book, sheet, 'Оборудование');
+  XLSX.utils.book_append_sheet(book, repairsSheet(allItems || [...result.found, ...result.missing]), 'Ремонты');
   XLSX.writeFile(book, `Инвентаризация_${stamp(finishedAt)}.xlsx`);
 };
 
@@ -178,5 +242,6 @@ export const exportEquipmentList = (items: Equipment[]) => {
   ];
   const book = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(book, sheet, 'Оборудование');
+  XLSX.utils.book_append_sheet(book, repairsSheet(items), 'Ремонты');
   XLSX.writeFile(book, `Оборудование_${stamp()}.xlsx`);
 };

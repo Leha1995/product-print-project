@@ -189,7 +189,7 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
                     totalPrice: lastSession.totalPrice,
                     missingPrice: lastSession.missingPrice,
                     sessions,
-                  }, lastSession.finishedAt);
+                  }, lastSession.finishedAt, items);
                   return;
                 }
                 exportEquipmentList(items);
@@ -490,6 +490,7 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
           setScanOpen(true);
         }}
         onResolve={handleResolve}
+        items={items}
       />
       <InventoryHistoryDialog
         open={historyOpen}

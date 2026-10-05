@@ -178,6 +178,7 @@ const InventoryHistoryDialog = ({
                             sessions,
                           },
                           s.finishedAt,
+                          items,
                         )
                       }
                       className="mt-2 flex w-full items-center justify-center gap-2 border-2 border-primary bg-background px-3 py-2 font-head text-[0.7rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
