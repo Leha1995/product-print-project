@@ -20,6 +20,7 @@ interface TechnicianScreenProps {
   userName: string;
   onLogout: () => void;
   viewTechId?: number | null;
+  inline?: boolean;
 }
 
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('ru-RU') : '—');
@@ -44,7 +45,7 @@ const asEquipment = (r: TechRepair): Equipment => ({
   ],
 });
 
-const TechnicianScreen = ({ userName, onLogout, viewTechId = null }: TechnicianScreenProps) => {
+const TechnicianScreen = ({ userName, onLogout, viewTechId = null, inline = false }: TechnicianScreenProps) => {
   const viewOnly = Boolean(viewTechId);
   const [list, setList] = useState<TechRepair[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,7 +130,11 @@ const TechnicianScreen = ({ userName, onLogout, viewTechId = null }: TechnicianS
   };
 
   return (
-    <div className={viewOnly ? 'fixed inset-0 z-50 overflow-y-auto bg-background' : 'min-h-screen bg-background'}>
+    <div
+      className={
+        inline ? 'bg-background' : viewOnly ? 'fixed inset-0 z-50 overflow-y-auto bg-background' : 'min-h-screen bg-background'
+      }
+    >
       {viewOnly && (
         <div className="flex items-center justify-center gap-2 border-b-2 border-primary bg-warning px-4 py-2 text-center font-head text-[0.72rem] font-bold uppercase text-warning-foreground">
           <Icon name="Eye" size={15} strokeWidth={2.5} />

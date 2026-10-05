@@ -54,6 +54,9 @@ const Index = () => {
   const isTechnician = user?.role === 'technician';
   const [targetId, setTargetId] = useState<number | null>(null);
   const activeTarget = targetId ?? (inventoryOnly ? null : (user?.id ?? null));
+  const pickedTech = isSuperAdmin
+    ? managed.find((m) => m.id === targetId && m.role === 'technician') || null
+    : null;
   const managerPicked = inventoryOnly && targetId !== null;
   const viewingName = (() => {
     const found = managed.find((m) => m.id === targetId);
@@ -71,7 +74,10 @@ const Index = () => {
     replaceCatalog,
     saveCategories,
     savePrefs,
-  } = useCatalog(isTechnician ? null : user?.id, isTechnician ? null : activeTarget);
+  } = useCatalog(
+    isTechnician ? null : user?.id,
+    isTechnician ? null : pickedTech ? (user?.id ?? null) : activeTarget,
+  );
   const {
     categories,
     addCategory,
@@ -298,6 +304,15 @@ const Index = () => {
           viewingName={viewingName}
         />
       )}
+      {pickedTech ? (
+        <TechnicianScreen
+          key={pickedTech.id}
+          inline
+          userName={pickedTech.fullName || pickedTech.username}
+          viewTechId={pickedTech.id}
+          onLogout={() => setTargetId(null)}
+        />
+      ) : (
       <IndexMain
         inventoryOnly={inventoryOnly}
         managerPicked={managerPicked}
@@ -336,6 +351,7 @@ const Index = () => {
         jobs={jobs}
         onClearJobs={() => setJobs([])}
       />
+      )}
       <Footer />
       <PrintDialog
         product={selected}
