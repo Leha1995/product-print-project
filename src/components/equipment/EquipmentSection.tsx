@@ -9,12 +9,17 @@ import RepairReturnDialog from '@/components/equipment/RepairReturnDialog';
 import RepairSendDialog from '@/components/equipment/RepairSendDialog';
 import RepairHistory from '@/components/equipment/RepairHistory';
 import FindQrDialog from '@/components/equipment/FindQrDialog';
+import TaskCreateDialog, { TaskDraft } from '@/components/equipment/TaskCreateDialog';
+import TasksPanel from '@/components/equipment/TasksPanel';
 import useHardwareScanner from '@/hooks/useHardwareScanner';
 import { playScanSound } from '@/lib/scanSound';
 import useEquipment from '@/hooks/useEquipment';
 import {
   Equipment,
+  EquipmentTask,
   FinishResult,
+  cancelTask,
+  createTask,
   finishInventory,
   markQrFixed,
   resolveMissing,
@@ -35,7 +40,18 @@ interface EquipmentSectionProps {
 const money = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`;
 
 const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) => {
-  const { items, sessions, loading, save, remove, setItems, setSessions } = useEquipment(
+  const {
+    items,
+    sessions,
+    tasks,
+    technicians,
+    loading,
+    save,
+    remove,
+    setItems,
+    setSessions,
+    setTasks,
+  } = useEquipment(
     userId,
     targetId,
   );
@@ -49,6 +65,8 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [findOpen, setFindOpen] = useState(false);
+  const [taskOpen, setTaskOpen] = useState(false);
+  const [taskItem, setTaskItem] = useState<Equipment | null>(null);
   const [foundId, setFoundId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [repairItem, setRepairItem] = useState<Equipment | null>(null);
@@ -88,13 +106,40 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
   };
 
   const anyDialogOpen =
-    formOpen || qrOpen || scanOpen || resultOpen || historyOpen || repairOpen || sendOpen || findOpen;
+    formOpen || qrOpen || scanOpen || resultOpen || historyOpen || repairOpen || sendOpen || findOpen || taskOpen;
   useHardwareScanner(!anyDialogOpen && items.length > 0, findByCode);
 
   const totalPrice = items.reduce((sum, i) => (i.active ? sum + i.price : sum), 0);
   const residualTotal = totalResidual(items.filter((i) => i.active));
   const lastSession = sessions[0];
   const inRepairCount = items.filter((i) => i.active && i.inRepair).length;
+
+  const handleCreateTask = async (draft: TaskDraft) => {
+    try {
+      const res = await createTask(draft);
+      setTasks(res.tasks);
+      setFoundId(null);
+      const tech = technicians.find((t) => t.id === draft.technicianId);
+      toast({
+        title: 'Задача отправлена',
+        description: tech ? `Технику: ${tech.name}` : technicians.length ? 'Закреплённым техникам' : 'Техник пока не закреплён',
+      });
+    } catch {
+      toast({ title: 'Не удалось отправить задачу', description: 'Проверь интернет и повтори' });
+      throw new Error('save_failed');
+    }
+  };
+
+  const handleCancelTask = async (task: EquipmentTask) => {
+    if (!window.confirm(`Отменить задачу №${task.id}?`)) return;
+    try {
+      const res = await cancelTask(task.id);
+      setTasks(res.tasks);
+      toast({ title: 'Задача отменена' });
+    } catch {
+      toast({ title: 'Не удалось отменить', description: 'Проверь интернет и повтори' });
+    }
+  };
 
   const handleSendRepair = async (item: Equipment, description: string, photos: string[]) => {
     try {
@@ -199,6 +244,18 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
               Добавить
             </button>
           )}
+          {isAdmin && (
+            <button
+              onClick={() => {
+                setTaskItem(null);
+                setTaskOpen(true);
+              }}
+              className="flex items-center gap-2 border-2 border-primary bg-card px-3 py-2.5 font-head text-[0.75rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
+            >
+              <Icon name="ClipboardPlus" fallback="ClipboardList" size={16} strokeWidth={2.5} />
+              Создать задачу
+            </button>
+          )}
           {sessions.some((s) => s.finishedAt) && (
             <button
               onClick={() => setHistoryOpen(true)}
@@ -281,6 +338,8 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
         </button>
       )}
 
+      <TasksPanel tasks={tasks} canManage={isAdmin} onCancel={handleCancelTask} />
+
       {items.length > 0 && (
         <div className="mt-4 flex gap-2">
           <input
@@ -334,6 +393,18 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
                   >
                     <Icon name={item.inRepair ? 'CircleCheck' : 'Wrench'} size={13} strokeWidth={2.5} />
                     {item.inRepair ? 'Принять с ремонта' : 'Отправить в ремонт'}
+                  </button>
+                )}
+                {item.active && isAdmin && (
+                  <button
+                    onClick={() => {
+                      setTaskItem(item);
+                      setTaskOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 border-2 border-primary bg-card px-2.5 py-1 font-head text-[0.65rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
+                  >
+                    <Icon name="ClipboardPlus" fallback="ClipboardList" size={13} strokeWidth={2.5} />
+                    Задача
                   </button>
                 )}
                 <button
@@ -401,6 +472,12 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
                 <p className="mt-1.5 inline-flex items-center gap-1 border-2 border-warning bg-warning px-1.5 py-0.5 font-head text-[0.6rem] font-bold uppercase text-warning-foreground">
                   <Icon name="TriangleAlert" size={12} strokeWidth={2.5} />
                   Заменить QR
+                </p>
+              )}
+              {tasks.some((t) => t.status === 'open' && t.equipmentId === item.id) && (
+                <p className="mt-1.5 mr-1 inline-flex items-center gap-1 border-2 border-primary bg-background px-1.5 py-0.5 font-head text-[0.6rem] font-bold uppercase text-primary">
+                  <Icon name="ClipboardList" size={12} strokeWidth={2.5} />
+                  {`Задач: ${tasks.filter((t) => t.status === 'open' && t.equipmentId === item.id).length}`}
                 </p>
               )}
               {item.inRepair && item.active && (
@@ -479,6 +556,19 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
                   Вернуть в работу
                 </button>
               )}
+              {item.active && isAdmin && (
+                <button
+                  onClick={() => {
+                    setTaskItem(item);
+                    setTaskOpen(true);
+                  }}
+                  aria-label="Создать задачу технику"
+                  title="Задача технику"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center border-2 border-primary bg-background text-primary transition-colors hover:bg-muted"
+                >
+                  <Icon name="ClipboardPlus" fallback="ClipboardList" size={14} strokeWidth={2.5} />
+                </button>
+              )}
               <button
                 onClick={() => {
                   setQrItems([item]);
@@ -541,6 +631,14 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
             description: item.name,
           });
         }}
+      />
+      <TaskCreateDialog
+        open={taskOpen}
+        onOpenChange={setTaskOpen}
+        items={items}
+        technicians={technicians}
+        presetItem={taskItem}
+        onConfirm={handleCreateTask}
       />
       <FindQrDialog open={findOpen} onOpenChange={setFindOpen} onCode={findByCode} />
       <RepairSendDialog

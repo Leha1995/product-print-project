@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   Equipment,
+  EquipmentTask,
   InventorySession,
+  TechnicianRef,
   deleteEquipment,
   fetchEquipment,
   saveEquipment,
@@ -12,6 +14,8 @@ const useEquipment = (userId?: number, targetId?: number | null) => {
   const [items, setItems] = useState<Equipment[]>([]);
   const [sessions, setSessions] = useState<InventorySession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tasks, setTasks] = useState<EquipmentTask[]>([]);
+  const [technicians, setTechnicians] = useState<TechnicianRef[]>([]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -19,6 +23,8 @@ const useEquipment = (userId?: number, targetId?: number | null) => {
       const data = await fetchEquipment();
       setItems(data.items);
       setSessions(data.sessions);
+      setTasks(data.tasks);
+      setTechnicians(data.technicians);
     } catch {
       setItems([]);
     } finally {
@@ -43,7 +49,19 @@ const useEquipment = (userId?: number, targetId?: number | null) => {
     if (res?.items) setItems(res.items);
   }, []);
 
-  return { items, sessions, loading, reload, save, remove, setItems, setSessions };
+  return {
+    items,
+    sessions,
+    tasks,
+    technicians,
+    loading,
+    reload,
+    save,
+    remove,
+    setItems,
+    setSessions,
+    setTasks,
+  };
 };
 
 export default useEquipment;

@@ -58,8 +58,6 @@ def cleanup_repair_photos(cur, limit: int = 10) -> None:
         f'ORDER BY returned_at LIMIT {int(limit)}'
     )
     rows = cur.fetchall()
-    if not rows:
-        return
     s3 = s3_client()
     for rid, photos in rows:
         for url in photos or []:
@@ -71,6 +69,21 @@ def cleanup_repair_photos(cur, limit: int = 10) -> None:
             except Exception as err:
                 print(f'repair photo delete failed {key}: {err}')
         cur.execute(f"UPDATE equipment_repairs SET photos = '[]'::jsonb WHERE id = {int(rid)}")
+
+    cur.execute(
+        "SELECT id, photos FROM equipment_tasks WHERE status <> 'open' AND done_at IS NOT NULL "
+        "AND done_at < NOW() - INTERVAL '24 hours' AND photos <> '[]'::jsonb "
+        f'ORDER BY done_at LIMIT {int(limit)}'
+    )
+    for tid, photos in cur.fetchall():
+        for url in photos or []:
+            _, sep, key = str(url).partition('/bucket/')
+            if sep and key.startswith('tasks/'):
+                try:
+                    s3.delete_object(Bucket='files', Key=key)
+                except Exception as err:
+                    print(f'task photo delete failed {key}: {err}')
+        cur.execute(f"UPDATE equipment_tasks SET photos = '[]'::jsonb WHERE id = {int(tid)}")
 
 
 def session_user(cur, token: str):
@@ -303,6 +316,95 @@ def return_repair(cur, uid: int, body: dict) -> None:
     )
 
 
+def owner_technicians(cur, uid: int):
+    """Техники, закреплённые за точкой uid (напрямую, через управляющего или «все точки»)."""
+    cur.execute(f'SELECT role, manager_id FROM app_users WHERE id = {int(uid)}')
+    row = cur.fetchone()
+    heads = [int(uid)]
+    if row and row[0] == 'admin' and row[1]:
+        heads.append(int(row[1]))
+    cur.execute(
+        "SELECT u.id, COALESCE(NULLIF(u.full_name, ''), u.username) FROM app_users u "
+        "WHERE u.role = 'technician' AND u.active AND ("
+        'NOT EXISTS (SELECT 1 FROM technician_scopes s WHERE s.technician_id = u.id) '
+        'OR EXISTS (SELECT 1 FROM technician_scopes s LEFT JOIN app_users h ON h.id = s.head_id '
+        f"WHERE s.technician_id = u.id AND (s.head_id IN ({', '.join(str(h) for h in heads)}) OR h.role = 'superadmin'))"
+        ') ORDER BY 2'
+    )
+    return [{'id': r[0], 'name': r[1]} for r in cur.fetchall()]
+
+
+TASK_COLS = (
+    't.id, t.user_id, t.equipment_id, t.technician_id, t.description, t.photos, t.status, '
+    't.created_at, t.done_at, t.done_comment, e.name, e.location, e.code, '
+    "COALESCE(NULLIF(o.full_name, ''), o.username), COALESCE(NULLIF(tu.full_name, ''), tu.username), "
+    "COALESCE(NULLIF(cu.full_name, ''), cu.username), COALESCE(NULLIF(du.full_name, ''), du.username)"
+)
+TASK_JOINS = (
+    'FROM equipment_tasks t '
+    'LEFT JOIN equipment e ON e.user_id = t.user_id AND e.id = t.equipment_id '
+    'LEFT JOIN app_users o ON o.id = t.user_id '
+    'LEFT JOIN app_users tu ON tu.id = t.technician_id '
+    'LEFT JOIN app_users cu ON cu.id = t.created_by '
+    'LEFT JOIN app_users du ON du.id = t.done_by '
+)
+
+
+def task_rows(cur, where: str, limit: int = 200):
+    cur.execute(
+        f'SELECT {TASK_COLS} {TASK_JOINS} WHERE {where} '
+        "ORDER BY (t.status = 'open') DESC, t.created_at DESC "
+        f'LIMIT {int(limit)}'
+    )
+    return [
+        {
+            'id': r[0],
+            'ownerId': r[1],
+            'equipmentId': r[2],
+            'technicianId': r[3],
+            'description': r[4] or '',
+            'photos': r[5] or [],
+            'status': r[6],
+            'createdAt': r[7].isoformat() if r[7] else None,
+            'doneAt': r[8].isoformat() if r[8] else None,
+            'doneComment': r[9] or '',
+            'equipmentName': r[10] or '',
+            'location': r[11] or '',
+            'code': r[12] or '',
+            'ownerName': r[13] or '',
+            'technicianName': r[14] or '',
+            'createdByName': r[15] or '',
+            'doneByName': r[16] or '',
+        }
+        for r in cur.fetchall()
+    ]
+
+
+def owner_tasks(cur, uid: int):
+    return task_rows(
+        cur,
+        f"t.user_id = {int(uid)} AND (t.status = 'open' OR t.done_at > NOW() - INTERVAL '30 days')",
+    )
+
+
+def technician_tasks(cur, me):
+    owners = technician_owners(cur, me)
+    scope = '' if owners is None else f" AND t.user_id IN ({', '.join(str(o) for o in owners) or '0'})"
+    return task_rows(
+        cur,
+        f"(t.technician_id IS NULL OR t.technician_id = {int(me['id'])}){scope} "
+        "AND (t.status = 'open' OR t.done_at > NOW() - INTERVAL '7 days')",
+    )
+
+
+def upload_photos(raw_list, prefix: str):
+    out = []
+    for raw in (raw_list or [])[:4]:
+        if isinstance(raw, str) and raw.startswith('data:image/'):
+            out.append(upload_image(raw, prefix, 'tasks'))
+    return out
+
+
 def handler(event: dict, context) -> dict:
     """Инвентаризация оборудования кухни: карточки с QR-кодом, стоимостью и расходами на ремонт, сессии сканирования."""
     method = event.get('httpMethod', 'GET')
@@ -328,8 +430,19 @@ def handler(event: dict, context) -> dict:
         cleanup_repair_photos(cur)
     if me['role'] == 'technician':
         if method == 'GET':
-            return finish({'repairs': technician_items(cur, me)})
+            return finish({'repairs': technician_items(cur, me), 'tasks': technician_tasks(cur, me)})
         tbody = json.loads(event.get('body') or '{}')
+        if tbody.get('action') == 'task_done':
+            tid = int(tbody.get('taskId') or 0)
+            visible = {t['id'] for t in technician_tasks(cur, me) if t['status'] == 'open'}
+            if tid not in visible:
+                return finish({'error': 'not_found', 'tasks': technician_tasks(cur, me)}, 409)
+            cur.execute(
+                "UPDATE equipment_tasks SET status = 'done', done_at = NOW(), "
+                f"done_by = {int(me['id'])}, done_comment = {q(str(tbody.get('comment') or '').strip()[:1000])} "
+                f"WHERE id = {tid} AND status = 'open'"
+            )
+            return finish({'ok': True, 'tasks': technician_tasks(cur, me)})
         if tbody.get('action') != 'return_repair':
             return finish({'error': 'forbidden'}, 403)
         owner = int(tbody.get('ownerId') or 0)
@@ -357,7 +470,14 @@ def handler(event: dict, context) -> dict:
         uid = target
 
     if method == 'GET':
-        return finish({'items': read_items(cur, uid), 'sessions': read_sessions(cur, uid)})
+        return finish(
+            {
+                'items': read_items(cur, uid),
+                'sessions': read_sessions(cur, uid),
+                'tasks': owner_tasks(cur, uid),
+                'technicians': owner_technicians(cur, uid),
+            }
+        )
 
     body = json.loads(event.get('body') or '{}')
     action = body.get('action', '')
@@ -365,6 +485,38 @@ def handler(event: dict, context) -> dict:
     if method == 'DELETE':
         cur.execute(f"DELETE FROM equipment WHERE user_id = {uid} AND id = {q(body.get('id', ''))}")
         return finish({'ok': True, 'items': read_items(cur, uid)})
+
+    if action == 'create_task':
+        description = str(body.get('description') or '').strip()[:2000]
+        if not description:
+            return finish({'error': 'empty_description'}, 400)
+        techs = owner_technicians(cur, uid)
+        tech_id = body.get('technicianId')
+        tech_sql = 'NULL'
+        if tech_id:
+            if int(tech_id) not in {t['id'] for t in techs}:
+                return finish({'error': 'bad_technician'}, 400)
+            tech_sql = str(int(tech_id))
+        eid = str(body.get('equipmentId') or '').strip()
+        eq_sql = 'NULL'
+        if eid:
+            cur.execute(f'SELECT 1 FROM equipment WHERE user_id = {uid} AND id = {q(eid)}')
+            if cur.fetchone():
+                eq_sql = q(eid)
+        photos = upload_photos(body.get('photos'), f'{uid}-{uuid.uuid4().hex[:6]}')
+        cur.execute(
+            'INSERT INTO equipment_tasks (user_id, equipment_id, technician_id, created_by, description, photos) '
+            f"VALUES ({uid}, {eq_sql}, {tech_sql}, {int(me['id'])}, {q(description)}, {q(json.dumps(photos))}::jsonb)"
+        )
+        return finish({'ok': True, 'tasks': owner_tasks(cur, uid)})
+
+    if action == 'cancel_task':
+        cur.execute(
+            "UPDATE equipment_tasks SET status = 'cancelled', done_at = NOW(), "
+            f"done_by = {int(me['id'])} WHERE user_id = {uid} AND id = {int(body.get('taskId') or 0)} "
+            "AND status = 'open'"
+        )
+        return finish({'ok': True, 'tasks': owner_tasks(cur, uid)})
 
     if action == 'resolve':
         eid = str(body.get('id') or '')

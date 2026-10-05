@@ -76,9 +76,36 @@ const send = async (body: Record<string, unknown>, method = 'POST') => {
   return res.json();
 };
 
+export interface EquipmentTask {
+  id: number;
+  ownerId: number;
+  equipmentId: string | null;
+  technicianId: number | null;
+  description: string;
+  photos: string[];
+  status: 'open' | 'done' | 'cancelled';
+  createdAt: string | null;
+  doneAt: string | null;
+  doneComment: string;
+  equipmentName: string;
+  location: string;
+  code: string;
+  ownerName: string;
+  technicianName: string;
+  createdByName: string;
+  doneByName: string;
+}
+
+export interface TechnicianRef {
+  id: number;
+  name: string;
+}
+
 export const fetchEquipment = async (): Promise<{
   items: Equipment[];
   sessions: InventorySession[];
+  tasks: EquipmentTask[];
+  technicians: TechnicianRef[];
 }> => {
   const res = await fetch(API, { headers: authHeaders() });
   if (!res.ok) throw new Error(String(res.status));
@@ -86,8 +113,20 @@ export const fetchEquipment = async (): Promise<{
   return {
     items: Array.isArray(data.items) ? (data.items as Equipment[]) : [],
     sessions: Array.isArray(data.sessions) ? (data.sessions as InventorySession[]) : [],
+    tasks: Array.isArray(data.tasks) ? (data.tasks as EquipmentTask[]) : [],
+    technicians: Array.isArray(data.technicians) ? (data.technicians as TechnicianRef[]) : [],
   };
 };
+
+export const createTask = (payload: {
+  description: string;
+  photos: string[];
+  equipmentId?: string | null;
+  technicianId?: number | null;
+}) => send({ action: 'create_task', ...payload }) as Promise<{ tasks: EquipmentTask[] }>;
+
+export const cancelTask = (taskId: number) =>
+  send({ action: 'cancel_task', taskId }) as Promise<{ tasks: EquipmentTask[] }>;
 
 export const saveEquipment = (item: Partial<Equipment>) =>
   send({ item }) as Promise<{ items: Equipment[] }>;
@@ -135,12 +174,18 @@ export interface TechRepair {
   photos?: string[];
 }
 
-export const fetchTechRepairs = async (): Promise<TechRepair[]> => {
+export const fetchTechRepairs = async (): Promise<{ repairs: TechRepair[]; tasks: EquipmentTask[] }> => {
   const res = await fetch(API, { headers: authHeaders() });
   if (!res.ok) throw new Error(String(res.status));
   const data = await res.json();
-  return Array.isArray(data.repairs) ? (data.repairs as TechRepair[]) : [];
+  return {
+    repairs: Array.isArray(data.repairs) ? (data.repairs as TechRepair[]) : [],
+    tasks: Array.isArray(data.tasks) ? (data.tasks as EquipmentTask[]) : [],
+  };
 };
+
+export const techTaskDone = (taskId: number, comment: string) =>
+  send({ action: 'task_done', taskId, comment }) as Promise<{ tasks: EquipmentTask[] }>;
 
 export const techReturnRepair = (ownerId: number, id: string, cost: number, description: string) =>
   send({ action: 'return_repair', ownerId, id, cost, description }) as Promise<{ repairs: TechRepair[] }>;
