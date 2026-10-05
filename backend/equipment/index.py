@@ -41,6 +41,38 @@ def upload_image(data_url: str, item_id: str, folder: str = 'equipment') -> str:
     return f"https://cdn.poehali.dev/projects/{os.environ['AWS_ACCESS_KEY_ID']}/bucket/{key}"
 
 
+def s3_client():
+    return boto3.client(
+        's3',
+        endpoint_url='https://bucket.poehali.dev',
+        aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+        aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+    )
+
+
+def cleanup_repair_photos(cur, limit: int = 10) -> None:
+    """Удаляет из хранилища фото поломок через 24 часа после возврата из ремонта."""
+    cur.execute(
+        "SELECT id, photos FROM equipment_repairs WHERE returned_at IS NOT NULL "
+        "AND returned_at < NOW() - INTERVAL '24 hours' AND photos <> '[]'::jsonb "
+        f'ORDER BY returned_at LIMIT {int(limit)}'
+    )
+    rows = cur.fetchall()
+    if not rows:
+        return
+    s3 = s3_client()
+    for rid, photos in rows:
+        for url in photos or []:
+            _, sep, key = str(url).partition('/bucket/')
+            if not sep or not key.startswith('repairs/'):
+                continue
+            try:
+                s3.delete_object(Bucket='files', Key=key)
+            except Exception as err:
+                print(f'repair photo delete failed {key}: {err}')
+        cur.execute(f"UPDATE equipment_repairs SET photos = '[]'::jsonb WHERE id = {int(rid)}")
+
+
 def session_user(cur, token: str):
     if not token:
         return None
@@ -292,6 +324,8 @@ def handler(event: dict, context) -> dict:
     me = session_user(cur, token)
     if not me:
         return finish({'error': 'unauthorized'}, 401)
+    if method == 'GET':
+        cleanup_repair_photos(cur)
     if me['role'] == 'technician':
         if method == 'GET':
             return finish({'repairs': technician_items(cur, me)})

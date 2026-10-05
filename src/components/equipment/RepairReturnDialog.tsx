@@ -78,6 +78,13 @@ const RepairReturnDialog = ({ item, open, onOpenChange, onConfirm }: RepairRetur
             />
           </label>
 
+          {(item.repairs?.find((r) => !r.returnedAt)?.photos?.length ?? 0) > 0 && (
+            <p className="mt-2 flex items-center gap-1.5 text-[12px] text-muted-foreground">
+              <Icon name="Clock" size={13} strokeWidth={2.5} />
+              Фото поломки удалятся через 24 часа после возврата
+            </p>
+          )}
+
           <p className="mt-2 text-[12px] text-muted-foreground">
             {`Всего на ремонт будет: ${money((item.repairCost || 0) + value)}`}
           </p>
