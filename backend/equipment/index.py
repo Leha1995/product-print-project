@@ -798,7 +798,8 @@ def handler(event: dict, context) -> dict:
             task_text = f'Ремонт: {eq_name}' + (f'\n{description}' if description else '')
             cur.execute(
                 'INSERT INTO equipment_tasks (user_id, equipment_id, technician_id, created_by, description, photos, priority, kind) '
-                f"VALUES ({uid}, {q(eid)}, NULL, {int(me['id'])}, {q(task_text[:2000])}, {q(json.dumps(photos))}::jsonb, 'soon', 'repair')"
+                f"VALUES ({uid}, {q(eid)}, NULL, {int(me['id'])}, {q(task_text[:2000])}, {q(json.dumps(photos))}::jsonb, "
+                f"{q(body.get('priority') if body.get('priority') in PRIORITIES else 'soon')}, 'repair')"
             )
         return finish({'ok': True, 'items': read_items(cur, uid), 'tasks': owner_tasks(cur, uid)})
 

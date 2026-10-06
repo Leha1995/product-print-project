@@ -28,6 +28,7 @@ import {
   sendToRepair,
 } from '@/lib/equipmentApi';
 import { toast } from '@/hooks/use-toast';
+import { TaskPriority } from '@/lib/taskPriority';
 import { hasDepreciation, residualValue, totalResidual } from '@/lib/depreciation';
 import { exportEquipmentList, exportInventory, pickEquipment } from '@/lib/inventoryExport';
 
@@ -142,9 +143,14 @@ const EquipmentSection = ({ userId, targetId, isAdmin, readOnly = false }: Equip
     }
   };
 
-  const handleSendRepair = async (item: Equipment, description: string, photos: string[]) => {
+  const handleSendRepair = async (
+    item: Equipment,
+    description: string,
+    photos: string[],
+    priority: TaskPriority,
+  ) => {
     try {
-      const res = await sendToRepair(item.id, description, photos);
+      const res = await sendToRepair(item.id, description, photos, priority);
       setItems(res.items);
       if (res.tasks) setTasks(res.tasks);
       setFoundId((cur) => (cur === item.id ? null : cur));

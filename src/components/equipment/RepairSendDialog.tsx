@@ -3,6 +3,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import Icon from '@/components/ui/icon';
 import { Equipment } from '@/lib/equipmentApi';
 import { readFile, shrink } from '@/lib/imageFile';
+import { PRIORITY_OPTIONS, TaskPriority } from '@/lib/taskPriority';
 
 const MAX_PHOTOS = 4;
 
@@ -10,7 +11,7 @@ interface RepairSendDialogProps {
   item: Equipment | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (item: Equipment, description: string, photos: string[]) => Promise<void>;
+  onConfirm: (item: Equipment, description: string, photos: string[], priority: TaskPriority) => Promise<void>;
 }
 
 const RepairSendDialog = ({ item, open, onOpenChange, onConfirm }: RepairSendDialogProps) => {
@@ -18,11 +19,13 @@ const RepairSendDialog = ({ item, open, onOpenChange, onConfirm }: RepairSendDia
   const [busy, setBusy] = useState(false);
   const [photos, setPhotos] = useState<string[]>([]);
   const [reading, setReading] = useState(false);
+  const [priority, setPriority] = useState<TaskPriority>('soon');
 
   useEffect(() => {
     if (open) {
       setPhotos([]);
       setDescription('');
+      setPriority('soon');
       setBusy(false);
     }
   }, [open]);
@@ -48,7 +51,7 @@ const RepairSendDialog = ({ item, open, onOpenChange, onConfirm }: RepairSendDia
     if (busy) return;
     setBusy(true);
     try {
-      await onConfirm(item, description.trim(), photos);
+      await onConfirm(item, description.trim(), photos, priority);
       onOpenChange(false);
     } finally {
       setBusy(false);
@@ -75,6 +78,36 @@ const RepairSendDialog = ({ item, open, onOpenChange, onConfirm }: RepairSendDia
               className="mt-1 w-full resize-none border-2 border-primary bg-card px-3 py-2.5 font-body text-[14px] text-primary outline-none"
             />
           </label>
+          <div className="mt-3">
+            <span className="font-head text-[0.68rem] font-bold uppercase tracking-[0.06em] text-primary">
+              Срочность ремонта
+            </span>
+            <div className="mt-1 grid grid-cols-3 gap-2">
+              {PRIORITY_OPTIONS.map((p) => {
+                const on = priority === p.value;
+                return (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => setPriority(p.value)}
+                    aria-pressed={on}
+                    className={`flex min-h-[60px] flex-col items-center justify-center gap-1 border-2 px-1 py-2 text-center transition-all ${
+                      on
+                        ? `${p.chip} scale-[1.03] shadow-[3px_3px_0_0_hsl(var(--primary))]`
+                        : `${p.border} bg-card text-primary opacity-70 hover:opacity-100`
+                    }`}
+                  >
+                    <Icon name={p.icon} fallback="Flag" size={18} strokeWidth={2.5} />
+                    <span className="font-head text-[0.66rem] font-black uppercase leading-tight">{p.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1 text-[12px] text-muted-foreground">
+              {PRIORITY_OPTIONS.find((p) => p.value === priority)?.hint}
+            </p>
+          </div>
+
           <div className="mt-3">
             <span className="font-head text-[0.68rem] font-bold uppercase tracking-[0.06em] text-primary">
               {`Фото поломки · ${photos.length} из ${MAX_PHOTOS}`}

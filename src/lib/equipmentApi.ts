@@ -157,8 +157,8 @@ export const markQrFixed = (id: string) =>
 
 export const restoreEquipment = (id: string) =>
   send({ action: 'restore', id }) as Promise<{ items: Equipment[] }>;
-export const sendToRepair = (id: string, description = '', photos: string[] = []) =>
-  send({ action: 'send_repair', id, description, photos }) as Promise<{ items: Equipment[]; tasks?: EquipmentTask[] }>;
+export const sendToRepair = (id: string, description = '', photos: string[] = [], priority = 'soon') =>
+  send({ action: 'send_repair', id, description, photos, priority }) as Promise<{ items: Equipment[]; tasks?: EquipmentTask[] }>;
 
 export const returnFromRepair = (id: string, cost: number, description?: string) =>
   send({ action: 'return_repair', id, cost, description }) as Promise<{ items: Equipment[]; tasks?: EquipmentTask[] }>;
