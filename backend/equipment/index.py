@@ -792,9 +792,10 @@ def handler(event: dict, context) -> dict:
         return finish({'transfers': incoming_transfers(cur, uid)})
 
     if method == 'GET' and qs.get('report') == 'admins':
+        scope_sql = f" AND manager_id = {int(me['id'])}" if me['role'] == 'manager' else ''
         cur.execute(
             "SELECT id, COALESCE(NULLIF(full_name, ''), username) FROM app_users "
-            f"WHERE role = 'admin' AND active AND id <> {int(uid)} ORDER BY 2"
+            f"WHERE role = 'admin' AND active AND id <> {int(uid)}{scope_sql} ORDER BY 2"
         )
         return finish({'admins': [{'id': r[0], 'name': r[1]} for r in cur.fetchall()]})
 
@@ -851,7 +852,7 @@ def handler(event: dict, context) -> dict:
         to_user = int(body.get('toUser') or 0)
         eid = str(body.get('id') or '')
         cur.execute(f"SELECT 1 FROM app_users WHERE id = {to_user} AND role = 'admin' AND active")
-        if not cur.fetchone() or to_user == uid:
+        if not cur.fetchone() or to_user == uid or not can_manage(cur, me, to_user):
             return finish({'error': 'bad_target'}, 400)
         cur.execute(
             f'SELECT active, in_repair FROM equipment WHERE user_id = {uid} AND id = {q(eid)}'

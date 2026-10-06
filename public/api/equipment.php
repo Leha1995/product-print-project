@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/lib.php';
+require __DIR__ . '/schema.php';
 
 $db = boot();
 
@@ -35,6 +36,15 @@ function read_items(PDO $db, int $uid): array
         . 'FROM equipment WHERE user_id = ? ORDER BY active DESC, location, name',
         [$uid]
     );
+    $pending = [];
+    foreach (all_rows(
+        $db,
+        "SELECT t.equipment_id, COALESCE(NULLIF(u.full_name, ''), u.username) AS name FROM equipment_transfers t "
+        . "JOIN app_users u ON u.id = t.to_user WHERE t.from_user = ? AND t.status = 'pending' ORDER BY t.id",
+        [$uid]
+    ) as $t) {
+        $pending[$t['equipment_id']] = (string)$t['name'];
+    }
     return array_map(fn($r) => [
         'id' => $r['id'],
         'name' => $r['name'],
@@ -49,6 +59,7 @@ function read_items(PDO $db, int $uid): array
         'qrBroken' => flag($r['qr_broken']),
         'writtenOffAt' => iso($r['written_off_at'], true),
         'writeOffReason' => (string)$r['write_off_reason'],
+        'transferTo' => $pending[$r['id']] ?? '',
     ], $rows);
 }
 
@@ -82,14 +93,126 @@ function money($value): float
     return is_numeric($value) ? round((float)$value, 2) : 0.0;
 }
 
+const TRANSFER_PASSWORD = '1234';
+
+function ensure_transfers(PDO $db): void
+{
+    $driver = (load_config()['driver'] ?? 'mysql') === 'sqlite' ? 'sqlite' : 'mysql';
+    foreach (schema_sql($driver) as $sql) {
+        if (strpos($sql, 'equipment_transfers') !== false) {
+            $db->exec($sql);
+        }
+    }
+}
+
+function incoming_transfers(PDO $db, int $uid): array
+{
+    $rows = all_rows(
+        $db,
+        'SELECT t.id, t.created_at, e.name, e.code, e.price, e.location, e.serial, e.image, e.note, '
+        . "COALESCE(NULLIF(u.full_name, ''), u.username) AS from_name FROM equipment_transfers t "
+        . 'JOIN equipment e ON e.user_id = t.from_user AND e.id = t.equipment_id '
+        . 'LEFT JOIN app_users u ON u.id = t.from_user '
+        . "WHERE t.to_user = ? AND t.status = 'pending' ORDER BY t.created_at, t.id",
+        [$uid]
+    );
+    return array_map(fn($r) => [
+        'id' => (int)$r['id'],
+        'createdAt' => iso($r['created_at'], true),
+        'name' => $r['name'],
+        'code' => $r['code'],
+        'price' => (float)$r['price'],
+        'location' => (string)$r['location'],
+        'serial' => (string)$r['serial'],
+        'image' => (string)$r['image'],
+        'note' => (string)$r['note'],
+        'fromName' => (string)$r['from_name'],
+    ], $rows);
+}
+
+function decide_transfer(PDO $db, int $uid, array $me, array $body): array
+{
+    $tid = (int)($body['transferId'] ?? 0);
+    $row = one_row(
+        $db,
+        "SELECT from_user, equipment_id FROM equipment_transfers WHERE id = ? AND to_user = ? AND status = 'pending'",
+        [$tid, $uid]
+    );
+    if (!$row) {
+        return ['error' => 'not_found', 'transfers' => incoming_transfers($db, $uid)];
+    }
+    $from = (int)$row['from_user'];
+    $eid = (string)$row['equipment_id'];
+    if (($body['action'] ?? '') === 'transfer_decline') {
+        run(
+            $db,
+            "UPDATE equipment_transfers SET status = 'declined', decided_at = ?, decided_by = ? WHERE id = ?",
+            [now_utc(), $me['id'], $tid]
+        );
+        return ['ok' => true, 'transfers' => incoming_transfers($db, $uid)];
+    }
+    $newId = $eid;
+    if (one_value($db, 'SELECT 1 FROM equipment WHERE user_id = ? AND id = ?', [$uid, $eid])) {
+        $newId = 'eq-' . substr(bin2hex(random_bytes(5)), 0, 10);
+    }
+    $moved = run(
+        $db,
+        'UPDATE equipment SET user_id = ?, id = ?, qr_broken = 0, updated_at = ? WHERE user_id = ? AND id = ?',
+        [$uid, $newId, now_utc(), $from, $eid]
+    )->rowCount();
+    if (!$moved) {
+        run($db, "UPDATE equipment_transfers SET status = 'cancelled', decided_at = ? WHERE id = ?", [now_utc(), $tid]);
+        return ['error' => 'not_found', 'transfers' => incoming_transfers($db, $uid)];
+    }
+    run(
+        $db,
+        "UPDATE equipment_transfers SET status = 'accepted', decided_at = ?, decided_by = ? WHERE id = ?",
+        [now_utc(), $me['id'], $tid]
+    );
+    run(
+        $db,
+        "UPDATE equipment_transfers SET status = 'cancelled', decided_at = ? WHERE from_user = ? AND equipment_id = ? AND status = 'pending'",
+        [now_utc(), $from, $eid]
+    );
+    return ['ok' => true, 'transfers' => incoming_transfers($db, $uid)];
+}
+
 $me = session_user($db, header_value('X-Auth-Token'));
 if (!$me) {
     out(['error' => 'unauthorized'], 401);
+}
+ensure_transfers($db);
+
+if ($me['role'] === 'admin') {
+    if (method() === 'GET' && ($_GET['transfers'] ?? '') === 'incoming') {
+        out(['transfers' => incoming_transfers($db, $me['id'])]);
+    }
+    $adminBody = method() === 'POST' ? body() : [];
+    if (in_array($adminBody['action'] ?? '', ['transfer_accept', 'transfer_decline'], true)) {
+        out(decide_transfer($db, $me['id'], $me, $adminBody));
+    }
+    out(['error' => 'forbidden'], 403);
 }
 if (!in_array($me['role'], ['superadmin', 'manager'], true)) {
     out(['error' => 'forbidden'], 403);
 }
 $uid = target_user($db, $me, 'equipment_can_manage');
+
+if (method() === 'GET' && ($_GET['transfers'] ?? '') === 'incoming') {
+    out(['transfers' => incoming_transfers($db, $uid)]);
+}
+
+if (method() === 'GET' && ($_GET['report'] ?? '') === 'admins') {
+    $sql = "SELECT id, COALESCE(NULLIF(full_name, ''), username) AS name FROM app_users "
+        . "WHERE role = 'admin' AND active = 1 AND id <> ?";
+    $params = [$uid];
+    if ($me['role'] === 'manager') {
+        $sql .= ' AND manager_id = ?';
+        $params[] = $me['id'];
+    }
+    $rows = all_rows($db, $sql . ' ORDER BY name', $params);
+    out(['admins' => array_map(fn($r) => ['id' => (int)$r['id'], 'name' => (string)$r['name']], $rows)]);
+}
 
 if (method() === 'GET') {
     out(['items' => read_items($db, $uid), 'sessions' => read_sessions($db, $uid)]);
@@ -101,6 +224,48 @@ $reason = (string)($body['reason'] ?? '') ?: 'Списано при инвент
 
 if (method() === 'DELETE') {
     run($db, 'DELETE FROM equipment WHERE user_id = ? AND id = ?', [$uid, (string)($body['id'] ?? '')]);
+    out(['ok' => true, 'items' => read_items($db, $uid)]);
+}
+
+if (in_array($action, ['transfer_accept', 'transfer_decline'], true)) {
+    $res = decide_transfer($db, $uid, $me, $body);
+    $res['items'] = read_items($db, $uid);
+    out($res);
+}
+
+if ($action === 'transfer') {
+    if ((string)($body['password'] ?? '') !== TRANSFER_PASSWORD) {
+        out(['error' => 'bad_password'], 403);
+    }
+    $toUser = (int)($body['toUser'] ?? 0);
+    $eid = (string)($body['id'] ?? '');
+    $isAdmin = one_value($db, "SELECT 1 FROM app_users WHERE id = ? AND role = 'admin' AND active = 1", [$toUser]);
+    if (!$isAdmin || $toUser === $uid || !equipment_can_manage($db, $me, $toUser)) {
+        out(['error' => 'bad_target'], 400);
+    }
+    $row = one_row($db, 'SELECT active FROM equipment WHERE user_id = ? AND id = ?', [$uid, $eid]);
+    if (!$row || !flag($row['active'])) {
+        out(['error' => 'not_found'], 404);
+    }
+    run(
+        $db,
+        "UPDATE equipment_transfers SET status = 'cancelled', decided_at = ? WHERE from_user = ? AND equipment_id = ? AND status = 'pending'",
+        [now_utc(), $uid, $eid]
+    );
+    run(
+        $db,
+        'INSERT INTO equipment_transfers (equipment_id, from_user, to_user, created_by, status, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [$eid, $uid, $toUser, $me['id'], 'pending', now_utc()]
+    );
+    out(['ok' => true, 'items' => read_items($db, $uid)]);
+}
+
+if ($action === 'transfer_cancel') {
+    run(
+        $db,
+        "UPDATE equipment_transfers SET status = 'cancelled', decided_at = ?, decided_by = ? WHERE from_user = ? AND equipment_id = ? AND status = 'pending'",
+        [now_utc(), $me['id'], $uid, (string)($body['id'] ?? '')]
+    );
     out(['ok' => true, 'items' => read_items($db, $uid)]);
 }
 
@@ -179,7 +344,7 @@ if ($action === 'restore') {
 
 if ($action === 'finish') {
     $scannedCodes = array_map('strval', (array)($body['scanned'] ?? []));
-    $active = array_values(array_filter(read_items($db, $uid), fn($i) => $i['active']));
+    $active = array_values(array_filter(read_items($db, $uid), fn($i) => $i['active'] && $i['transferTo'] === ''));
     $found = array_values(array_filter($active, fn($i) => in_array($i['code'], $scannedCodes, true)));
     $missing = array_values(array_filter($active, fn($i) => !in_array($i['code'], $scannedCodes, true)));
     $totalPrice = array_sum(array_column($active, 'price'));

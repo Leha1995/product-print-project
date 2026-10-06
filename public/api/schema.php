@@ -111,6 +111,17 @@ function schema_sql(string $driver): array
             total_price DECIMAL(12,2) NOT NULL DEFAULT 0,
             missing_price DECIMAL(12,2) NOT NULL DEFAULT 0
         )$tail",
+        "CREATE TABLE IF NOT EXISTS equipment_transfers (
+            id $auto,
+            equipment_id $key NOT NULL,
+            from_user INT NOT NULL,
+            to_user INT NOT NULL,
+            created_by INT NULL,
+            status VARCHAR(16) NOT NULL DEFAULT 'pending',
+            created_at DATETIME NULL,
+            decided_at DATETIME NULL,
+            decided_by INT NULL
+        )$tail",
         "CREATE TABLE IF NOT EXISTS print_keys (
             owner_id INT NOT NULL PRIMARY KEY,
             print_key VARCHAR(64) NOT NULL,

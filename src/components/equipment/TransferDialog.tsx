@@ -98,7 +98,7 @@ const TransferDialog = ({ item, open, onOpenChange, onDone }: TransferDialogProp
           </label>
 
           <p className="mt-3 text-[12px] text-muted-foreground">
-            Админ получит карточку и должен подтвердить перемещение. До подтверждения оборудование остаётся у тебя.
+            Админ получит карточку и должен подтвердить перемещение. До подтверждения оборудование остаётся на текущей точке.
           </p>
 
           {error && <p className="mt-2 text-[13px] font-semibold text-destructive">{error}</p>}
