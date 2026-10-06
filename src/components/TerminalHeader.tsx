@@ -107,7 +107,7 @@ const TerminalHeader = ({
       </div>
 
       <div className="brand-squeeze font-head text-lg font-black uppercase tracking-[-0.02em] text-primary md:text-2xl">
-        Автосуши&nbsp;Автопицца
+        САМ&nbsp;Кафе
       </div>
 
       <div className="flex items-center justify-end gap-3">

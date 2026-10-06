@@ -76,7 +76,7 @@ const LoginScreen = ({ onLogin, kicked }: LoginScreenProps) => {
           </span>
           <div>
             <h1 className="font-head text-xl font-black uppercase leading-tight text-primary">
-              Автосуши Автопицца
+              САМ Кафе
             </h1>
             <p className="text-[13px] text-muted-foreground">Вход в терминал маркировки</p>
           </div>

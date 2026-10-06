@@ -66,7 +66,7 @@ export const defaultLabelSettings: LabelSettings = {
   staffList: ['Иванова А.', 'Петров С.', 'Смирнова О.', 'Кузнецов Д.'],
   shelfLifeHours: 24,
   logo: '',
-  shopName: 'Автосуши Автопицца',
+  shopName: 'САМ Кафе',
   printMode: 'browser',
   netPrinterId: '',
   netGapMm: 2,
@@ -90,7 +90,11 @@ export const useLabelSettings = () => {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setSettings({ ...defaultLabelSettings, ...JSON.parse(raw), paper: 'label43x25' });
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (saved.shopName === 'Автосуши Автопицца') saved.shopName = defaultLabelSettings.shopName;
+        setSettings({ ...defaultLabelSettings, ...saved, paper: 'label43x25' });
+      }
     } catch {
       /* storage unavailable */
     }
