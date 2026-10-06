@@ -206,10 +206,6 @@ if (method() === 'GET' && ($_GET['report'] ?? '') === 'admins') {
     $sql = "SELECT id, COALESCE(NULLIF(full_name, ''), username) AS name FROM app_users "
         . "WHERE role = 'admin' AND active = 1 AND id <> ?";
     $params = [$uid];
-    if ($me['role'] === 'manager') {
-        $sql .= ' AND manager_id = ?';
-        $params[] = $me['id'];
-    }
     $rows = all_rows($db, $sql . ' ORDER BY name', $params);
     out(['admins' => array_map(fn($r) => ['id' => (int)$r['id'], 'name' => (string)$r['name']], $rows)]);
 }
@@ -240,7 +236,7 @@ if ($action === 'transfer') {
     $toUser = (int)($body['toUser'] ?? 0);
     $eid = (string)($body['id'] ?? '');
     $isAdmin = one_value($db, "SELECT 1 FROM app_users WHERE id = ? AND role = 'admin' AND active = 1", [$toUser]);
-    if (!$isAdmin || $toUser === $uid || !equipment_can_manage($db, $me, $toUser)) {
+    if (!$isAdmin || $toUser === $uid) {
         out(['error' => 'bad_target'], 400);
     }
     $row = one_row($db, 'SELECT active FROM equipment WHERE user_id = ? AND id = ?', [$uid, $eid]);
