@@ -339,3 +339,29 @@ export const decideTransfer = async (transferId: number, accept: boolean) => {
   const data = await res.json();
   return Array.isArray(data.transfers) ? (data.transfers as IncomingTransfer[]) : [];
 };
+
+export interface TransferRecord {
+  id: number;
+  name: string;
+  code: string;
+  price: number;
+  status: 'pending' | 'accepted' | 'declined' | 'cancelled';
+  createdAt: string | null;
+  decidedAt: string | null;
+  fromName: string;
+  toName: string;
+  createdByName: string;
+  decidedByName: string;
+}
+
+export const fetchAccountantTransfers = async (from?: string, to?: string): Promise<TransferRecord[]> => {
+  const params = new URLSearchParams({ report: 'transfers' });
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const res = await fetch(`${API}?${params}`, {
+    headers: { 'Content-Type': 'application/json', 'X-Auth-Token': getToken() },
+  });
+  if (!res.ok) throw new Error(String(res.status));
+  const data = await res.json();
+  return Array.isArray(data.transfers) ? (data.transfers as TransferRecord[]) : [];
+};

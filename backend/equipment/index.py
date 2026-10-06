@@ -721,6 +721,50 @@ def handler(event: dict, context) -> dict:
                     for r in cur.fetchall()
                 ]
             return finish({'technicians': techs})
+        if qs_acc.get('report') == 'transfers':
+            d_from = date_sql(qs_acc.get('from'))
+            d_to = date_sql(qs_acc.get('to'))
+            period = ''
+            if d_from != 'NULL':
+                period += f' AND t.created_at >= {d_from}::date'
+            if d_to != 'NULL':
+                period += f" AND t.created_at < {d_to}::date + INTERVAL '1 day'"
+            scope = (
+                f"SELECT admin_id FROM accountant_scopes WHERE accountant_id = {int(me['id'])}"
+            )
+            cur.execute(
+                'SELECT t.id, t.equipment_name, t.equipment_code, t.equipment_price, t.status, '
+                't.created_at, t.decided_at, '
+                "COALESCE(NULLIF(fu.full_name, ''), fu.username), COALESCE(NULLIF(tu.full_name, ''), tu.username), "
+                "COALESCE(NULLIF(cu.full_name, ''), cu.username), COALESCE(NULLIF(du.full_name, ''), du.username) "
+                'FROM equipment_transfers t '
+                'LEFT JOIN app_users fu ON fu.id = t.from_user '
+                'LEFT JOIN app_users tu ON tu.id = t.to_user '
+                'LEFT JOIN app_users cu ON cu.id = t.created_by '
+                'LEFT JOIN app_users du ON du.id = t.decided_by '
+                f'WHERE (t.from_user IN ({scope}) OR t.to_user IN ({scope})){period} '
+                'ORDER BY t.created_at DESC, t.id DESC LIMIT 5000'
+            )
+            return finish(
+                {
+                    'transfers': [
+                        {
+                            'id': r[0],
+                            'name': r[1] or '',
+                            'code': r[2] or '',
+                            'price': float(r[3] or 0),
+                            'status': r[4],
+                            'createdAt': r[5].isoformat() if r[5] else None,
+                            'decidedAt': r[6].isoformat() if r[6] else None,
+                            'fromName': r[7] or '',
+                            'toName': r[8] or '',
+                            'createdByName': r[9] or '',
+                            'decidedByName': r[10] or '',
+                        }
+                        for r in cur.fetchall()
+                    ]
+                }
+            )
         if qs_acc.get('report') == 'all_points':
             cur.execute(
                 "SELECT u.id, COALESCE(NULLIF(u.full_name, ''), u.username) FROM accountant_scopes s "
@@ -866,8 +910,10 @@ def handler(event: dict, context) -> dict:
             f"WHERE from_user = {uid} AND equipment_id = {q(eid)} AND status = 'pending'"
         )
         cur.execute(
-            'INSERT INTO equipment_transfers (equipment_id, from_user, to_user, created_by) '
-            f"VALUES ({q(eid)}, {uid}, {to_user}, {int(me['id'])})"
+            'INSERT INTO equipment_transfers (equipment_id, from_user, to_user, created_by, '
+            'equipment_name, equipment_code, equipment_price) '
+            f"SELECT {q(eid)}, {uid}, {to_user}, {int(me['id'])}, name, code, COALESCE(price, 0) "
+            f'FROM equipment WHERE user_id = {uid} AND id = {q(eid)}'
         )
         return finish({'ok': True, 'items': read_items(cur, uid)})
 

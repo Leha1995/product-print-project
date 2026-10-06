@@ -32,6 +32,7 @@ import useCatalogTransfer from '@/components/index/useCatalogTransfer';
 import TechnicianScreen from '@/components/technician/TechnicianScreen';
 import AccountantExportButton from '@/components/AccountantExportButton';
 import AccountantTechsPanel from '@/components/accountant/AccountantTechsPanel';
+import AccountantTransfersPanel from '@/components/accountant/AccountantTransfersPanel';
 
 const Index = () => {
   const [selected, setSelected] = useState<Product | null>(null);
@@ -295,6 +296,7 @@ const Index = () => {
       />
       {isAccountant && <AccountantExportButton />}
       {isAccountant && <AccountantTechsPanel />}
+      {isAccountant && <AccountantTransfersPanel />}
       {(isAdmin || isAccountant) && user && (
         <WorkspaceSwitcher
           managed={managed}
