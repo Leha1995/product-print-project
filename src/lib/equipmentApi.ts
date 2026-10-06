@@ -226,3 +226,18 @@ export const techTaskDone = (taskId: number, comment: string, cost = 0) =>
 
 export const techReturnRepair = (ownerId: number, id: string, cost: number, description: string) =>
   send({ action: 'return_repair', ownerId, id, cost, description }) as Promise<{ repairs: TechRepair[] }>;
+
+export interface PointEquipment {
+  id: number;
+  name: string;
+  items: Equipment[];
+}
+
+export const fetchAllPoints = async (): Promise<PointEquipment[]> => {
+  const res = await fetch(`${API}?report=all_points`, {
+    headers: { 'Content-Type': 'application/json', 'X-Auth-Token': getToken() },
+  });
+  if (!res.ok) throw new Error(String(res.status));
+  const data = await res.json();
+  return Array.isArray(data.points) ? (data.points as PointEquipment[]) : [];
+};

@@ -29,6 +29,7 @@ import IndexMain from '@/components/index/IndexMain';
 import useExpiryAlerts from '@/components/index/useExpiryAlerts';
 import useCatalogTransfer from '@/components/index/useCatalogTransfer';
 import TechnicianScreen from '@/components/technician/TechnicianScreen';
+import AccountantExportButton from '@/components/AccountantExportButton';
 
 const Index = () => {
   const [selected, setSelected] = useState<Product | null>(null);
@@ -289,6 +290,7 @@ const Index = () => {
         showSections={canInventory && (!inventoryOnly || managerPicked)}
         inventoryOnly={inventoryOnly && !managerPicked}
       />
+      {isAccountant && <AccountantExportButton />}
       {(isAdmin || isAccountant) && user && (
         <WorkspaceSwitcher
           managed={managed}

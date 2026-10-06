@@ -575,6 +575,16 @@ def handler(event: dict, context) -> dict:
         raw_acc = str(headers.get('X-Target-User') or headers.get('x-target-user') or '')
         if method != 'GET':
             return finish({'error': 'read_only'}, 403)
+        if qs_acc.get('report') == 'all_points':
+            cur.execute(
+                "SELECT u.id, COALESCE(NULLIF(u.full_name, ''), u.username) FROM accountant_scopes s "
+                'JOIN app_users u ON u.id = s.admin_id '
+                f"WHERE s.accountant_id = {int(me['id'])} AND u.role = 'admin' AND u.active ORDER BY 2"
+            )
+            points = [{'id': r[0], 'name': r[1]} for r in cur.fetchall()]
+            for pt in points:
+                pt['items'] = read_items(cur, pt['id'])
+            return finish({'points': points})
         if not raw_acc.isdigit():
             return finish({'items': [], 'sessions': [], 'tasks': [], 'technicians': []})
         cur.execute(
