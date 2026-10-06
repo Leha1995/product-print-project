@@ -582,8 +582,18 @@ def handler(event: dict, context) -> dict:
                 f"WHERE s.accountant_id = {int(me['id'])} AND u.role = 'admin' AND u.active ORDER BY 2"
             )
             points = [{'id': r[0], 'name': r[1]} for r in cur.fetchall()]
+            d_from = date_sql(qs_acc.get('from'))
+            d_to = date_sql(qs_acc.get('to'))
+            period = ''
+            if d_from != 'NULL':
+                period += f' AND t.done_at >= {d_from}::date'
+            if d_to != 'NULL':
+                period += f" AND t.done_at < {d_to}::date + INTERVAL '1 day'"
             for pt in points:
                 pt['items'] = read_items(cur, pt['id'])
+                pt['tasks'] = task_rows(
+                    cur, f"t.user_id = {int(pt['id'])} AND t.status = 'done'{period}", 5000
+                )
             return finish({'points': points})
         if not raw_acc.isdigit():
             return finish({'items': [], 'sessions': [], 'tasks': [], 'technicians': []})

@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx-js-style';
-import { Equipment, PointEquipment } from '@/lib/equipmentApi';
+import { Equipment, EquipmentTask, PointEquipment } from '@/lib/equipmentApi';
 import { residualValue } from '@/lib/depreciation';
 
 const BOLD = { font: { bold: true } };
@@ -24,10 +24,39 @@ const stamp = () => {
 const dateText = (iso?: string | null) =>
   iso ? new Date(iso.length === 10 ? `${iso}T00:00:00` : iso).toLocaleDateString('ru-RU') : '';
 
-const repairsTotal = (item: Equipment) => {
-  const fromHistory = (item.repairs || []).reduce((s, r) => s + (r.returnedAt ? r.cost || 0 : 0), 0);
-  return Math.round(Math.max(fromHistory, item.repairCost || 0));
+export interface ExportPeriod {
+  from: string;
+  to: string;
+  label: string;
+}
+
+let period: ExportPeriod | null = null;
+
+const dayKey = (iso?: string | null) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
+
+const inPeriod = (iso?: string | null) => {
+  if (!period) return true;
+  const k = dayKey(iso);
+  if (!k) return false;
+  return (!period.from || k >= period.from) && (!period.to || k <= period.to);
+};
+
+const periodRepairs = (item: Equipment) =>
+  (item.repairs || []).filter((r) => r.returnedAt && inPeriod(r.returnedAt));
+
+const repairsTotal = (item: Equipment) => {
+  const fromHistory = periodRepairs(item).reduce((s, r) => s + (r.cost || 0), 0);
+  return Math.round(period ? fromHistory : Math.max(fromHistory, item.repairCost || 0));
+};
+
+const tasksOf = (p: PointEquipment) => p.tasks || [];
+const tasksCost = (list: EquipmentTask[]) => Math.round(list.reduce((s, t) => s + (t.cost || 0), 0));
+const periodSuffix = () => (period ? ` (${period.label})` : '');
 
 const statusOf = (item: Equipment) =>
   !item.active ? 'Списано' : item.inRepair ? 'В ремонте' : 'В работе';
@@ -69,14 +98,19 @@ const summarySheet = (points: PointEquipment[]) => {
     'Стоимость покупки, ₽',
     'Остаточная стоимость, ₽',
     'Амортизация, ₽',
-    'Расходы на ремонт, ₽',
+    `Ремонты оборудования, ₽${periodSuffix()}`,
+    `Выполнено задач${periodSuffix()}`,
+    `Расходы по задачам, ₽${periodSuffix()}`,
+    `Всего на ремонт, ₽${periodSuffix()}`,
   ];
   const rows: Cell[][] = [header];
-  const sums = [0, 0, 0, 0, 0, 0, 0];
+  const sums = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   points.forEach((p) => {
     const active = p.items.filter((i) => i.active);
     const price = active.reduce((s, i) => s + (i.price || 0), 0);
     const residual = active.reduce((s, i) => s + residualValue(i), 0);
+    const repairs = p.items.reduce((s, i) => s + repairsTotal(i), 0);
+    const tCost = tasksCost(tasksOf(p));
     const vals = [
       active.length,
       active.filter((i) => i.inRepair).length,
@@ -84,16 +118,37 @@ const summarySheet = (points: PointEquipment[]) => {
       Math.round(price),
       Math.round(residual),
       Math.round(price - residual),
-      p.items.reduce((s, i) => s + repairsTotal(i), 0),
+      repairs,
+      tasksOf(p).length,
+      tCost,
+      repairs + tCost,
     ];
     vals.forEach((v, i) => (sums[i] += v));
     rows.push([p.name, ...vals]);
   });
   rows.push(['ИТОГО по всем точкам', ...sums]);
+  if (period) rows.unshift([`Период: ${period.label}`], []);
   const sheet = XLSX.utils.aoa_to_sheet(rows);
-  styleSheet(sheet, { moneyCols: [4, 5, 6, 7], totalRows: [rows.length - 1] });
-  sheet['!cols'] = [{ wch: 30 }, { wch: 12 }, { wch: 11 }, { wch: 10 }, { wch: 18 }, { wch: 20 }, { wch: 16 }, { wch: 18 }];
-  sheet['!rows'] = [{ hpt: 32 }];
+  const shift = period ? 2 : 0;
+  styleSheet(sheet, { moneyCols: [4, 5, 6, 7, 9, 10], totalRows: [rows.length - 1] });
+  if (period) {
+    const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1');
+    for (let c = range.s.c; c <= range.e.c; c += 1) {
+      const ref0 = XLSX.utils.encode_cell({ r: 0, c });
+      if (sheet[ref0]) sheet[ref0].s = { font: { bold: true, sz: 13 } };
+      const ref1 = XLSX.utils.encode_cell({ r: 1, c });
+      if (sheet[ref1]) sheet[ref1].s = {};
+      const ref2 = XLSX.utils.encode_cell({ r: 2, c });
+      if (sheet[ref2]) sheet[ref2].s = { ...HEAD };
+    }
+  }
+  sheet['!cols'] = [
+    { wch: 30 }, { wch: 12 }, { wch: 11 }, { wch: 10 }, { wch: 18 }, { wch: 20 }, { wch: 16 },
+    { wch: 20 }, { wch: 14 }, { wch: 18 }, { wch: 18 },
+  ];
+  const heights = [] as { hpt: number }[];
+  heights[shift] = { hpt: 44 };
+  sheet['!rows'] = heights;
   return sheet;
 };
 
@@ -106,8 +161,8 @@ const equipmentSheet = (points: PointEquipment[]) => {
     'Стоимость покупки, ₽',
     'Остаточная стоимость, ₽',
     'Амортизация, ₽/день',
-    'Расходы на ремонт, ₽',
-    'Ремонтов',
+    `Расходы на ремонт, ₽${periodSuffix()}`,
+    `Ремонтов${periodSuffix()}`,
     'В эксплуатации с',
     'Серийный номер',
     'QR-код',
@@ -131,7 +186,7 @@ const equipmentSheet = (points: PointEquipment[]) => {
         i.active ? Math.round(residualValue(i)) : 0,
         i.depreciationPerDay || 0,
         repairsTotal(i),
-        (i.repairs || []).filter((r) => r.returnedAt).length,
+        periodRepairs(i).length,
         dateText(i.commissionedAt),
         i.serial || '',
         i.code,
@@ -150,7 +205,7 @@ const equipmentSheet = (points: PointEquipment[]) => {
       Math.round(active.reduce((s, i) => s + residualValue(i), 0)),
       '',
       p.items.reduce((s, i) => s + repairsTotal(i), 0),
-      p.items.reduce((s, i) => s + (i.repairs || []).filter((r) => r.returnedAt).length, 0),
+      p.items.reduce((s, i) => s + periodRepairs(i).length, 0),
       '', '', '', '', '',
     ]);
     colors.push(null);
@@ -170,7 +225,13 @@ const equipmentSheet = (points: PointEquipment[]) => {
 const repairsSheet = (points: PointEquipment[]) => {
   const header = ['Точка', 'Оборудование', 'Дата отправки', 'Дата возврата', 'Сумма, ₽', 'Описание поломки'];
   const records = points
-    .flatMap((p) => p.items.flatMap((i) => (i.repairs || []).map((r) => ({ p, i, r }))))
+    .flatMap((p) =>
+      p.items.flatMap((i) =>
+        (i.repairs || [])
+          .filter((r) => (period ? r.returnedAt && inPeriod(r.returnedAt) : true))
+          .map((r) => ({ p, i, r })),
+      ),
+    )
     .sort((a, b) => a.p.name.localeCompare(b.p.name, 'ru') || (b.r.sentAt || '').localeCompare(a.r.sentAt || ''));
   const rows: Cell[][] = [header];
   const colors: (string | null)[] = [];
@@ -186,7 +247,7 @@ const repairsSheet = (points: PointEquipment[]) => {
     colors.push(r.returnedAt ? null : YELLOW);
   });
   if (!records.length) {
-    rows.push(['', 'Ремонтов пока не было', '', '', '', '']);
+    rows.push(['', period ? 'За период ремонтов не было' : 'Ремонтов пока не было', '', '', '', '']);
     colors.push(null);
   } else {
     rows.push([
@@ -205,10 +266,58 @@ const repairsSheet = (points: PointEquipment[]) => {
   return sheet;
 };
 
-export const exportAllPoints = (points: PointEquipment[]) => {
-  const book = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(book, summarySheet(points), 'Сводка по точкам');
-  XLSX.utils.book_append_sheet(book, equipmentSheet(points), 'Оборудование');
-  XLSX.utils.book_append_sheet(book, repairsSheet(points), 'Ремонты');
-  XLSX.writeFile(book, `Оборудование_все_точки_${stamp()}.xlsx`);
+const PRIORITY: Record<string, string> = { urgent: 'Очень срочно', soon: 'Побыстрее', normal: 'Не срочно' };
+
+const tasksSheet = (points: PointEquipment[]) => {
+  const header = [
+    'Точка',
+    'Дата выполнения',
+    '№ задачи',
+    'Задача',
+    'Оборудование',
+    'Срочность',
+    'Выполнил',
+    'Что сделано',
+    'Потрачено, ₽',
+  ];
+  const records = points
+    .flatMap((p) => tasksOf(p).map((t) => ({ p, t })))
+    .sort((a, b) => a.p.name.localeCompare(b.p.name, 'ru') || (b.t.doneAt || '').localeCompare(a.t.doneAt || ''));
+  const rows: Cell[][] = [header];
+  records.forEach(({ p, t }) => {
+    rows.push([
+      p.name,
+      dateText(t.doneAt),
+      t.id,
+      t.description,
+      t.equipmentName || '',
+      PRIORITY[t.priority || 'normal'] || '',
+      t.doneByName || '',
+      t.doneComment || '',
+      Math.round(t.cost || 0),
+    ]);
+  });
+  if (!records.length) rows.push(['', period ? 'За период задач не выполнялось' : 'Выполненных задач нет']);
+  else rows.push(['ИТОГО', `Задач: ${records.length}`, '', '', '', '', '', '', tasksCost(records.map((r) => r.t))]);
+  const sheet = XLSX.utils.aoa_to_sheet(rows);
+  styleSheet(sheet, { moneyCols: [8], totalRows: records.length ? [rows.length - 1] : [] });
+  sheet['!cols'] = [
+    { wch: 24 }, { wch: 13 }, { wch: 9 }, { wch: 44 }, { wch: 24 }, { wch: 13 }, { wch: 20 }, { wch: 40 }, { wch: 13 },
+  ];
+  return sheet;
+};
+
+export const exportAllPoints = (points: PointEquipment[], range: ExportPeriod | null = null) => {
+  period = range;
+  try {
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, summarySheet(points), 'Сводка по точкам');
+    XLSX.utils.book_append_sheet(book, equipmentSheet(points), 'Оборудование');
+    XLSX.utils.book_append_sheet(book, repairsSheet(points), 'Ремонты');
+    XLSX.utils.book_append_sheet(book, tasksSheet(points), 'Выполненные задачи');
+    const tag = range ? `${range.from || 'начало'}_${range.to || 'сегодня'}` : 'за_всё_время';
+    XLSX.writeFile(book, `Оборудование_все_точки_${tag}_${stamp()}.xlsx`);
+  } finally {
+    period = null;
+  }
 };

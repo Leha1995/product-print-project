@@ -231,10 +231,14 @@ export interface PointEquipment {
   id: number;
   name: string;
   items: Equipment[];
+  tasks?: EquipmentTask[];
 }
 
-export const fetchAllPoints = async (): Promise<PointEquipment[]> => {
-  const res = await fetch(`${API}?report=all_points`, {
+export const fetchAllPoints = async (from?: string, to?: string): Promise<PointEquipment[]> => {
+  const params = new URLSearchParams({ report: 'all_points' });
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const res = await fetch(`${API}?${params}`, {
     headers: { 'Content-Type': 'application/json', 'X-Auth-Token': getToken() },
   });
   if (!res.ok) throw new Error(String(res.status));
