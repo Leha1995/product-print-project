@@ -75,9 +75,7 @@ if (!$installed && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     if (!$errors) {
         try {
             $db = connect_db($cfg);
-            foreach (schema_sql('mysql') as $sql) {
-                $db->exec($sql);
-            }
+            upgrade_schema($db, true);
             if ($data) {
                 $map = !empty($_POST['copy_images']) ? 'download_image' : null;
                 $counts = import_data($db, $data['tables'], $map);
