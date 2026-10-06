@@ -2,7 +2,7 @@ import json
 import os
 import hashlib
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 import psycopg2
@@ -268,7 +268,17 @@ EXPORT_TABLES = {
     'shared_products': 'id, name, category, categories, weight, composition, image, barcode, hit, '
                        'shelf_life_hours, storage_text, author, created_at, updated_at',
     'equipment': 'user_id, id, name, code, price, location, note, image, serial, active, created_at, '
-                 'updated_at, qr_broken, written_off_at, write_off_reason',
+                 'updated_at, qr_broken, written_off_at, write_off_reason, commissioned_at, '
+                 'depreciation_per_day, repair_cost, in_repair, repair_sent_at',
+    'equipment_repairs': 'id, user_id, equipment_id, sent_at, returned_at, cost, description, photos, returned_by',
+    'equipment_tasks': 'id, user_id, equipment_id, technician_id, created_by, description, photos, status, '
+                       'created_at, done_at, done_by, done_comment, priority, cost, kind',
+    'equipment_transfers': 'id, equipment_id, from_user, to_user, created_by, status, created_at, decided_at, '
+                           'decided_by, equipment_name, equipment_code, equipment_price',
+    'technician_scopes': 'technician_id, head_id',
+    'accountant_scopes': 'accountant_id, admin_id',
+    'accountant_technicians': 'accountant_id, technician_id',
+    'telegram_links': 'user_id, chat_id, tg_name, linked_at',
     'print_keys': 'owner_id, key, printers, last_seen, created_at',
     'inventory_sessions': 'id, user_id, started_by, started_at, finished_at, scanned, missing, total, '
                           'total_price, missing_price',
@@ -282,6 +292,8 @@ def export_value(value):
         return value.strftime('%Y-%m-%d %H:%M:%S')
     if isinstance(value, Decimal):
         return float(value)
+    if isinstance(value, date):
+        return value.isoformat()
     return value
 
 

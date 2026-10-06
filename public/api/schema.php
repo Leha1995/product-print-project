@@ -97,6 +97,11 @@ function schema_sql(string $driver): array
             qr_broken TINYINT NOT NULL DEFAULT 0,
             written_off_at DATETIME NULL,
             write_off_reason $text NULL,
+            commissioned_at DATE NULL,
+            depreciation_per_day DECIMAL(14,2) NULL DEFAULT 0,
+            repair_cost DECIMAL(14,2) NULL DEFAULT 0,
+            in_repair TINYINT NULL DEFAULT 0,
+            repair_sent_at DATETIME NULL,
             PRIMARY KEY (user_id, id)
         )$tail",
         "CREATE TABLE IF NOT EXISTS inventory_sessions (
@@ -120,7 +125,64 @@ function schema_sql(string $driver): array
             status VARCHAR(16) NOT NULL DEFAULT 'pending',
             created_at DATETIME NULL,
             decided_at DATETIME NULL,
-            decided_by INT NULL
+            decided_by INT NULL,
+            equipment_name $short NULL,
+            equipment_code $short NULL,
+            equipment_price DECIMAL(12,2) NULL
+        )$tail",
+        "CREATE TABLE IF NOT EXISTS equipment_repairs (
+            id $auto,
+            user_id INT NOT NULL,
+            equipment_id $key NOT NULL,
+            sent_at DATETIME NULL,
+            returned_at DATETIME NULL,
+            cost DECIMAL(14,2) NOT NULL DEFAULT 0,
+            description $text NULL,
+            photos $text NULL,
+            returned_by INT NULL
+        )$tail",
+        "CREATE TABLE IF NOT EXISTS equipment_tasks (
+            id $auto,
+            user_id INT NOT NULL,
+            equipment_id $key NULL,
+            technician_id INT NULL,
+            created_by INT NULL,
+            description $text NULL,
+            photos $text NULL,
+            status VARCHAR(16) NOT NULL DEFAULT 'open',
+            created_at DATETIME NULL,
+            done_at DATETIME NULL,
+            done_by INT NULL,
+            done_comment $text NULL,
+            priority VARCHAR(16) NOT NULL DEFAULT 'normal',
+            cost DECIMAL(12,2) NOT NULL DEFAULT 0,
+            kind VARCHAR(16) NOT NULL DEFAULT 'task'
+        )$tail",
+        "CREATE TABLE IF NOT EXISTS technician_scopes (
+            technician_id INT NOT NULL,
+            head_id INT NOT NULL,
+            PRIMARY KEY (technician_id, head_id)
+        )$tail",
+        "CREATE TABLE IF NOT EXISTS accountant_scopes (
+            accountant_id INT NOT NULL,
+            admin_id INT NOT NULL,
+            PRIMARY KEY (accountant_id, admin_id)
+        )$tail",
+        "CREATE TABLE IF NOT EXISTS accountant_technicians (
+            accountant_id INT NOT NULL,
+            technician_id INT NOT NULL,
+            PRIMARY KEY (accountant_id, technician_id)
+        )$tail",
+        "CREATE TABLE IF NOT EXISTS telegram_links (
+            user_id INT NOT NULL PRIMARY KEY,
+            chat_id VARCHAR(32) NOT NULL,
+            tg_name $short NOT NULL DEFAULT '',
+            linked_at DATETIME NULL
+        )$tail",
+        "CREATE TABLE IF NOT EXISTS telegram_link_codes (
+            code VARCHAR(64) NOT NULL PRIMARY KEY,
+            user_id INT NOT NULL,
+            expires_at DATETIME NOT NULL
         )$tail",
         "CREATE TABLE IF NOT EXISTS print_keys (
             owner_id INT NOT NULL PRIMARY KEY,
@@ -144,6 +206,55 @@ function schema_sql(string $driver): array
     ];
 }
 
+const SCHEMA_VERSION = 3;
+
+const SCHEMA_COLUMNS = [
+    'equipment' => [
+        'commissioned_at' => 'DATE NULL',
+        'depreciation_per_day' => 'DECIMAL(14,2) NULL DEFAULT 0',
+        'repair_cost' => 'DECIMAL(14,2) NULL DEFAULT 0',
+        'in_repair' => 'TINYINT NULL DEFAULT 0',
+        'repair_sent_at' => 'DATETIME NULL',
+    ],
+    'equipment_transfers' => [
+        'equipment_name' => 'VARCHAR(255) NULL',
+        'equipment_code' => 'VARCHAR(255) NULL',
+        'equipment_price' => 'DECIMAL(12,2) NULL',
+    ],
+];
+
+function table_columns(PDO $db, string $table): array
+{
+    $stmt = $db->query("SELECT * FROM $table LIMIT 0");
+    $cols = [];
+    for ($i = 0; $i < $stmt->columnCount(); $i++) {
+        $meta = $stmt->getColumnMeta($i);
+        $cols[] = $meta['name'];
+    }
+    return $cols;
+}
+
+function upgrade_schema(PDO $db, bool $force = false): void
+{
+    $marker = __DIR__ . '/.schema_v' . SCHEMA_VERSION;
+    if (!$force && is_file($marker)) {
+        return;
+    }
+    $driver = (load_config()['driver'] ?? 'mysql') === 'sqlite' ? 'sqlite' : 'mysql';
+    foreach (schema_sql($driver) as $sql) {
+        $db->exec($sql);
+    }
+    foreach (SCHEMA_COLUMNS as $table => $columns) {
+        $have = table_columns($db, $table);
+        foreach ($columns as $col => $def) {
+            if (!in_array($col, $have, true)) {
+                $db->exec("ALTER TABLE $table ADD COLUMN $col $def");
+            }
+        }
+    }
+    @file_put_contents($marker, date('c'));
+}
+
 const IMPORT_COLUMNS = [
     'app_users' => ['id', 'username', 'full_name', 'password_hash', 'role', 'active', 'created_at', 'manager_id', 'access_until'],
     'app_sessions' => ['token', 'user_id', 'created_at', 'expires_at'],
@@ -152,9 +263,23 @@ const IMPORT_COLUMNS = [
     'user_prefs' => ['user_id', 'pref_key', 'value', 'updated_at'],
     'user_meta' => ['user_id', 'seeded', 'created_at'],
     'shared_products' => ['id', 'name', 'category', 'categories', 'weight', 'composition', 'image', 'barcode', 'hit', 'shelf_life_hours', 'storage_text', 'author', 'created_at', 'updated_at'],
-    'equipment' => ['user_id', 'id', 'name', 'code', 'price', 'location', 'note', 'image', 'serial', 'active', 'created_at', 'updated_at', 'qr_broken', 'written_off_at', 'write_off_reason'],
+    'equipment' => ['user_id', 'id', 'name', 'code', 'price', 'location', 'note', 'image', 'serial', 'active', 'created_at', 'updated_at', 'qr_broken', 'written_off_at', 'write_off_reason', 'commissioned_at', 'depreciation_per_day', 'repair_cost', 'in_repair', 'repair_sent_at'],
+    'equipment_repairs' => ['id', 'user_id', 'equipment_id', 'sent_at', 'returned_at', 'cost', 'description', 'photos', 'returned_by'],
+    'equipment_tasks' => ['id', 'user_id', 'equipment_id', 'technician_id', 'created_by', 'description', 'photos', 'status', 'created_at', 'done_at', 'done_by', 'done_comment', 'priority', 'cost', 'kind'],
+    'equipment_transfers' => ['id', 'equipment_id', 'from_user', 'to_user', 'created_by', 'status', 'created_at', 'decided_at', 'decided_by', 'equipment_name', 'equipment_code', 'equipment_price'],
+    'technician_scopes' => ['technician_id', 'head_id'],
+    'accountant_scopes' => ['accountant_id', 'admin_id'],
+    'accountant_technicians' => ['accountant_id', 'technician_id'],
+    'telegram_links' => ['user_id', 'chat_id', 'tg_name', 'linked_at'],
     'print_keys' => ['owner_id', 'print_key', 'printers', 'last_seen', 'created_at'],
     'inventory_sessions' => ['id', 'user_id', 'started_by', 'started_at', 'finished_at', 'scanned', 'missing', 'total', 'total_price', 'missing_price'],
+];
+
+const IMPORT_DEFAULTS = [
+    'equipment' => ['location' => '', 'serial' => '', 'price' => 0, 'active' => 1, 'qr_broken' => 0, 'in_repair' => 0, 'depreciation_per_day' => 0, 'repair_cost' => 0],
+    'equipment_tasks' => ['status' => 'open', 'priority' => 'normal', 'cost' => 0, 'kind' => 'task'],
+    'equipment_repairs' => ['cost' => 0],
+    'equipment_transfers' => ['status' => 'pending'],
 ];
 
 function import_value($value)
@@ -173,6 +298,10 @@ function import_data(PDO $db, array $tables, ?callable $mapImage = null): array
     $counts = [];
     $db->beginTransaction();
     foreach (IMPORT_COLUMNS as $table => $cols) {
+        if (!array_key_exists($table, $tables) && !in_array($table, ['app_users', 'equipment'], true)) {
+            $counts[$table] = 0;
+            continue;
+        }
         $rows = $tables[$table] ?? [];
         $db->exec("DELETE FROM $table");
         $stmt = $db->prepare("INSERT INTO $table (" . implode(', ', $cols) . ') VALUES (' . implode(', ', array_fill(0, count($cols), '?')) . ')');
@@ -186,7 +315,8 @@ function import_data(PDO $db, array $tables, ?callable $mapImage = null): array
             if ($mapImage && isset($row['image']) && is_string($row['image'])) {
                 $row['image'] = $mapImage($row['image']);
             }
-            $stmt->execute(array_map(fn($c) => import_value($row[$c] ?? null), $cols));
+            $defaults = IMPORT_DEFAULTS[$table] ?? [];
+            $stmt->execute(array_map(fn($c) => import_value($row[$c] ?? ($defaults[$c] ?? null)), $cols));
         }
         $counts[$table] = count($rows);
     }

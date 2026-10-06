@@ -52,6 +52,7 @@ if (!$installed && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         'name' => trim((string)($_POST['name'] ?? '')),
         'user' => trim((string)($_POST['user'] ?? '')),
         'pass' => (string)($_POST['pass'] ?? ''),
+        'telegram_token' => trim((string)($_POST['telegram_token'] ?? '')),
     ];
     $superPass = (string)($_POST['super_pass'] ?? '');
     $data = null;
@@ -83,7 +84,9 @@ if (!$installed && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 $messages[] = 'Перенесено: пользователей — ' . $counts['app_users']
                     . ', продуктов — ' . $counts['user_products']
                     . ', общая база — ' . $counts['shared_products']
-                    . ', оборудование — ' . $counts['equipment'] . '.';
+                    . ', оборудование — ' . $counts['equipment']
+                    . ', задач техникам — ' . ($counts['equipment_tasks'] ?? 0)
+                    . ', ремонтов — ' . ($counts['equipment_repairs'] ?? 0) . '.';
             } else {
                 run(
                     $db,
@@ -155,6 +158,10 @@ if (!$installed && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         <input type="file" name="data" accept=".json,application/json">
         <div class="hint">Скачивается в старой версии сайта: профиль супер-админа → «Выгрузить данные для переноса». Все логины и пароли сохранятся.</div>
         <label class="check"><input type="checkbox" name="copy_images" value="1" checked> Скопировать фото продуктов на мой хостинг</label>
+        <hr>
+        <label>Токен Telegram-бота (необязательно)</label>
+        <input type="text" name="telegram_token" value="<?= h($_POST['telegram_token'] ?? '') ?>" placeholder="123456:ABC-DEF...">
+        <div class="hint">Нужен для уведомлений техникам и админам. Возьмите у @BotFather. Работает только при открытии сайта по https.</div>
         <hr>
         <label>Пароль супер-админа (только если без файла)</label>
         <input type="password" name="super_pass">

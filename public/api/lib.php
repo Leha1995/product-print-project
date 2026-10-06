@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 const APP_ID = 'asap-terminal';
 const SESSION_DAYS = 365;
-const ROLES = ['user', 'admin', 'manager', 'superadmin'];
+const ROLES = ['user', 'admin', 'manager', 'superadmin', 'technician', 'accountant'];
 const GLOBAL_ROLES = ['manager', 'superadmin'];
 
 function config_path(): string
