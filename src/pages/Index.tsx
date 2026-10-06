@@ -10,6 +10,7 @@ import WorkspaceSwitcher from '@/components/WorkspaceSwitcher';
 import useCategories from '@/hooks/useCategories';
 import AdminLoginDialog from '@/components/AdminLoginDialog';
 import LoginScreen from '@/components/LoginScreen';
+import IncomingTransfers from '@/components/equipment/IncomingTransfers';
 import UsersDialog from '@/components/UsersDialog';
 import useAuth from '@/hooks/useAuth';
 import usePrintHistory from '@/hooks/usePrintHistory';
@@ -275,6 +276,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <IncomingTransfers enabled={user?.role === 'admin'} />
       <TerminalHeader
         printedCount={jobs.length}
         onNavigate={scrollTo}

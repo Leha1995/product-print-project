@@ -8,6 +8,7 @@ interface EquipmentFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (item: Partial<Equipment>) => void;
+  onTransfer?: (item: Equipment) => void;
 }
 
 const empty = {
@@ -50,7 +51,7 @@ const shrink = (dataUrl: string, max = 900) =>
     img.src = dataUrl;
   });
 
-const EquipmentFormDialog = ({ item, open, onOpenChange, onSave }: EquipmentFormDialogProps) => {
+const EquipmentFormDialog = ({ item, open, onOpenChange, onSave, onTransfer }: EquipmentFormDialogProps) => {
   const [form, setForm] = useState(empty);
 
   useEffect(() => {
@@ -255,6 +256,25 @@ const EquipmentFormDialog = ({ item, open, onOpenChange, onSave }: EquipmentForm
             <p className="mt-3 border-2 border-dashed border-primary px-3 py-2 text-[12px] text-muted-foreground">
               {`QR-код карточки: ${item.code}`}
             </p>
+          )}
+
+          {item && onTransfer && item.active && (
+            <button
+              type="button"
+              disabled={item.inRepair || Boolean(item.transferTo)}
+              onClick={() => {
+                onOpenChange(false);
+                onTransfer(item);
+              }}
+              className="mt-3 flex w-full items-center justify-center gap-2 border-2 border-primary bg-background px-4 py-2.5 font-head text-[0.75rem] font-bold uppercase text-primary transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Icon name="ArrowRightLeft" size={16} strokeWidth={2.5} />
+              {item.transferTo
+                ? `Ожидает подтверждения: ${item.transferTo}`
+                : item.inRepair
+                  ? 'В ремонте — переместить нельзя'
+                  : 'Переместить на другого админа'}
+            </button>
           )}
 
           <div className="mt-5 flex gap-2">

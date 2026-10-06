@@ -11,6 +11,7 @@ import RepairHistory from '@/components/equipment/RepairHistory';
 import FindQrDialog from '@/components/equipment/FindQrDialog';
 import TaskCreateDialog, { TaskDraft } from '@/components/equipment/TaskCreateDialog';
 import TasksPanel from '@/components/equipment/TasksPanel';
+import TransferDialog from '@/components/equipment/TransferDialog';
 import useHardwareScanner from '@/hooks/useHardwareScanner';
 import { playScanSound } from '@/lib/scanSound';
 import useEquipment from '@/hooks/useEquipment';
@@ -19,6 +20,7 @@ import {
   EquipmentTask,
   FinishResult,
   cancelTask,
+  cancelTransfer,
   createTask,
   finishInventory,
   markQrFixed,
@@ -75,6 +77,8 @@ const EquipmentSection = ({ userId, targetId, isAdmin, readOnly = false }: Equip
   const [repairOpen, setRepairOpen] = useState(false);
   const [sendItem, setSendItem] = useState<Equipment | null>(null);
   const [sendOpen, setSendOpen] = useState(false);
+  const [transferItem, setTransferItem] = useState<Equipment | null>(null);
+  const [transferOpen, setTransferOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -108,7 +112,7 @@ const EquipmentSection = ({ userId, targetId, isAdmin, readOnly = false }: Equip
   };
 
   const anyDialogOpen =
-    formOpen || qrOpen || scanOpen || resultOpen || historyOpen || repairOpen || sendOpen || findOpen || taskOpen;
+    formOpen || transferOpen || qrOpen || scanOpen || resultOpen || historyOpen || repairOpen || sendOpen || findOpen || taskOpen;
   useHardwareScanner(!anyDialogOpen && items.length > 0, findByCode);
 
   const totalPrice = items.reduce((sum, i) => (i.active ? sum + i.price : sum), 0);
@@ -499,6 +503,30 @@ const EquipmentSection = ({ userId, targetId, isAdmin, readOnly = false }: Equip
                     : 'В ремонте'}
                 </p>
               )}
+              {item.transferTo && item.active && (
+                <p className="mt-1.5 mr-1 inline-flex items-center gap-1 border-2 border-primary bg-accent px-1.5 py-0.5 font-head text-[0.6rem] font-bold uppercase text-accent-foreground">
+                  <Icon name="ArrowRightLeft" size={12} strokeWidth={2.5} />
+                  {`Перемещается → ${item.transferTo}`}
+                  {isAdmin && !readOnly && (
+                    <button
+                      onClick={async () => {
+                        if (!window.confirm('Отменить перемещение?')) return;
+                        try {
+                          const res = await cancelTransfer(item.id);
+                          setItems(res.items);
+                          toast({ title: 'Перемещение отменено', description: item.name });
+                        } catch {
+                          toast({ title: 'Не удалось отменить', description: 'Проверь интернет и повтори' });
+                        }
+                      }}
+                      aria-label="Отменить перемещение"
+                      className="ml-1 underline"
+                    >
+                      отменить
+                    </button>
+                  )}
+                </p>
+              )}
               {!item.active && (
                 <p className="mt-1.5 inline-flex items-center gap-1 border-2 border-destructive bg-destructive px-1.5 py-0.5 font-head text-[0.6rem] font-bold uppercase text-destructive-foreground">
                   <Icon name="Archive" size={12} strokeWidth={2.5} />
@@ -635,12 +663,29 @@ const EquipmentSection = ({ userId, targetId, isAdmin, readOnly = false }: Equip
         item={editing}
         open={formOpen}
         onOpenChange={setFormOpen}
+        onTransfer={
+          readOnly
+            ? undefined
+            : (item) => {
+                setTransferItem(item);
+                setTransferOpen(true);
+              }
+        }
         onSave={async (item) => {
           await save(item);
           toast({
             title: editing ? 'Оборудование обновлено' : 'Оборудование добавлено',
             description: item.name,
           });
+        }}
+      />
+      <TransferDialog
+        item={transferItem}
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
+        onDone={(list, name) => {
+          setItems(list);
+          toast({ title: 'Отправлено на подтверждение', description: name ? `Админ: ${name}` : undefined });
         }}
       />
       <TaskCreateDialog

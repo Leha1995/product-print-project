@@ -211,7 +211,10 @@ def read_items(cur, uid: int):
     cur.execute(
         'SELECT id, name, code, price, location, note, image, serial, active, created_at, '
         'qr_broken, written_off_at, write_off_reason, commissioned_at, depreciation_per_day, repair_cost, '
-        'in_repair, repair_sent_at '
+        'in_repair, repair_sent_at, '
+        "(SELECT COALESCE(NULLIF(u.full_name, ''), u.username) FROM equipment_transfers t "
+        'JOIN app_users u ON u.id = t.to_user WHERE t.from_user = equipment.user_id '
+        "AND t.equipment_id = equipment.id AND t.status = 'pending' ORDER BY t.id DESC LIMIT 1) "
         f'FROM equipment WHERE user_id = {uid} ORDER BY active DESC, location, name'
     )
     return [
@@ -235,6 +238,7 @@ def read_items(cur, uid: int):
             'inRepair': bool(r[16]),
             'repairSentAt': r[17].isoformat() if r[17] else None,
             'repairs': repairs.get(r[0], []),
+            'transferTo': r[18] or '',
         }
         for r in cur.fetchall()
     ]
@@ -498,6 +502,76 @@ def upload_photos(raw_list, prefix: str):
     return out
 
 
+TRANSFER_PASSWORD = '1234'
+
+
+def incoming_transfers(cur, uid: int):
+    cur.execute(
+        'SELECT t.id, t.created_at, e.name, e.code, e.price, e.location, e.serial, e.image, e.note, '
+        "COALESCE(NULLIF(u.full_name, ''), u.username) FROM equipment_transfers t "
+        'JOIN equipment e ON e.user_id = t.from_user AND e.id = t.equipment_id '
+        'LEFT JOIN app_users u ON u.id = t.from_user '
+        f"WHERE t.to_user = {int(uid)} AND t.status = 'pending' ORDER BY t.created_at"
+    )
+    return [
+        {
+            'id': r[0],
+            'createdAt': r[1].isoformat() if r[1] else None,
+            'name': r[2],
+            'code': r[3],
+            'price': float(r[4] or 0),
+            'location': r[5] or '',
+            'serial': r[6] or '',
+            'image': r[7] or '',
+            'note': r[8] or '',
+            'fromName': r[9] or '',
+        }
+        for r in cur.fetchall()
+    ]
+
+
+def decide_transfer(cur, uid: int, me, body: dict) -> dict:
+    tid = int(body.get('transferId') or 0)
+    cur.execute(
+        'SELECT from_user, equipment_id FROM equipment_transfers '
+        f"WHERE id = {tid} AND to_user = {int(uid)} AND status = 'pending'"
+    )
+    row = cur.fetchone()
+    if not row:
+        return {'error': 'not_found', 'transfers': incoming_transfers(cur, uid)}
+    from_user, eid = int(row[0]), row[1]
+    if body.get('action') == 'transfer_decline':
+        cur.execute(
+            "UPDATE equipment_transfers SET status = 'declined', decided_at = NOW(), "
+            f"decided_by = {int(me['id'])} WHERE id = {tid}"
+        )
+        return {'ok': True, 'transfers': incoming_transfers(cur, uid)}
+    new_id = eid
+    cur.execute(f'SELECT 1 FROM equipment WHERE user_id = {int(uid)} AND id = {q(eid)}')
+    if cur.fetchone():
+        new_id = f"eq-{uuid.uuid4().hex[:10]}"
+    cur.execute(
+        f'UPDATE equipment SET user_id = {int(uid)}, id = {q(new_id)}, qr_broken = FALSE, updated_at = NOW() '
+        f'WHERE user_id = {from_user} AND id = {q(eid)} RETURNING id'
+    )
+    if not cur.fetchone():
+        cur.execute(f"UPDATE equipment_transfers SET status = 'cancelled', decided_at = NOW() WHERE id = {tid}")
+        return {'error': 'not_found', 'transfers': incoming_transfers(cur, uid)}
+    cur.execute(
+        f'UPDATE equipment_repairs SET user_id = {int(uid)}, equipment_id = {q(new_id)} '
+        f'WHERE user_id = {from_user} AND equipment_id = {q(eid)}'
+    )
+    cur.execute(
+        f"UPDATE equipment_transfers SET status = 'accepted', decided_at = NOW(), decided_by = {int(me['id'])} "
+        f'WHERE id = {tid}'
+    )
+    cur.execute(
+        "UPDATE equipment_transfers SET status = 'cancelled', decided_at = NOW() "
+        f"WHERE from_user = {from_user} AND equipment_id = {q(eid)} AND status = 'pending'"
+    )
+    return {'ok': True, 'transfers': incoming_transfers(cur, uid)}
+
+
 def handler(event: dict, context) -> dict:
     """Инвентаризация оборудования кухни: карточки с QR-кодом, стоимостью и расходами на ремонт, сессии сканирования."""
     method = event.get('httpMethod', 'GET')
@@ -689,6 +763,15 @@ def handler(event: dict, context) -> dict:
             }
         )
 
+    if me['role'] == 'admin':
+        qs_adm = event.get('queryStringParameters') or {}
+        if method == 'GET' and qs_adm.get('transfers') == 'incoming':
+            return finish({'transfers': incoming_transfers(cur, me['id'])})
+        abody = json.loads(event.get('body') or '{}') if method == 'POST' else {}
+        if abody.get('action') in ('transfer_accept', 'transfer_decline'):
+            return finish(decide_transfer(cur, me['id'], me, abody))
+        return finish({'error': 'forbidden'}, 403)
+
     if me['role'] not in ('superadmin', 'manager'):
         return finish({'error': 'forbidden'}, 403)
 
@@ -704,6 +787,16 @@ def handler(event: dict, context) -> dict:
     if method == 'GET' and qs.get('report') == 'tasks':
         sid = str(qs.get('sessionId') or '')
         return finish(tasks_report(cur, uid, int(sid) if sid.isdigit() else 0))
+
+    if method == 'GET' and qs.get('transfers') == 'incoming':
+        return finish({'transfers': incoming_transfers(cur, uid)})
+
+    if method == 'GET' and qs.get('report') == 'admins':
+        cur.execute(
+            "SELECT id, COALESCE(NULLIF(full_name, ''), username) FROM app_users "
+            f"WHERE role = 'admin' AND active AND id <> {int(uid)} ORDER BY 2"
+        )
+        return finish({'admins': [{'id': r[0], 'name': r[1]} for r in cur.fetchall()]})
 
     if method == 'GET':
         return finish(
@@ -746,6 +839,45 @@ def handler(event: dict, context) -> dict:
             f"VALUES ({uid}, {eq_sql}, {tech_sql}, {int(me['id'])}, {q(description)}, {q(json.dumps(photos))}::jsonb, {q(priority)})"
         )
         return finish({'ok': True, 'tasks': owner_tasks(cur, uid)})
+
+    if action in ('transfer_accept', 'transfer_decline'):
+        res = decide_transfer(cur, uid, me, body)
+        res['items'] = read_items(cur, uid)
+        return finish(res)
+
+    if action == 'transfer':
+        if str(body.get('password') or '') != TRANSFER_PASSWORD:
+            return finish({'error': 'bad_password'}, 403)
+        to_user = int(body.get('toUser') or 0)
+        eid = str(body.get('id') or '')
+        cur.execute(f"SELECT 1 FROM app_users WHERE id = {to_user} AND role = 'admin' AND active")
+        if not cur.fetchone() or to_user == uid:
+            return finish({'error': 'bad_target'}, 400)
+        cur.execute(
+            f'SELECT active, in_repair FROM equipment WHERE user_id = {uid} AND id = {q(eid)}'
+        )
+        row = cur.fetchone()
+        if not row or not row[0]:
+            return finish({'error': 'not_found'}, 404)
+        if row[1]:
+            return finish({'error': 'in_repair'}, 409)
+        cur.execute(
+            "UPDATE equipment_transfers SET status = 'cancelled', decided_at = NOW() "
+            f"WHERE from_user = {uid} AND equipment_id = {q(eid)} AND status = 'pending'"
+        )
+        cur.execute(
+            'INSERT INTO equipment_transfers (equipment_id, from_user, to_user, created_by) '
+            f"VALUES ({q(eid)}, {uid}, {to_user}, {int(me['id'])})"
+        )
+        return finish({'ok': True, 'items': read_items(cur, uid)})
+
+    if action == 'transfer_cancel':
+        cur.execute(
+            "UPDATE equipment_transfers SET status = 'cancelled', decided_at = NOW(), "
+            f"decided_by = {int(me['id'])} WHERE from_user = {uid} "
+            f"AND equipment_id = {q(body.get('id', ''))} AND status = 'pending'"
+        )
+        return finish({'ok': True, 'items': read_items(cur, uid)})
 
     if action == 'cancel_task':
         cur.execute(
@@ -868,7 +1000,7 @@ def handler(event: dict, context) -> dict:
     if action == 'finish':
         scanned = [str(c) for c in (body.get('scanned') or [])]
         items = read_items(cur, uid)
-        active = [i for i in items if i['active'] and not i['inRepair']]
+        active = [i for i in items if i['active'] and not i['inRepair'] and not i['transferTo']]
         found = [i for i in active if i['code'] in scanned]
         missing = [i for i in active if i['code'] not in scanned]
         total_price = sum(i['price'] for i in active)

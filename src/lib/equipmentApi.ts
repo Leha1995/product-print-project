@@ -32,6 +32,7 @@ export interface Equipment {
   inRepair?: boolean;
   repairSentAt?: string | null;
   repairs?: RepairRecord[];
+  transferTo?: string;
 }
 
 export interface InventorySession {
@@ -278,4 +279,63 @@ export const fetchAccountantTechs = async (from?: string, to?: string): Promise<
   if (!res.ok) throw new Error(String(res.status));
   const data = await res.json();
   return Array.isArray(data.technicians) ? (data.technicians as AccountantTech[]) : [];
+};
+
+export interface AdminRef {
+  id: number;
+  name: string;
+}
+
+export interface IncomingTransfer {
+  id: number;
+  createdAt: string | null;
+  name: string;
+  code: string;
+  price: number;
+  location: string;
+  serial: string;
+  image: string;
+  note: string;
+  fromName: string;
+}
+
+export const fetchTransferAdmins = async (): Promise<AdminRef[]> => {
+  const res = await fetch(`${API}?report=admins`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(String(res.status));
+  const data = await res.json();
+  return Array.isArray(data.admins) ? (data.admins as AdminRef[]) : [];
+};
+
+export const transferEquipment = async (id: string, toUser: number, password: string) => {
+  const res = await fetch(API, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ action: 'transfer', id, toUser, password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error || String(res.status));
+  return data as { items: Equipment[] };
+};
+
+export const cancelTransfer = (id: string) =>
+  send({ action: 'transfer_cancel', id }) as Promise<{ items: Equipment[] }>;
+
+const ownHeaders = () => ({ 'Content-Type': 'application/json', 'X-Auth-Token': getToken() });
+
+export const fetchIncomingTransfers = async (): Promise<IncomingTransfer[]> => {
+  const res = await fetch(`${API}?transfers=incoming`, { headers: ownHeaders() });
+  if (!res.ok) throw new Error(String(res.status));
+  const data = await res.json();
+  return Array.isArray(data.transfers) ? (data.transfers as IncomingTransfer[]) : [];
+};
+
+export const decideTransfer = async (transferId: number, accept: boolean) => {
+  const res = await fetch(API, {
+    method: 'POST',
+    headers: ownHeaders(),
+    body: JSON.stringify({ action: accept ? 'transfer_accept' : 'transfer_decline', transferId }),
+  });
+  if (!res.ok) throw new Error(String(res.status));
+  const data = await res.json();
+  return Array.isArray(data.transfers) ? (data.transfers as IncomingTransfer[]) : [];
 };

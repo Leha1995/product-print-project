@@ -1,7 +1,7 @@
 {
+  "telegram": "https://functions.poehali.dev/0697b548-83f1-4ccb-a6d3-f53178d93e0f",
   "print": "https://functions.poehali.dev/c67759d8-3390-4c8c-a7af-a3fa69f1c9f3",
   "equipment": "https://functions.poehali.dev/72436dc3-89cf-47ce-a4bc-2d471dd76275",
   "auth": "https://functions.poehali.dev/e2f238d3-01a0-409f-973c-33e38bfdbb57",
-  "catalog": "https://functions.poehali.dev/189bcae7-31a1-4023-9d91-07dee22dad90",
-  "shared-catalog": "https://functions.poehali.dev/ab7271ee-0998-4b1b-8aaf-dfa59fb9b932"
+  "catalog": "https://functions.poehali.dev/189bcae7-31a1-4023-9d91-07dee22dad90"
 }
