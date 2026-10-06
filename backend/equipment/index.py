@@ -296,7 +296,7 @@ def save_item(cur, uid: int, item: dict) -> int:
     return 1
 
 
-def return_repair(cur, uid: int, body: dict) -> None:
+def return_repair(cur, uid: int, body: dict, by_user: int = 0) -> None:
     cost = max(0.0, float(num(body.get('cost'))))
     eid = str(body.get('id') or '')
     description = body.get('description')
@@ -310,14 +310,14 @@ def return_repair(cur, uid: int, body: dict) -> None:
     open_row = cur.fetchone()
     if open_row:
         cur.execute(
-            f'UPDATE equipment_repairs SET returned_at = NOW(), cost = {num(cost)}{desc_sql} '
+            f'UPDATE equipment_repairs SET returned_at = NOW(), returned_by = {int(by_user) or "NULL"}, cost = {num(cost)}{desc_sql} '
             f'WHERE id = {int(open_row[0])}'
         )
     else:
         cur.execute(
-            'INSERT INTO equipment_repairs (user_id, equipment_id, sent_at, returned_at, cost, description) '
+            'INSERT INTO equipment_repairs (user_id, equipment_id, sent_at, returned_at, cost, description, returned_by) '
             f"SELECT {uid}, {q(eid)}, COALESCE(repair_sent_at, NOW()), NOW(), {num(cost)}, "
-            f"{q(str(description or '').strip()[:1000])} FROM equipment WHERE user_id = {uid} AND id = {q(eid)}"
+            f"{q(str(description or '').strip()[:1000])}, {int(by_user) or 'NULL'} FROM equipment WHERE user_id = {uid} AND id = {q(eid)}"
         )
     cur.execute(
         'UPDATE equipment SET in_repair = FALSE, repair_sent_at = NULL, '
@@ -445,6 +445,42 @@ def technician_tasks(cur, me):
     )
 
 
+def technician_month_stats(cur, tech_id: int, month: str = '') -> dict:
+    """Сводка техника за календарный месяц: выполненные задачи, возвращённые ремонты и расходы."""
+    today = datetime.date.today()
+    try:
+        start = datetime.date.fromisoformat(f'{str(month)[:7]}-01')
+    except ValueError:
+        start = today.replace(day=1)
+    if start > today.replace(day=1) or start.year < 2000:
+        start = today.replace(day=1)
+    end = (start.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
+    tid = int(tech_id)
+    cur.execute(
+        'SELECT COUNT(*), COALESCE(SUM(cost), 0), '
+        "COUNT(*) FILTER (WHERE priority = 'urgent') FROM equipment_tasks "
+        f"WHERE status = 'done' AND done_by = {tid} AND done_at >= '{start.isoformat()}' AND done_at < '{end.isoformat()}'"
+    )
+    t = cur.fetchone() or (0, 0, 0)
+    cur.execute(
+        'SELECT COUNT(*), COALESCE(SUM(cost), 0) FROM equipment_repairs '
+        f"WHERE returned_by = {tid} AND returned_at >= '{start.isoformat()}' AND returned_at < '{end.isoformat()}'"
+    )
+    r = cur.fetchone() or (0, 0)
+    tasks_cost = float(t[1] or 0)
+    repairs_cost = float(r[1] or 0)
+    return {
+        'month': start.isoformat()[:7],
+        'isCurrent': start == today.replace(day=1),
+        'tasksDone': int(t[0] or 0),
+        'urgentDone': int(t[2] or 0),
+        'tasksCost': tasks_cost,
+        'repairsReturned': int(r[0] or 0),
+        'repairsCost': repairs_cost,
+        'totalCost': round(tasks_cost + repairs_cost, 2),
+    }
+
+
 def upload_photos(raw_list, prefix: str):
     out = []
     for raw in (raw_list or [])[:4]:
@@ -477,6 +513,7 @@ def handler(event: dict, context) -> dict:
     if method == 'GET':
         cleanup_repair_photos(cur)
     view_tech = str((event.get('queryStringParameters') or {}).get('viewTech') or '')
+    month_param = str((event.get('queryStringParameters') or {}).get('month') or '')
     if method == 'GET' and view_tech:
         if me['role'] != 'superadmin' or not view_tech.isdigit():
             return finish({'error': 'forbidden'}, 403)
@@ -493,11 +530,18 @@ def handler(event: dict, context) -> dict:
                 'repairs': technician_items(cur, tech),
                 'tasks': technician_tasks(cur, tech),
                 'technicianName': row[3],
+                'stats': technician_month_stats(cur, row[0], month_param),
             }
         )
     if me['role'] == 'technician':
         if method == 'GET':
-            return finish({'repairs': technician_items(cur, me), 'tasks': technician_tasks(cur, me)})
+            return finish(
+                {
+                    'repairs': technician_items(cur, me),
+                    'tasks': technician_tasks(cur, me),
+                    'stats': technician_month_stats(cur, me['id'], month_param),
+                }
+            )
         tbody = json.loads(event.get('body') or '{}')
         if tbody.get('action') == 'task_done':
             tid = int(tbody.get('taskId') or 0)
@@ -523,7 +567,7 @@ def handler(event: dict, context) -> dict:
         )
         if not cur.fetchone():
             return finish({'error': 'not_in_repair', 'repairs': technician_items(cur, me)}, 409)
-        return_repair(cur, owner, tbody)
+        return_repair(cur, owner, tbody, int(me['id']))
         return finish({'ok': True, 'repairs': technician_items(cur, me)})
 
     if me['role'] not in ('superadmin', 'manager'):
@@ -683,7 +727,7 @@ def handler(event: dict, context) -> dict:
         return finish({'ok': True, 'items': read_items(cur, uid)})
 
     if action == 'return_repair':
-        return_repair(cur, uid, body)
+        return_repair(cur, uid, body, int(me['id']))
         return finish({'ok': True, 'items': read_items(cur, uid)})
 
     if action == 'restore':

@@ -4,6 +4,7 @@ import RepairReturnDialog from '@/components/equipment/RepairReturnDialog';
 import {
   Equipment,
   EquipmentTask,
+  TechMonthStats,
   TechRepair,
   fetchTechRepairs,
   techReturnRepair,
@@ -15,6 +16,7 @@ import { toast } from '@/hooks/use-toast';
 import useHardwareScanner from '@/hooks/useHardwareScanner';
 import { playScanSound } from '@/lib/scanSound';
 import RepairPhotos from '@/components/equipment/RepairPhotos';
+import TechMonthSummary from '@/components/technician/TechMonthSummary';
 
 interface TechnicianScreenProps {
   userName: string;
@@ -57,18 +59,31 @@ const TechnicianScreen = ({ userName, onLogout, viewTechId = null, inline = fals
   const [doneTask, setDoneTask] = useState<EquipmentTask | null>(null);
   const [doneOpen, setDoneOpen] = useState(false);
   const [showClosed, setShowClosed] = useState(false);
+  const [stats, setStats] = useState<TechMonthStats | null>(null);
+  const [month, setMonth] = useState('');
+  const [statsLoading, setStatsLoading] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const data = await fetchTechRepairs(viewTechId);
+      const data = await fetchTechRepairs(viewTechId, month);
       setList(data.repairs);
       setTasks(data.tasks);
+      setStats(data.stats);
     } catch {
       toast({ title: 'Не удалось загрузить список', description: 'Проверь интернет и обнови' });
     } finally {
       setLoading(false);
+      setStatsLoading(false);
     }
-  }, [viewTechId]);
+  }, [viewTechId, month]);
+
+  const shiftMonth = (delta: number) => {
+    if (!stats) return;
+    const [y, m] = stats.month.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setStatsLoading(true);
+    setMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
 
   useEffect(() => {
     load();
@@ -109,6 +124,7 @@ const TechnicianScreen = ({ userName, onLogout, viewTechId = null, inline = fals
       const res = await techTaskDone(task.id, comment, cost);
       setTasks(res.tasks);
       toast({ title: 'Задача закрыта', description: `№${task.id}` });
+      load();
     } catch {
       toast({ title: 'Не удалось сохранить', description: 'Проверь интернет и повтори' });
       load();
@@ -122,6 +138,7 @@ const TechnicianScreen = ({ userName, onLogout, viewTechId = null, inline = fals
       const res = await techReturnRepair(current.ownerId, current.id, cost, description);
       setList(res.repairs);
       toast({ title: 'Возвращено из ремонта', description: current.name });
+      load();
     } catch {
       toast({ title: 'Не удалось сохранить', description: 'Проверь интернет и повтори' });
       load();
@@ -161,6 +178,7 @@ const TechnicianScreen = ({ userName, onLogout, viewTechId = null, inline = fals
       </header>
 
       <main className="px-4 py-6 md:px-8">
+        <TechMonthSummary stats={stats} loading={statsLoading} onShift={shiftMonth} />
         <div className="mb-4 grid grid-cols-2 border-2 border-primary sm:inline-grid sm:w-auto">
           {(
             [

@@ -1,0 +1,1 @@
+ALTER TABLE equipment_repairs ADD COLUMN IF NOT EXISTS returned_by INTEGER NULL;

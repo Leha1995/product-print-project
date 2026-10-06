@@ -177,16 +177,32 @@ export interface TechRepair {
   photos?: string[];
 }
 
+export interface TechMonthStats {
+  month: string;
+  isCurrent: boolean;
+  tasksDone: number;
+  urgentDone: number;
+  tasksCost: number;
+  repairsReturned: number;
+  repairsCost: number;
+  totalCost: number;
+}
+
 export const fetchTechRepairs = async (
   viewTechId?: number | null,
-): Promise<{ repairs: TechRepair[]; tasks: EquipmentTask[] }> => {
-  const url = viewTechId ? `${API}?viewTech=${viewTechId}` : API;
+  month?: string,
+): Promise<{ repairs: TechRepair[]; tasks: EquipmentTask[]; stats: TechMonthStats | null }> => {
+  const params = new URLSearchParams();
+  if (viewTechId) params.set('viewTech', String(viewTechId));
+  if (month) params.set('month', month);
+  const url = params.toString() ? `${API}?${params}` : API;
   const res = await fetch(url, { headers: authHeaders() });
   if (!res.ok) throw new Error(String(res.status));
   const data = await res.json();
   return {
     repairs: Array.isArray(data.repairs) ? (data.repairs as TechRepair[]) : [],
     tasks: Array.isArray(data.tasks) ? (data.tasks as EquipmentTask[]) : [],
+    stats: data.stats ? (data.stats as TechMonthStats) : null,
   };
 };
 
