@@ -28,6 +28,7 @@ const roleLabel: Record<Role, string> = {
   manager: 'Управляющий',
   superadmin: 'Супер-админ',
   technician: 'Техник',
+  accountant: 'Бухгалтер',
 };
 
 const inputClass =
@@ -157,7 +158,7 @@ const UsersDialog = ({
         fullName,
         role,
         managerId: role === 'user' || role === 'admin' ? managerId || null : null,
-        scopeIds: role === 'technician' ? scopeIds : undefined,
+        scopeIds: role === 'technician' || role === 'accountant' ? scopeIds : undefined,
         accessDays: role === 'admin' ? accessDays || null : null,
       });
       apply(r.users);
@@ -301,14 +302,16 @@ const UsersDialog = ({
                 <option value="admin">Админ</option>
                 <option value="manager">Управляющий</option>
                 <option value="technician">Техник</option>
+                <option value="accountant">Бухгалтер</option>
                 <option value="superadmin">Супер-админ</option>
               </select>
             )}
-            {isSuperAdmin && role === 'technician' && (
+            {isSuperAdmin && (role === 'technician' || role === 'accountant') && (
               <TechScopePicker
                 heads={scopeHeads}
                 value={scopeIds}
                 onChange={setScopeIds}
+                adminsOnly={role === 'accountant'}
                 className="md:col-span-2"
               />
             )}
@@ -441,7 +444,7 @@ const UsersDialog = ({
                           }`
                         : ''
                     }${
-                      u.role === 'technician'
+                      u.role === 'technician' || u.role === 'accountant'
                         ? ` · ${
                             u.scopeIds?.length
                               ? u.scopeIds
@@ -451,12 +454,14 @@ const UsersDialog = ({
                                   })
                                   .filter(Boolean)
                                   .join(', ')
-                              : 'все точки'
+                              : u.role === 'accountant'
+                                ? 'админы не закреплены'
+                                : 'все точки'
                           }`
                         : ''
                     }`}
                   </p>
-                  {u.role !== 'superadmin' && u.role !== 'technician' && (
+                  {u.role !== 'superadmin' && u.role !== 'technician' && u.role !== 'accountant' && (
                     <p
                       className={`truncate text-[12px] font-bold ${toneClass[accessInfo(u.accessUntil, !u.accessOwn).tone]}`}
                     >
@@ -477,6 +482,7 @@ const UsersDialog = ({
                     <option value="admin">Админ</option>
                     <option value="manager">Управляющий</option>
                     <option value="technician">Техник</option>
+                    <option value="accountant">Бухгалтер</option>
                     <option value="superadmin">Супер-админ</option>
                   </select>
                 )}
@@ -490,11 +496,17 @@ const UsersDialog = ({
                     Кабинет
                   </button>
                 )}
-                {isSuperAdmin && u.role === 'technician' && (
+                {isSuperAdmin && (u.role === 'technician' || u.role === 'accountant') && (
                   <TechScopePicker
                     heads={scopeHeads}
                     value={u.scopeIds || []}
-                    onChange={(ids) => patch({ id: u.id, scopeIds: ids }, 'Точки техника обновлены')}
+                    adminsOnly={u.role === 'accountant'}
+                    onChange={(ids) =>
+                      patch(
+                        { id: u.id, scopeIds: ids },
+                        u.role === 'accountant' ? 'Админы бухгалтера обновлены' : 'Точки техника обновлены',
+                      )
+                    }
                     className="max-w-[260px] py-1 text-[13px]"
                   />
                 )}

@@ -10,6 +10,7 @@ type MenuProps = ComponentProps<typeof MenuSection>;
 
 interface IndexMainProps {
   inventoryOnly: boolean;
+  readOnly?: boolean;
   managerPicked: boolean;
   activeTarget: number | null;
   section: 'labels' | 'equipment';
@@ -43,6 +44,7 @@ interface IndexMainProps {
 
 const IndexMain = ({
   inventoryOnly,
+  readOnly = false,
   managerPicked,
   activeTarget,
   section,
@@ -78,14 +80,16 @@ const IndexMain = ({
       <div className="mx-auto flex max-w-[520px] flex-col items-center gap-2 px-4 py-16 text-center">
         <Icon name="Store" size={34} strokeWidth={2} className="text-primary" />
         <p className="font-head text-base font-black uppercase text-primary">
-          Выбери сотрудника
+          {readOnly ? 'Выбери точку' : 'Выбери сотрудника'}
         </p>
         <p className="text-[13px] text-muted-foreground">
-          В строке выше укажи точку — откроется её оборудование и маркировка.
+          {readOnly
+            ? 'В строке выше укажи точку — откроется её оборудование и история инвентаризаций.'
+            : 'В строке выше укажи точку — откроется её оборудование и маркировка.'}
         </p>
       </div>
     ) : (section === 'equipment' || (inventoryOnly && !managerPicked)) && canInventory ? (
-      <EquipmentSection userId={userId} targetId={activeTarget} isAdmin={isAdmin} />
+      <EquipmentSection userId={userId} targetId={activeTarget} isAdmin={isAdmin} readOnly={readOnly} />
     ) : (
       <MenuSection
         products={items}

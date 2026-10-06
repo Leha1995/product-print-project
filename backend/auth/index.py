@@ -16,7 +16,7 @@ CORS = {
 }
 
 SESSION_DAYS = 365
-ROLES = ('user', 'admin', 'manager', 'superadmin', 'technician')
+ROLES = ('user', 'admin', 'manager', 'superadmin', 'technician', 'accountant')
 GLOBAL_ROLES = ('manager', 'superadmin')
 
 
@@ -122,10 +122,11 @@ def list_users(cur, me=None):
     )
     rows = cur.fetchall()
     scopes = read_scopes(cur)
+    acc_scopes = read_accountant_scopes(cur)
     own = {r[0]: r[7] for r in rows}
     result = []
     for r in rows:
-        if r[3] in GLOBAL_ROLES:
+        if r[3] in GLOBAL_ROLES or r[3] == 'accountant':
             until = None
         elif r[3] == 'admin':
             until = r[7]
@@ -146,7 +147,8 @@ def list_users(cur, me=None):
                 'managerId': r[6],
                 'accessUntil': until.isoformat() if until else None,
                 'accessOwn': r[3] == 'admin',
-                'scopeIds': scopes.get(r[0], []) if r[3] == 'technician' else [],
+                'scopeIds': scopes.get(r[0], []) if r[3] == 'technician'
+                else acc_scopes.get(r[0], []) if r[3] == 'accountant' else [],
             }
         )
     return result
@@ -171,6 +173,34 @@ def save_scopes(cur, tech_id: int, heads) -> None:
         )
 
 
+def read_accountant_scopes(cur) -> dict:
+    cur.execute('SELECT accountant_id, admin_id FROM accountant_scopes ORDER BY admin_id')
+    out: dict = {}
+    for aid, hid in cur.fetchall():
+        out.setdefault(aid, []).append(hid)
+    return out
+
+
+def save_accountant_scopes(cur, accountant_id: int, admins) -> None:
+    """Бухгалтеру закрепляются только админы (точки)."""
+    ids = sorted({int(h) for h in (admins or []) if str(h).isdigit() and int(h) != accountant_id})
+    cur.execute(f'DELETE FROM accountant_scopes WHERE accountant_id = {int(accountant_id)}')
+    if ids:
+        cur.execute(
+            'INSERT INTO accountant_scopes (accountant_id, admin_id) '
+            f"SELECT {int(accountant_id)}, id FROM app_users WHERE id IN ({', '.join(str(i) for i in ids)}) "
+            "AND role = 'admin'"
+        )
+
+
+def accountant_admin_ids(cur, accountant_id: int):
+    cur.execute(
+        'SELECT u.id FROM accountant_scopes s JOIN app_users u ON u.id = s.admin_id '
+        f"WHERE s.accountant_id = {int(accountant_id)} AND u.active AND u.role = 'admin' ORDER BY u.id"
+    )
+    return [r[0] for r in cur.fetchall()]
+
+
 def manager_branch_ids(cur, manager_id: int):
     """Управляющий видит закреплённых за ним админов и сотрудников этих админов."""
     cur.execute(
@@ -193,6 +223,8 @@ def managed_ids(cur, me):
     """Список id пользователей, чьим каталогом может управлять текущий аккаунт."""
     if me['role'] == 'manager':
         return manager_branch_ids(cur, me['id'])
+    if me['role'] == 'accountant':
+        return accountant_admin_ids(cur, me['id'])
     if me['role'] in GLOBAL_ROLES:
         cur.execute('SELECT id FROM app_users WHERE active ORDER BY id')
     elif me['role'] == 'admin':
@@ -331,7 +363,7 @@ def handler(event: dict, context) -> dict:
         if action == 'managed':
             cur.execute(
                 'SELECT id, username, full_name, role, manager_id FROM app_users WHERE id IN ('
-                + ', '.join(str(i) for i in managed_ids(cur, me))
+                + (', '.join(str(i) for i in managed_ids(cur, me)) or '0')
                 + ') ORDER BY role, username'
             )
             return done({
@@ -411,6 +443,8 @@ def handler(event: dict, context) -> dict:
             new_id = cur.fetchone()[0]
             if role == 'technician':
                 save_scopes(cur, new_id, body.get('scopeIds'))
+            elif role == 'accountant':
+                save_accountant_scopes(cur, new_id, body.get('scopeIds'))
             return done({'users': list_users(cur, me)})
 
         if action == 'update_user':
@@ -456,7 +490,13 @@ def handler(event: dict, context) -> dict:
                     sets.append(f"access_until = {q(until.isoformat(sep=' ', timespec='seconds'))}")
                     renew_branch = True
             if 'scopeIds' in body:
-                save_scopes(cur, user_id, body.get('scopeIds'))
+                cur.execute(f'SELECT role FROM app_users WHERE id = {user_id}')
+                srow = cur.fetchone()
+                scope_role = body.get('role') if body.get('role') in ROLES else (srow[0] if srow else '')
+                if scope_role == 'accountant':
+                    save_accountant_scopes(cur, user_id, body.get('scopeIds'))
+                else:
+                    save_scopes(cur, user_id, body.get('scopeIds'))
             if not sets:
                 return done({'users': list_users(cur, me)})
             cur.execute(f'UPDATE app_users SET {", ".join(sets)} WHERE id = {user_id}')
@@ -485,6 +525,9 @@ def handler(event: dict, context) -> dict:
             cur.execute(f'DELETE FROM app_sessions WHERE user_id = {user_id}')
             cur.execute(
                 f'DELETE FROM technician_scopes WHERE technician_id = {user_id} OR head_id = {user_id}'
+            )
+            cur.execute(
+                f'DELETE FROM accountant_scopes WHERE accountant_id = {user_id} OR admin_id = {user_id}'
             )
             cur.execute(f'UPDATE app_users SET manager_id = NULL WHERE manager_id = {user_id}')
             cur.execute(f'DELETE FROM app_users WHERE id = {user_id}')

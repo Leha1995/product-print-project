@@ -7,12 +7,13 @@ interface TechScopePickerProps {
   value: number[];
   onChange: (ids: number[]) => void;
   className?: string;
+  adminsOnly?: boolean;
 }
 
 const nameOf = (u: ManagedUser) => u.fullName || u.username;
 
-const TechScopePicker = ({ heads, value, onChange, className = '' }: TechScopePickerProps) => {
-  const managers = heads.filter((h) => h.role === 'manager');
+const TechScopePicker = ({ heads, value, onChange, className = '', adminsOnly = false }: TechScopePickerProps) => {
+  const managers = adminsOnly ? [] : heads.filter((h) => h.role === 'manager');
   const admins = heads.filter((h) => h.role === 'admin');
   const picked = heads.filter((h) => value.includes(h.id));
 
@@ -20,7 +21,9 @@ const TechScopePicker = ({ heads, value, onChange, className = '' }: TechScopePi
     onChange(value.includes(id) ? value.filter((v) => v !== id) : [...value, id]);
 
   const label = !picked.length
-    ? 'Все точки'
+    ? adminsOnly
+      ? 'никого'
+      : 'Все точки'
     : picked.length <= 2
       ? picked.map(nameOf).join(', ')
       : `${picked.length} привязки: ${picked.slice(0, 2).map(nameOf).join(', ')}…`;
@@ -66,13 +69,14 @@ const TechScopePicker = ({ heads, value, onChange, className = '' }: TechScopePi
         >
           <span className="flex min-w-0 items-center gap-2">
             <Icon name="MapPin" size={15} strokeWidth={2.5} className="shrink-0" />
-            <span className="truncate">{`Обслуживает: ${label}`}</span>
+            <span className="truncate">{`${adminsOnly ? 'Админы' : 'Обслуживает'}: ${label}`}</span>
           </span>
           <Icon name="ChevronDown" size={15} strokeWidth={2.5} className="shrink-0" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-[320px] max-w-[92vw] border-2 border-primary bg-card p-0">
         <div className="max-h-[320px] overflow-y-auto">
+          {!adminsOnly && (
           <button
             type="button"
             onClick={() => onChange([])}
@@ -87,10 +91,13 @@ const TechScopePicker = ({ heads, value, onChange, className = '' }: TechScopePi
             </span>
             <span className="font-head text-[0.75rem] font-bold uppercase text-primary">Все точки</span>
           </button>
+          )}
           {group('Управляющие', managers, 'все точки этого управляющего')}
           {group('Точки (админы)', admins, 'только эта точка')}
-          {!heads.length && (
-            <p className="px-3 py-4 text-[13px] text-muted-foreground">Нет управляющих и админов</p>
+          {!(adminsOnly ? admins.length : heads.length) && (
+            <p className="px-3 py-4 text-[13px] text-muted-foreground">
+              {adminsOnly ? 'Нет админов' : 'Нет управляющих и админов'}
+            </p>
           )}
         </div>
       </PopoverContent>

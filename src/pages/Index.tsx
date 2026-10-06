@@ -48,16 +48,17 @@ const Index = () => {
     isSuperAdmin,
     canInventory,
     inventoryOnly,
+    isAccountant,
   } =
     useAuth();
-  const { managed, refreshManaged } = useManagedUsers(isAdmin);
+  const { managed, refreshManaged } = useManagedUsers(isAdmin || isAccountant);
   const isTechnician = user?.role === 'technician';
   const [targetId, setTargetId] = useState<number | null>(null);
   const activeTarget = targetId ?? (inventoryOnly ? null : (user?.id ?? null));
   const pickedTech = isSuperAdmin
     ? managed.find((m) => m.id === targetId && m.role === 'technician') || null
     : null;
-  const managerPicked = inventoryOnly && targetId !== null;
+  const managerPicked = inventoryOnly && !isAccountant && targetId !== null;
   const viewingName = (() => {
     const found = managed.find((m) => m.id === targetId);
     return found ? found.fullName || found.username : '';
@@ -75,8 +76,8 @@ const Index = () => {
     saveCategories,
     savePrefs,
   } = useCatalog(
-    isTechnician ? null : user?.id,
-    isTechnician ? null : pickedTech ? (user?.id ?? null) : activeTarget,
+    isTechnician || isAccountant ? null : user?.id,
+    isTechnician || isAccountant ? null : pickedTech ? (user?.id ?? null) : activeTarget,
   );
   const {
     categories,
@@ -288,7 +289,7 @@ const Index = () => {
         showSections={canInventory && (!inventoryOnly || managerPicked)}
         inventoryOnly={inventoryOnly && !managerPicked}
       />
-      {isAdmin && user && (
+      {(isAdmin || isAccountant) && user && (
         <WorkspaceSwitcher
           managed={managed}
           currentId={user.id}
@@ -299,7 +300,7 @@ const Index = () => {
           }}
           label={inventoryOnly ? 'Точка' : 'Каталог сотрудника'}
           minCount={inventoryOnly ? 1 : 2}
-          placeholder={inventoryOnly ? 'Выбери сотрудника' : undefined}
+          placeholder={isAccountant ? 'Выбери точку' : inventoryOnly ? 'Выбери сотрудника' : undefined}
           allowEmpty={inventoryOnly}
           viewingName={viewingName}
         />
@@ -315,6 +316,7 @@ const Index = () => {
       ) : (
       <IndexMain
         inventoryOnly={inventoryOnly}
+        readOnly={isAccountant}
         managerPicked={managerPicked}
         activeTarget={activeTarget}
         section={section}

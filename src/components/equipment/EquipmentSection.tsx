@@ -35,11 +35,12 @@ interface EquipmentSectionProps {
   userId?: number;
   targetId?: number | null;
   isAdmin: boolean;
+  readOnly?: boolean;
 }
 
 const money = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`;
 
-const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) => {
+const EquipmentSection = ({ userId, targetId, isAdmin, readOnly = false }: EquipmentSectionProps) => {
   const {
     items,
     sessions,
@@ -301,6 +302,7 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
               Все наклейки
             </button>
           )}
+          {!readOnly && (
           <button
             onClick={() => {
               if (!items.some((i) => i.active)) {
@@ -318,6 +320,7 @@ const EquipmentSection = ({ userId, targetId, isAdmin }: EquipmentSectionProps) 
             <Icon name="ScanLine" size={18} strokeWidth={2.5} />
             Начать инвентаризацию
           </button>
+          )}
         </div>
       </div>
 

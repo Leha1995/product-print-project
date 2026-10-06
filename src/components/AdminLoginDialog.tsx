@@ -16,6 +16,9 @@ const roleLabel: Record<string, string> = {
   user: 'Сотрудник',
   admin: 'Администратор',
   superadmin: 'Супер-администратор',
+  manager: 'Управляющий',
+  technician: 'Техник',
+  accountant: 'Бухгалтер',
 };
 
 const AdminLoginDialog = ({ open, onOpenChange, user, onLogout }: AdminLoginDialogProps) => {

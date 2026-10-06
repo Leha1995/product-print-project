@@ -570,6 +570,33 @@ def handler(event: dict, context) -> dict:
         return_repair(cur, owner, tbody, int(me['id']))
         return finish({'ok': True, 'repairs': technician_items(cur, me)})
 
+    if me['role'] == 'accountant':
+        qs_acc = event.get('queryStringParameters') or {}
+        raw_acc = str(headers.get('X-Target-User') or headers.get('x-target-user') or '')
+        if method != 'GET':
+            return finish({'error': 'read_only'}, 403)
+        if not raw_acc.isdigit():
+            return finish({'items': [], 'sessions': [], 'tasks': [], 'technicians': []})
+        cur.execute(
+            'SELECT 1 FROM accountant_scopes s JOIN app_users u ON u.id = s.admin_id '
+            f"WHERE s.accountant_id = {int(me['id'])} AND s.admin_id = {int(raw_acc)} "
+            "AND u.role = 'admin' AND u.active"
+        )
+        if not cur.fetchone():
+            return finish({'error': 'forbidden'}, 403)
+        acc_uid = int(raw_acc)
+        if qs_acc.get('report') == 'tasks':
+            sid = str(qs_acc.get('sessionId') or '')
+            return finish(tasks_report(cur, acc_uid, int(sid) if sid.isdigit() else 0))
+        return finish(
+            {
+                'items': read_items(cur, acc_uid),
+                'sessions': read_sessions(cur, acc_uid),
+                'tasks': owner_tasks(cur, acc_uid),
+                'technicians': [],
+            }
+        )
+
     if me['role'] not in ('superadmin', 'manager'):
         return finish({'error': 'forbidden'}, 403)
 

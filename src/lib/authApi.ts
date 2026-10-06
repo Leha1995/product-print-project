@@ -1,7 +1,7 @@
 import { apiUrl } from '@/lib/apiBase';
 const API = apiUrl('auth');
 
-export type Role = 'user' | 'admin' | 'manager' | 'superadmin' | 'technician';
+export type Role = 'user' | 'admin' | 'manager' | 'superadmin' | 'technician' | 'accountant';
 
 export interface AuthUser {
   id: number;

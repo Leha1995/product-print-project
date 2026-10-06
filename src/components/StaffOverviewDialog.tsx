@@ -28,6 +28,7 @@ const roleShort: Record<string, string> = {
   admin: 'Админ',
   manager: 'Управляющий',
   superadmin: 'Супер-админ',
+  accountant: 'Бухгалтер',
 };
 
 const roleRank = (role: string) =>

@@ -114,8 +114,10 @@ export const useAuth = () => {
       user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'manager',
     isSuperAdmin: user?.role === 'superadmin',
     isManager: user?.role === 'manager',
-    canInventory: user?.role === 'manager' || user?.role === 'superadmin',
-    inventoryOnly: user?.role === 'manager',
+    isAccountant: user?.role === 'accountant',
+    canInventory:
+      user?.role === 'manager' || user?.role === 'superadmin' || user?.role === 'accountant',
+    inventoryOnly: user?.role === 'manager' || user?.role === 'accountant',
   };
 };
 
