@@ -123,6 +123,7 @@ const TechnicianScreen = ({ userName, onLogout, viewTechId = null, inline = fals
     try {
       const res = await techTaskDone(task.id, comment, cost);
       setTasks(res.tasks);
+      if (res.repairs) setList(res.repairs);
       toast({ title: 'Задача закрыта', description: `№${task.id}` });
       load();
     } catch {
@@ -137,6 +138,7 @@ const TechnicianScreen = ({ userName, onLogout, viewTechId = null, inline = fals
     try {
       const res = await techReturnRepair(current.ownerId, current.id, cost, description);
       setList(res.repairs);
+      if (res.tasks) setTasks(res.tasks);
       toast({ title: 'Возвращено из ремонта', description: current.name });
       load();
     } catch {

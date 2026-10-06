@@ -296,7 +296,7 @@ def save_item(cur, uid: int, item: dict) -> int:
     return 1
 
 
-def return_repair(cur, uid: int, body: dict, by_user: int = 0) -> None:
+def return_repair(cur, uid: int, body: dict, by_user: int = 0, close_task: bool = True) -> None:
     cost = max(0.0, float(num(body.get('cost'))))
     eid = str(body.get('id') or '')
     description = body.get('description')
@@ -324,6 +324,14 @@ def return_repair(cur, uid: int, body: dict, by_user: int = 0) -> None:
         f'repair_cost = COALESCE(repair_cost, 0) + {num(cost)}, updated_at = NOW() '
         f"WHERE user_id = {uid} AND id = {q(body.get('id', ''))}"
     )
+    if close_task:
+        comment = str(body.get('description') or '').strip()[:1000]
+        cur.execute(
+            "UPDATE equipment_tasks SET status = 'done', done_at = NOW(), "
+            f"cost = {num(cost)}, done_by = {int(by_user) or 'NULL'}, "
+            f"done_comment = {q(comment or 'Возвращено из ремонта')} "
+            f"WHERE user_id = {uid} AND equipment_id = {q(eid)} AND kind = 'repair' AND status = 'open'"
+        )
 
 
 def owner_technicians(cur, uid: int):
@@ -349,7 +357,7 @@ TASK_COLS = (
     't.created_at, t.done_at, t.done_comment, e.name, e.location, e.code, '
     "COALESCE(NULLIF(o.full_name, ''), o.username), COALESCE(NULLIF(tu.full_name, ''), tu.username), "
     "COALESCE(NULLIF(cu.full_name, ''), cu.username), COALESCE(NULLIF(du.full_name, ''), du.username), "
-    't.priority, t.cost'
+    't.priority, t.cost, t.kind'
 )
 PRIORITIES = ('urgent', 'soon', 'normal')
 TASK_JOINS = (
@@ -391,6 +399,7 @@ def task_rows(cur, where: str, limit: int = 200):
             'doneByName': r[16] or '',
             'priority': r[17] if r[17] in PRIORITIES else 'normal',
             'cost': float(r[18] or 0),
+            'kind': r[19] or 'task',
         }
         for r in cur.fetchall()
     ]
@@ -457,7 +466,7 @@ def technician_month_stats(cur, tech_id: int, month: str = '') -> dict:
     end = (start.replace(day=28) + datetime.timedelta(days=4)).replace(day=1)
     tid = int(tech_id)
     cur.execute(
-        'SELECT COUNT(*), COALESCE(SUM(cost), 0), '
+        "SELECT COUNT(*), COALESCE(SUM(cost) FILTER (WHERE kind <> 'repair'), 0), "
         "COUNT(*) FILTER (WHERE priority = 'urgent') FROM equipment_tasks "
         f"WHERE status = 'done' AND done_by = {tid} AND done_at >= '{start.isoformat()}' AND done_at < '{end.isoformat()}'"
     )
@@ -552,9 +561,22 @@ def handler(event: dict, context) -> dict:
                 "UPDATE equipment_tasks SET status = 'done', done_at = NOW(), "
                 f"cost = {task_cost(tbody.get('cost'))}, "
                 f"done_by = {int(me['id'])}, done_comment = {q(str(tbody.get('comment') or '').strip()[:1000])} "
-                f"WHERE id = {tid} AND status = 'open'"
+                f"WHERE id = {tid} AND status = 'open' RETURNING kind, user_id, equipment_id, cost, done_comment"
             )
-            return finish({'ok': True, 'tasks': technician_tasks(cur, me)})
+            closed = cur.fetchone()
+            if closed and closed[0] == 'repair' and closed[2]:
+                cur.execute(
+                    f'SELECT 1 FROM equipment WHERE user_id = {int(closed[1])} AND id = {q(closed[2])} AND in_repair = TRUE'
+                )
+                if cur.fetchone():
+                    return_repair(
+                        cur,
+                        int(closed[1]),
+                        {'id': closed[2], 'cost': float(closed[3] or 0), 'description': closed[4] or None},
+                        int(me['id']),
+                        close_task=False,
+                    )
+            return finish({'ok': True, 'tasks': technician_tasks(cur, me), 'repairs': technician_items(cur, me)})
         if tbody.get('action') != 'return_repair':
             return finish({'error': 'forbidden'}, 403)
         owner = int(tbody.get('ownerId') or 0)
@@ -568,7 +590,7 @@ def handler(event: dict, context) -> dict:
         if not cur.fetchone():
             return finish({'error': 'not_in_repair', 'repairs': technician_items(cur, me)}, 409)
         return_repair(cur, owner, tbody, int(me['id']))
-        return finish({'ok': True, 'repairs': technician_items(cur, me)})
+        return finish({'ok': True, 'repairs': technician_items(cur, me), 'tasks': technician_tasks(cur, me)})
 
     if me['role'] == 'accountant':
         qs_acc = event.get('queryStringParameters') or {}
@@ -771,11 +793,18 @@ def handler(event: dict, context) -> dict:
                 'INSERT INTO equipment_repairs (user_id, equipment_id, sent_at, description, photos) '
                 f'VALUES ({uid}, {q(eid)}, NOW(), {q(description)}, {q(json.dumps(photos))}::jsonb)'
             )
-        return finish({'ok': True, 'items': read_items(cur, uid)})
+            cur.execute(f'SELECT name FROM equipment WHERE user_id = {uid} AND id = {q(eid)}')
+            eq_name = (cur.fetchone() or [''])[0]
+            task_text = f'Ремонт: {eq_name}' + (f'\n{description}' if description else '')
+            cur.execute(
+                'INSERT INTO equipment_tasks (user_id, equipment_id, technician_id, created_by, description, photos, priority, kind) '
+                f"VALUES ({uid}, {q(eid)}, NULL, {int(me['id'])}, {q(task_text[:2000])}, {q(json.dumps(photos))}::jsonb, 'soon', 'repair')"
+            )
+        return finish({'ok': True, 'items': read_items(cur, uid), 'tasks': owner_tasks(cur, uid)})
 
     if action == 'return_repair':
         return_repair(cur, uid, body, int(me['id']))
-        return finish({'ok': True, 'items': read_items(cur, uid)})
+        return finish({'ok': True, 'items': read_items(cur, uid), 'tasks': owner_tasks(cur, uid)})
 
     if action == 'restore':
         cur.execute(

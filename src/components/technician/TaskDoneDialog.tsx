@@ -42,7 +42,14 @@ const TaskDoneDialog = ({ task, open, onOpenChange, onConfirm }: TaskDoneDialogP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[420px] border-2 border-primary bg-background p-5">
         <form onSubmit={submit}>
-          <h3 className="pr-8 font-head text-lg font-black uppercase text-primary">Задача выполнена</h3>
+          <h3 className="pr-8 font-head text-lg font-black uppercase text-primary">
+            {task.kind === 'repair' ? 'Отремонтировано' : 'Задача выполнена'}
+          </h3>
+          {task.kind === 'repair' && (
+            <p className="mt-1 text-[12px] font-bold text-success">
+              Оборудование автоматически вернётся в работу на точке
+            </p>
+          )}
           <p className="mt-1 line-clamp-2 text-[13px] text-muted-foreground">{task.description}</p>
           <label className="mt-4 block">
             <span className="font-head text-[0.68rem] font-bold uppercase tracking-[0.06em] text-primary">

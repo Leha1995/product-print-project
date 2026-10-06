@@ -178,7 +178,7 @@ const tasksSheet = (tasks: EquipmentTask[], from: string | null, to: string | nu
   const period = `Период: ${from ? dateTimeText(from) : 'с начала учёта'} — ${to ? dateTimeText(to) : 'сейчас'}`;
   const width = TASK_HEADER.length;
   const done = tasks.filter((t) => t.status === 'done');
-  const total = done.reduce((sum, t) => sum + (t.cost || 0), 0);
+  const total = done.reduce((sum, t) => sum + (t.kind === 'repair' ? 0 : t.cost || 0), 0);
   const aoa: (string | number)[][] = [[period], TASK_HEADER];
   tasks.forEach((t, i) => {
     const isDone = t.status === 'done';
@@ -319,7 +319,7 @@ export const exportInventory = async (
           {
             Показатель: 'Затраты на прочие задачи, ₽',
             Значение: Math.round(
-              report.tasks.reduce((sum, t) => sum + (t.status === 'done' ? t.cost || 0 : 0), 0),
+              report.tasks.reduce((sum, t) => sum + (t.status === 'done' && t.kind !== 'repair' ? t.cost || 0 : 0), 0),
             ),
           },
         ]

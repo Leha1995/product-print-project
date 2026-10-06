@@ -49,6 +49,12 @@ const TaskCard = ({ task, showOwner = false, action }: TaskCardProps) => {
             />
             {open ? 'В работе' : task.status === 'done' ? 'Выполнено' : 'Отменено'}
           </span>
+          {task.kind === 'repair' && (
+            <span className="inline-flex items-center gap-1 border-2 border-primary bg-accent px-1.5 py-0.5 font-head text-[0.6rem] font-bold uppercase text-accent-foreground">
+              <Icon name="Wrench" size={12} strokeWidth={2.5} />
+              Ремонт
+            </span>
+          )}
           <span className="text-[11px] text-muted-foreground">{`№${task.id} · ${dateTime(task.createdAt)}`}</span>
         </div>
 

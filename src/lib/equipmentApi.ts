@@ -96,6 +96,7 @@ export interface EquipmentTask {
   doneByName: string;
   priority?: 'urgent' | 'soon' | 'normal';
   cost?: number;
+  kind?: 'task' | 'repair';
 }
 
 export interface TechnicianRef {
@@ -157,10 +158,10 @@ export const markQrFixed = (id: string) =>
 export const restoreEquipment = (id: string) =>
   send({ action: 'restore', id }) as Promise<{ items: Equipment[] }>;
 export const sendToRepair = (id: string, description = '', photos: string[] = []) =>
-  send({ action: 'send_repair', id, description, photos }) as Promise<{ items: Equipment[] }>;
+  send({ action: 'send_repair', id, description, photos }) as Promise<{ items: Equipment[]; tasks?: EquipmentTask[] }>;
 
 export const returnFromRepair = (id: string, cost: number, description?: string) =>
-  send({ action: 'return_repair', id, cost, description }) as Promise<{ items: Equipment[] }>;
+  send({ action: 'return_repair', id, cost, description }) as Promise<{ items: Equipment[]; tasks?: EquipmentTask[] }>;
 
 export interface TechRepair {
   ownerId: number;
@@ -222,10 +223,10 @@ export const fetchTasksReport = async (
 };
 
 export const techTaskDone = (taskId: number, comment: string, cost = 0) =>
-  send({ action: 'task_done', taskId, comment, cost }) as Promise<{ tasks: EquipmentTask[] }>;
+  send({ action: 'task_done', taskId, comment, cost }) as Promise<{ tasks: EquipmentTask[]; repairs?: TechRepair[] }>;
 
 export const techReturnRepair = (ownerId: number, id: string, cost: number, description: string) =>
-  send({ action: 'return_repair', ownerId, id, cost, description }) as Promise<{ repairs: TechRepair[] }>;
+  send({ action: 'return_repair', ownerId, id, cost, description }) as Promise<{ repairs: TechRepair[]; tasks?: EquipmentTask[] }>;
 
 export interface PointEquipment {
   id: number;

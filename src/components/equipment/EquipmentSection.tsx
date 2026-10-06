@@ -146,8 +146,9 @@ const EquipmentSection = ({ userId, targetId, isAdmin, readOnly = false }: Equip
     try {
       const res = await sendToRepair(item.id, description, photos);
       setItems(res.items);
+      if (res.tasks) setTasks(res.tasks);
       setFoundId((cur) => (cur === item.id ? null : cur));
-      toast({ title: 'Отправлено в ремонт', description: `${item.name} — не участвует в инвентаризации` });
+      toast({ title: 'Отправлено в ремонт', description: `${item.name} — техник получил задачу` });
     } catch {
       toast({ title: 'Не удалось сохранить', description: 'Проверь интернет и повтори' });
       throw new Error('save_failed');
@@ -158,6 +159,7 @@ const EquipmentSection = ({ userId, targetId, isAdmin, readOnly = false }: Equip
     try {
       const res = await returnFromRepair(item.id, cost, description);
       setItems(res.items);
+      if (res.tasks) setTasks(res.tasks);
       setFoundId((cur) => (cur === item.id ? null : cur));
       toast({
         title: 'Принято с ремонта',

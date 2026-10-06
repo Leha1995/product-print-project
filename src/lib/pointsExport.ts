@@ -55,7 +55,8 @@ const repairsTotal = (item: Equipment) => {
 };
 
 const tasksOf = (p: PointEquipment) => p.tasks || [];
-const tasksCost = (list: EquipmentTask[]) => Math.round(list.reduce((s, t) => s + (t.cost || 0), 0));
+const tasksCost = (list: EquipmentTask[]) =>
+  Math.round(list.reduce((s, t) => s + (t.kind === 'repair' ? 0 : t.cost || 0), 0));
 const periodSuffix = () => (period ? ` (${period.label})` : '');
 
 const statusOf = (item: Equipment) =>
