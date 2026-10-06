@@ -597,6 +597,56 @@ def handler(event: dict, context) -> dict:
         raw_acc = str(headers.get('X-Target-User') or headers.get('x-target-user') or '')
         if method != 'GET':
             return finish({'error': 'read_only'}, 403)
+        if qs_acc.get('report') == 'technicians':
+            cur.execute(
+                "SELECT u.id, COALESCE(NULLIF(u.full_name, ''), u.username) FROM accountant_technicians a "
+                'JOIN app_users u ON u.id = a.technician_id '
+                f"WHERE a.accountant_id = {int(me['id'])} AND u.role = 'technician' ORDER BY 2"
+            )
+            techs = [{'id': r[0], 'name': r[1]} for r in cur.fetchall()]
+            d_from = date_sql(qs_acc.get('from'))
+            d_to = date_sql(qs_acc.get('to'))
+            done_period = ''
+            if d_from != 'NULL':
+                done_period += f' AND t.done_at >= {d_from}::date'
+            if d_to != 'NULL':
+                done_period += f" AND t.done_at < {d_to}::date + INTERVAL '1 day'"
+            for tech in techs:
+                tid = int(tech['id'])
+                owners = technician_owners(cur, {'id': tid})
+                scope = '' if owners is None else f" AND t.user_id IN ({', '.join(str(o) for o in owners) or '0'})"
+                tech['done'] = task_rows(cur, f"t.status = 'done' AND t.done_by = {tid}{done_period}", 5000)
+                tech['open'] = task_rows(
+                    cur,
+                    f"t.status = 'open' AND (t.technician_id IS NULL OR t.technician_id = {tid}){scope}",
+                    1000,
+                )
+                cur.execute(
+                    'SELECT r.id, r.user_id, r.equipment_id, r.sent_at, r.returned_at, r.cost, r.description, '
+                    "e.name, e.location, COALESCE(NULLIF(o.full_name, ''), o.username) FROM equipment_repairs r "
+                    'LEFT JOIN equipment e ON e.user_id = r.user_id AND e.id = r.equipment_id '
+                    'LEFT JOIN app_users o ON o.id = r.user_id '
+                    f"WHERE r.returned_by = {tid}"
+                    + (f' AND r.returned_at >= {d_from}::date' if d_from != 'NULL' else '')
+                    + (f" AND r.returned_at < {d_to}::date + INTERVAL '1 day'" if d_to != 'NULL' else '')
+                    + ' ORDER BY r.returned_at DESC LIMIT 5000'
+                )
+                tech['repairs'] = [
+                    {
+                        'id': r[0],
+                        'ownerId': r[1],
+                        'equipmentId': r[2],
+                        'sentAt': r[3].isoformat() if r[3] else None,
+                        'returnedAt': r[4].isoformat() if r[4] else None,
+                        'cost': float(r[5] or 0),
+                        'description': r[6] or '',
+                        'equipmentName': r[7] or '',
+                        'location': r[8] or '',
+                        'ownerName': r[9] or '',
+                    }
+                    for r in cur.fetchall()
+                ]
+            return finish({'technicians': techs})
         if qs_acc.get('report') == 'all_points':
             cur.execute(
                 "SELECT u.id, COALESCE(NULLIF(u.full_name, ''), u.username) FROM accountant_scopes s "

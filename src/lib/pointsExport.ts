@@ -24,11 +24,9 @@ const stamp = () => {
 const dateText = (iso?: string | null) =>
   iso ? new Date(iso.length === 10 ? `${iso}T00:00:00` : iso).toLocaleDateString('ru-RU') : '';
 
-export interface ExportPeriod {
-  from: string;
-  to: string;
-  label: string;
-}
+import { ExportPeriod } from '@/lib/periodPresets';
+
+export type { ExportPeriod };
 
 let period: ExportPeriod | null = null;
 

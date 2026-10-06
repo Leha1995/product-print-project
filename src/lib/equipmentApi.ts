@@ -246,3 +246,36 @@ export const fetchAllPoints = async (from?: string, to?: string): Promise<PointE
   const data = await res.json();
   return Array.isArray(data.points) ? (data.points as PointEquipment[]) : [];
 };
+
+export interface TechRepairRecord {
+  id: number;
+  ownerId: number;
+  equipmentId: string;
+  sentAt: string | null;
+  returnedAt: string | null;
+  cost: number;
+  description: string;
+  equipmentName: string;
+  location: string;
+  ownerName: string;
+}
+
+export interface AccountantTech {
+  id: number;
+  name: string;
+  done: EquipmentTask[];
+  open: EquipmentTask[];
+  repairs: TechRepairRecord[];
+}
+
+export const fetchAccountantTechs = async (from?: string, to?: string): Promise<AccountantTech[]> => {
+  const params = new URLSearchParams({ report: 'technicians' });
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const res = await fetch(`${API}?${params}`, {
+    headers: { 'Content-Type': 'application/json', 'X-Auth-Token': getToken() },
+  });
+  if (!res.ok) throw new Error(String(res.status));
+  const data = await res.json();
+  return Array.isArray(data.technicians) ? (data.technicians as AccountantTech[]) : [];
+};

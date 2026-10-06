@@ -11,6 +11,7 @@ import {
 } from '@/lib/authApi';
 import { toast } from '@/hooks/use-toast';
 import TechScopePicker from '@/components/users/TechScopePicker';
+import TechPicker from '@/components/users/TechPicker';
 
 interface UsersDialogProps {
   open: boolean;
@@ -77,6 +78,7 @@ const UsersDialog = ({
   const [role, setRole] = useState<Role>('user');
   const [managerId, setManagerId] = useState<number | ''>('');
   const [scopeIds, setScopeIds] = useState<number[]>([]);
+  const [techIds, setTechIds] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState('');
@@ -92,6 +94,7 @@ const UsersDialog = ({
   const admins = users.filter((u) => u.role === 'admin' || u.role === 'superadmin');
   const managers = users.filter((u) => u.role === 'manager');
   const scopeHeads = users.filter((u) => u.role === 'manager' || u.role === 'admin');
+  const allTechs = users.filter((u) => u.role === 'technician');
 
   const treeMode = isSuperAdmin || readOnly;
 
@@ -159,6 +162,7 @@ const UsersDialog = ({
         role,
         managerId: role === 'user' || role === 'admin' ? managerId || null : null,
         scopeIds: role === 'technician' || role === 'accountant' ? scopeIds : undefined,
+        techIds: role === 'accountant' ? techIds : undefined,
         accessDays: role === 'admin' ? accessDays || null : null,
       });
       apply(r.users);
@@ -168,6 +172,7 @@ const UsersDialog = ({
       setRole('user');
       setManagerId('');
       setScopeIds([]);
+      setTechIds([]);
       setAccessDays('');
       toast({ title: 'Пользователь добавлен' });
     } catch (e) {
@@ -314,6 +319,9 @@ const UsersDialog = ({
                 adminsOnly={role === 'accountant'}
                 className="md:col-span-2"
               />
+            )}
+            {isSuperAdmin && role === 'accountant' && (
+              <TechPicker technicians={allTechs} value={techIds} onChange={setTechIds} className="md:col-span-2" />
             )}
             {isSuperAdmin && role === 'user' && (
               <select
@@ -507,6 +515,14 @@ const UsersDialog = ({
                         u.role === 'accountant' ? 'Админы бухгалтера обновлены' : 'Точки техника обновлены',
                       )
                     }
+                    className="max-w-[260px] py-1 text-[13px]"
+                  />
+                )}
+                {isSuperAdmin && u.role === 'accountant' && (
+                  <TechPicker
+                    technicians={allTechs}
+                    value={u.techIds || []}
+                    onChange={(ids) => patch({ id: u.id, techIds: ids }, 'Техники бухгалтера обновлены')}
                     className="max-w-[260px] py-1 text-[13px]"
                   />
                 )}
