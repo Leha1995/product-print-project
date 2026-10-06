@@ -22,7 +22,7 @@ const LicenseContacts = ({ variant = 'light', className = '' }: LicenseContactsP
           dark ? 'text-primary-foreground' : 'text-primary'
         }`}
       >
-        Покупка лицензии
+        Техподдержка
       </span>
 
       <a
