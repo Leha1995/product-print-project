@@ -130,13 +130,16 @@ const call = async <T>(body: Record<string, unknown>): Promise<T> => {
   });
   if (res.status === 402) throw new Error('quota_exceeded');
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((data as { error?: string }).error || String(res.status));
+  if (!res.ok) {
+    const { error, detail } = data as { error?: string; detail?: string };
+    throw new Error([error || String(res.status), detail].filter(Boolean).join(': '));
+  }
   return data as T;
 };
 
 export const apiLogin = async (username: string, password: string) => {
   const res = await call<{ token: string; user: AuthUser }>({ action: 'login', username, password });
-  if (!res || !res.token || !res.user) throw new Error('bad_response');
+  if (!res || !res.token || !res.user) throw new Error('server_error: bad_response');
   return res;
 };
 

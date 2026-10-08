@@ -100,7 +100,8 @@ function out($payload, int $code = 200): void
     http_response_code($code);
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store');
-    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+    echo $json === false ? '{"error":"server_error","detail":"json_encode"}' : $json;
     exit;
 }
 
@@ -115,7 +116,7 @@ function boot(): PDO
     set_exception_handler(function (Throwable $e) {
         error_log('[asap] ' . $e->getMessage());
         log_server_error($e);
-        out(['error' => 'server_error'], 500);
+        out(['error' => 'server_error', 'detail' => mb_substr(get_class($e) . ': ' . $e->getMessage() . ' @ ' . basename($e->getFile()) . ':' . $e->getLine(), 0, 300)], 500);
     });
     register_shutdown_function(function () {
         $err = error_get_last();

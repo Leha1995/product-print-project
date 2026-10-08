@@ -42,6 +42,36 @@ if ($cfg && $posted) {
 
 $users = [];
 $loginResult = null;
+$realLogin = null;
+
+function real_login_request(string $login, string $pass): array
+{
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') ? 'https' : 'http';
+    $host = (string)($_SERVER['HTTP_HOST'] ?? 'localhost');
+    $dir = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? '/api/check.php'))), '/');
+    $url = $scheme . '://' . $host . $dir . '/auth.php';
+    $payload = json_encode(['action' => 'login', 'username' => $login, 'password' => $pass], JSON_UNESCAPED_UNICODE);
+    if (!function_exists('curl_init')) {
+        return [$url, 0, 'curl недоступен на хостинге'];
+    }
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $payload,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => false,
+        CURLOPT_TIMEOUT => 15,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => 0,
+    ]);
+    $body = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
+    $text = $body === false ? 'нет ответа: ' . $err : (string)$body;
+    $text = preg_replace('/"token":"[0-9a-f]+"/', '"token":"…"', $text);
+    return [$url, $code, mb_substr($text, 0, 800)];
+}
 if ($cfg && $authorized) {
     $db = null;
     try {
@@ -121,6 +151,7 @@ if ($cfg && $authorized) {
                                 throw new RuntimeException(json_last_error_msg());
                             }
                             $loginResult = [true, 'Полный тест входа пройден — сервер работает правильно'];
+                            $realLogin = real_login_request($testLogin, $testPass);
                         } catch (Throwable $ex) {
                             $loginResult = [false, 'Пароль верный, но ошибка на шаге «' . $step . '»: ' . get_class($ex) . ': ' . $ex->getMessage()];
                         }
@@ -175,6 +206,14 @@ $serverJs = @file_get_contents(__DIR__ . '/server.js');
 
     <?php if ($loginResult): ?>
         <div class="res <?= $loginResult[0] ? 'ok' : 'bad' ?>"><b>Проверка входа:</b> <?= e($loginResult[1]) ?></div>
+    <?php endif; ?>
+
+    <?php if ($realLogin): $realOk = $realLogin[1] === 200 && strpos($realLogin[2], '"token"') !== false; ?>
+        <div class="res <?= $realOk ? 'ok' : 'bad' ?>">
+            <b>Настоящий вход через сайт:</b> <?= $realOk ? 'работает' : 'НЕ работает' ?><br>
+            <span class="d">Адрес: <?= e($realLogin[0]) ?> · Код ответа: <?= e($realLogin[1]) ?></span><br>
+            <code class="d" style="display:block;white-space:pre-wrap;margin-top:6px"><?= e($realLogin[2]) ?></code>
+        </div>
     <?php endif; ?>
 
     <?php if ($authorized): $errs = read_server_errors(); ?>
