@@ -423,19 +423,122 @@ function save_image(string $dataUrl, string $folder, string $id): string
     return store_file($folder, $name, $bytes);
 }
 
-function uploads_dir(): string
+function legacy_uploads_dir(): string
 {
     return dirname(__DIR__) . '/uploads';
+}
+
+function uploads_dir(): string
+{
+    static $dir = null;
+    if ($dir !== null) {
+        return $dir;
+    }
+    $safe = dirname(__DIR__, 2) . '/asap-uploads-' . substr(md5(dirname(__DIR__)), 0, 10);
+    if (@is_dir($safe) || @mkdir($safe, 0755, true)) {
+        if (@is_writable($safe)) {
+            return $dir = $safe;
+        }
+    }
+    return $dir = legacy_uploads_dir();
+}
+
+function clean_upload_rel(string $rel): ?string
+{
+    $rel = ltrim(str_replace('\\', '/', $rel), '/');
+    return preg_match('~^[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$~', $rel) && strpos($rel, '..') === false ? $rel : null;
+}
+
+function find_upload(string $rel): ?string
+{
+    $rel = clean_upload_rel($rel);
+    if ($rel === null) {
+        return null;
+    }
+    foreach ([uploads_dir(), legacy_uploads_dir()] as $base) {
+        $path = $base . '/' . $rel;
+        if (@is_file($path)) {
+            return $path;
+        }
+    }
+    return null;
 }
 
 function store_file(string $folder, string $name, string $bytes): string
 {
     $dir = uploads_dir() . '/' . $folder;
-    if (!is_dir($dir)) {
-        mkdir($dir, 0755, true);
+    if (!@is_dir($dir)) {
+        @mkdir($dir, 0755, true);
     }
-    file_put_contents($dir . '/' . $name, $bytes);
+    if (@file_put_contents($dir . '/' . $name, $bytes) === false) {
+        return '';
+    }
     return site_url() . '/uploads/' . $folder . '/' . $name;
+}
+
+function imported_name(string $url): string
+{
+    $path = parse_url($url, PHP_URL_PATH) ?: '';
+    $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION)) ?: 'jpg';
+    if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'], true)) {
+        $ext = 'jpg';
+    }
+    return substr(sha1($url), 0, 20) . '.' . $ext;
+}
+
+function fetch_remote(string $url): ?string
+{
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_TIMEOUT => 20, CURLOPT_CONNECTTIMEOUT => 8]);
+        $bytes = curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        if (is_string($bytes) && $bytes !== '' && $code === 200) {
+            return $bytes;
+        }
+    }
+    $ctx = stream_context_create(['http' => ['timeout' => 20]]);
+    $bytes = @file_get_contents($url, false, $ctx);
+    return is_string($bytes) && $bytes !== '' ? $bytes : null;
+}
+
+function download_image(string $url): string
+{
+    static $cache = [];
+    if (!preg_match('~^https://cdn\.poehali\.dev/~', $url)) {
+        return $url;
+    }
+    if (isset($cache[$url])) {
+        return $cache[$url];
+    }
+    $name = imported_name($url);
+    if (find_upload('imported/' . $name)) {
+        return $cache[$url] = site_url() . '/uploads/imported/' . $name;
+    }
+    $bytes = fetch_remote($url);
+    if ($bytes === null) {
+        return $cache[$url] = $url;
+    }
+    $stored = store_file('imported', $name, $bytes);
+    return $cache[$url] = ($stored !== '' ? $stored : $url);
+}
+
+function collect_cdn_urls($node, array &$out): void
+{
+    if (is_array($node)) {
+        foreach ($node as $v) {
+            collect_cdn_urls($v, $out);
+        }
+    } elseif (is_string($node)) {
+        if (preg_match('~^https://cdn\.poehali\.dev/\S+$~', $node)) {
+            $out[$node] = true;
+        } elseif ($node !== '' && ($node[0] === '[' || $node[0] === '{') && strpos($node, 'cdn.poehali.dev') !== false) {
+            $decoded = json_decode($node, true);
+            if (is_array($decoded)) {
+                collect_cdn_urls($decoded, $out);
+            }
+        }
+    }
 }
 
 function site_url(): string

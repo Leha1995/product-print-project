@@ -40,6 +40,9 @@ if ($cfg && $posted) {
     }
 }
 
+@set_time_limit(600);
+$photoReport = null;
+
 $users = [];
 $loginResult = null;
 $realLogin = null;
@@ -167,6 +170,53 @@ if ($cfg && $authorized) {
     }
 }
 
+if ($cfg && $authorized && isset($_FILES['data']) && ($_FILES['data']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+    $dump = json_decode((string)file_get_contents($_FILES['data']['tmp_name']), true);
+    if (!is_array($dump)) {
+        $photoReport = [false, 'Файл не подходит — нужен тот же .json, что загружали при установке.', 0, 0, 0];
+    } else {
+        $urls = [];
+        collect_cdn_urls($dump, $urls);
+        $have = 0;
+        $got = 0;
+        $fail = 0;
+        foreach (array_keys($urls) as $u) {
+            $name = imported_name($u);
+            if (find_upload('imported/' . $name)) {
+                $have++;
+                continue;
+            }
+            $bytes = fetch_remote($u);
+            if ($bytes !== null && store_file('imported', $name, $bytes) !== '') {
+                $got++;
+            } else {
+                $fail++;
+            }
+        }
+        $photoReport = [$fail === 0, 'Всего фото: ' . count($urls) . ' · уже были: ' . $have . ' · скачано сейчас: ' . $got . ' · не удалось: ' . $fail, $have, $got, $fail];
+    }
+}
+
+$photoStat = null;
+if ($cfg && $authorized && isset($db) && $db) {
+    try {
+        $missing = 0;
+        $total = 0;
+        foreach (['user_products', 'shared_products', 'equipment'] as $t) {
+            foreach (all_rows($db, "SELECT image FROM {$t} WHERE image LIKE '%/uploads/%'") as $r) {
+                $total++;
+                $rel = substr((string)$r['image'], strpos((string)$r['image'], '/uploads/') + 9);
+                if (!find_upload($rel)) {
+                    $missing++;
+                }
+            }
+        }
+        $photoStat = [$total, $missing];
+    } catch (Throwable $ex) {
+        $photoStat = null;
+    }
+}
+
 $apiMode = is_installed() ? 'ваш сервер' : 'poehali.dev';
 $serverJs = @file_get_contents(__DIR__ . '/server.js');
 ?>
@@ -216,6 +266,19 @@ $serverJs = @file_get_contents(__DIR__ . '/server.js');
         </div>
     <?php endif; ?>
 
+    <?php if ($authorized): ?>
+        <h3>Фото продуктов и оборудования</h3>
+        <?php if ($photoStat): ?>
+            <div class="res <?= $photoStat[1] === 0 ? 'ok' : 'bad' ?>">
+                Фото на сервере: <?= (int)$photoStat[0] ?> · отсутствуют файлы: <b><?= (int)$photoStat[1] ?></b>
+            </div>
+        <?php endif; ?>
+        <?php if ($photoReport): ?>
+            <div class="res <?= $photoReport[0] ? 'ok' : 'bad' ?>"><b>Восстановление фото:</b> <?= e($photoReport[1]) ?></div>
+        <?php endif; ?>
+        <div class="d" style="margin-top:8px">Папка для фото: <?= e(basename(uploads_dir())) ?> (вне папки сайта — обновления её не затрут)</div>
+    <?php endif; ?>
+
     <?php if ($authorized): $tries = read_login_attempts(); ?>
         <h3>Последние попытки входа с сайта (<?= count($tries) ?>)</h3>
         <?php if (!$tries): ?><div class="d bad">Ни одна попытка входа с сайта не дошла до сервера.</div><?php endif; ?>
@@ -245,7 +308,7 @@ $serverJs = @file_get_contents(__DIR__ . '/server.js');
     <?php endif; ?>
 
     <?php if ($cfg): ?>
-        <form method="post">
+        <form method="post" enctype="multipart/form-data">
             <label>Пароль от базы данных MySQL</label>
             <input type="password" name="db_pass" value="<?= e($authorized ? (string)($_POST['db_pass'] ?? '') : '') ?>" required>
             <div class="d">Тот же, что вводили при установке. Нужен, чтобы посторонние не видели список пользователей.</div>
@@ -253,6 +316,9 @@ $serverJs = @file_get_contents(__DIR__ . '/server.js');
             <input type="text" name="login" value="<?= e($_POST['login'] ?? '') ?>">
             <label>Пароль этого пользователя</label>
             <input type="password" name="password">
+            <label>Восстановить фото: файл выгрузки .json (необязательно)</label>
+            <input type="file" name="data" accept=".json,application/json">
+            <div class="d">Тот же файл, что загружали при установке. Недостающие фото скачаются с poehali.dev — это может занять пару минут.</div>
             <button type="submit">Проверить</button>
         </form>
     <?php endif; ?>

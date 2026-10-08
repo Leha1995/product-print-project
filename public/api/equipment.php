@@ -394,7 +394,10 @@ function cleanup_photos(PDO $db): void
                 }
                 $rel = substr((string)$url, $pos + strlen('/uploads/'));
                 if (preg_match('~^(repairs|tasks)/[A-Za-z0-9_.-]+$~', $rel)) {
-                    @unlink(uploads_dir() . '/' . $rel);
+                    $found = find_upload($rel);
+                    if ($found) {
+                        @unlink($found);
+                    }
                 }
             }
             run($db, "UPDATE $table SET photos = '[]' WHERE id = ?", [(int)$r['id']]);

@@ -17,33 +17,6 @@ function h($v): string
     return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
 }
 
-function download_image(string $url): string
-{
-    static $cache = [];
-    if (!preg_match('~^https://cdn\.poehali\.dev/~', $url)) {
-        return $url;
-    }
-    if (isset($cache[$url])) {
-        return $cache[$url];
-    }
-    $path = parse_url($url, PHP_URL_PATH) ?: '';
-    $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION)) ?: 'jpg';
-    if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'], true)) {
-        $ext = 'jpg';
-    }
-    $name = substr(sha1($url), 0, 20) . '.' . $ext;
-    $file = uploads_dir() . '/imported/' . $name;
-    if (!is_file($file)) {
-        $ctx = stream_context_create(['http' => ['timeout' => 20], 'ssl' => ['verify_peer' => true]]);
-        $bytes = @file_get_contents($url, false, $ctx);
-        if ($bytes === false || $bytes === '') {
-            return $cache[$url] = $url;
-        }
-        store_file('imported', $name, $bytes);
-    }
-    return $cache[$url] = site_url() . '/uploads/imported/' . $name;
-}
-
 if (!$installed && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     $cfg = [
         'driver' => 'mysql',

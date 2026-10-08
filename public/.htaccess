@@ -3,6 +3,8 @@ DirectoryIndex index.html
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^uploads/(.+)$ api/file.php?f=$1 [L,QSA]
+  RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule . index.html [L]
 </IfModule>
@@ -11,4 +13,10 @@ DirectoryIndex index.html
   AddType application/javascript .js .mjs
   AddType text/css .css
   AddType image/svg+xml .svg
+</IfModule>
+
+<IfModule mod_headers.c>
+  <FilesMatch "(^index\.html$|^server\.js$)">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+  </FilesMatch>
 </IfModule>
