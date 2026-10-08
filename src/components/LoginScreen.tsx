@@ -51,6 +51,14 @@ const LoginScreen = ({ onLogin, kicked }: LoginScreenProps) => {
         setPassword('');
       } else if (text.includes('Failed to fetch') || text.includes('NetworkError')) {
         setError('Нет связи с сервером — проверьте интернет и попробуйте ещё раз');
+      } else if (text.includes('db_unavailable')) {
+        setError('Сервер не может подключиться к базе данных — проверьте её данные на странице api/check.php');
+      } else if (text.includes('not_installed')) {
+        setError('Сервер на хостинге не установлен — откройте api/install.php');
+      } else if (text.includes('server_error') || /\b5\d\d\b/.test(text)) {
+        setError('Ошибка на сервере — откройте страницу api/check.php, там будет причина');
+      } else if (!text.includes('invalid_credentials')) {
+        setError(`Сервер ответил ошибкой (${text.replace(/^Error:\s*/, '')}) — откройте api/check.php`);
       } else {
         setError('Неверный логин или пароль');
         setPassword('');
