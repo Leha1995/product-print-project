@@ -129,11 +129,25 @@ const call = async <T>(body: Record<string, unknown>): Promise<T> => {
       headers: { 'Content-Type': 'application/json', 'X-Auth-Token': getToken() },
       body: JSON.stringify(body),
     });
-  let res = await send();
-  for (let attempt = 0; attempt < 2 && [502, 503, 504].includes(res.status); attempt++) {
-    await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
-    res = await send();
+  const sendPlain = () => {
+    const token = getToken();
+    const url = `${API}${API.includes('?') ? '&' : '?'}t=${Date.now()}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body: JSON.stringify(body),
+      cache: 'no-store',
+      credentials: 'omit',
+    });
+  };
+  const bad = (r: Response | null) => !r || [500, 502, 503, 504].includes(r.status);
+  let res: Response | null = await send().catch(() => null);
+  for (let attempt = 0; attempt < 3 && bad(res); attempt++) {
+    await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+    res = await (attempt === 0 ? sendPlain() : send()).catch(() => null);
+    if (bad(res)) res = await sendPlain().catch(() => null);
   }
+  if (!res) throw new Error('network_error');
   if (res.status === 402) throw new Error('quota_exceeded');
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {

@@ -55,6 +55,8 @@ const LoginScreen = ({ onLogin, kicked }: LoginScreenProps) => {
         setError('Сервер не может подключиться к базе данных — проверьте её данные на странице api/check.php');
       } else if (text.includes('not_installed')) {
         setError('Сервер на хостинге не установлен — откройте api/install.php');
+      } else if (text.includes('network_error') || /\b50[234]\b/.test(text)) {
+        setError('Этот браузер не смог достучаться до сервера. Откройте сайт в Chrome или отключите в Яндекс Браузере режим «Турбо» и защиту Protect для этого сайта');
       } else if (text.includes('server_error') || /\b5\d\d\b/.test(text)) {
         setError(`Ошибка на сервере (${text.replace(/^Error:\s*/, '')}) — откройте страницу api/check.php, там будет причина`);
       } else if (!text.includes('invalid_credentials')) {

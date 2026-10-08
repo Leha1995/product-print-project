@@ -140,6 +140,9 @@ function managed_ids(PDO $db, array $me): array
 
 $body = body();
 $token = header_value('X-Auth-Token');
+if ($token === '' && isset($_GET['token']) && preg_match('/^[a-f0-9]{16,128}$/', (string)$_GET['token'])) {
+    $token = (string)$_GET['token'];
+}
 $action = (string)($body['action'] ?? $_GET['action'] ?? (method() === 'GET' ? 'me' : ''));
 
 if ((int)one_value($db, 'SELECT COUNT(*) FROM app_users') === 0) {
