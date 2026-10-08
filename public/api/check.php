@@ -216,6 +216,12 @@ $serverJs = @file_get_contents(__DIR__ . '/server.js');
         </div>
     <?php endif; ?>
 
+    <?php if ($authorized): $tries = read_login_attempts(); ?>
+        <h3>Последние попытки входа с сайта (<?= count($tries) ?>)</h3>
+        <?php if (!$tries): ?><div class="d bad">Ни одна попытка входа с сайта не дошла до сервера.</div><?php endif; ?>
+        <?php foreach (array_slice($tries, 0, 12) as $line): ?><div class="d" style="padding:4px 0;border-bottom:1px solid #eee"><?= e($line) ?></div><?php endforeach; ?>
+    <?php endif; ?>
+
     <?php if ($authorized): $errs = read_server_errors(); ?>
         <h3>Последние ошибки сервера (<?= count($errs) ?>)</h3>
         <?php if (!$errs): ?><div class="d">Ошибок не записано. Попробуйте войти на сайт и обновите эту страницу.</div><?php endif; ?>

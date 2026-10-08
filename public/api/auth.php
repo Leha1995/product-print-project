@@ -153,6 +153,7 @@ if ((int)one_value($db, 'SELECT COUNT(*) FROM app_users') === 0) {
 if ($action === 'login') {
     $username = mb_strtolower(trim((string)($body['username'] ?? '')));
     $password = (string)($body['password'] ?? '');
+    log_login_attempt($username, 'начат');
     $row = null;
     foreach (all_rows($db, 'SELECT id, username, full_name, password_hash, role, active, manager_id FROM app_users') as $candidate) {
         if (mb_strtolower($candidate['username']) === $username) {
@@ -161,6 +162,7 @@ if ($action === 'login') {
         }
     }
     if (!$row || !flag($row['active']) || !check_password($password, $row['password_hash'])) {
+        log_login_attempt($username, !$row ? 'нет такого логина' : (!flag($row['active']) ? 'отключён' : 'неверный пароль'));
         out(['error' => 'invalid_credentials'], 401);
     }
     [$until, $owner] = effective_access($db, (int)$row['id'], $row['role'], $row['manager_id']);
@@ -175,6 +177,7 @@ if ($action === 'login') {
         'INSERT INTO app_sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)',
         [$newToken, (int)$row['id'], now_utc(), now_utc(SESSION_DAYS * 86400)]
     );
+    log_login_attempt($username, 'УСПЕХ');
     out([
         'token' => $newToken,
         'user' => [

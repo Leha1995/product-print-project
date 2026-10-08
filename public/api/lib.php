@@ -152,6 +152,22 @@ function log_server_error(Throwable $e): void
     @file_put_contents($path, implode("\n", $old) . "\n");
 }
 
+function log_login_attempt(string $username, string $result): void
+{
+    $path = __DIR__ . '/.logins.log';
+    $old = @is_file($path) ? (array)@file($path, FILE_IGNORE_NEW_LINES) : [];
+    $old = array_slice($old, -29);
+    $ua = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
+    $old[] = gmdate('Y-m-d H:i:s') . ' UTC | ' . str_replace(["\r", "\n", '|'], ' ', mb_substr($username, 0, 40)) . ' | ' . $result . ' | ' . str_replace(["\r", "\n", '|'], ' ', mb_substr($ua, 0, 80));
+    @file_put_contents($path, implode("\n", $old) . "\n");
+}
+
+function read_login_attempts(): array
+{
+    $path = __DIR__ . '/.logins.log';
+    return @is_file($path) ? array_reverse((array)@file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)) : [];
+}
+
 function read_server_errors(): array
 {
     $path = error_log_path();

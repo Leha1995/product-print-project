@@ -123,11 +123,17 @@ export const removeKnownLogin = (username: string) => {
 };
 
 const call = async <T>(body: Record<string, unknown>): Promise<T> => {
-  const res = await fetch(API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Auth-Token': getToken() },
-    body: JSON.stringify(body),
-  });
+  const send = () =>
+    fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Token': getToken() },
+      body: JSON.stringify(body),
+    });
+  let res = await send();
+  for (let attempt = 0; attempt < 2 && [502, 503, 504].includes(res.status); attempt++) {
+    await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
+    res = await send();
+  }
   if (res.status === 402) throw new Error('quota_exceeded');
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
