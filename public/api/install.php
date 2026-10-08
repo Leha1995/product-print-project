@@ -8,7 +8,7 @@ header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: no-store');
 @set_time_limit(600);
 
-$installed = is_file(config_path());
+$installed = is_installed();
 $messages = [];
 $errors = [];
 
@@ -93,14 +93,10 @@ if (!$installed && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 );
                 $messages[] = 'Создан пользователь superadmin с заданным паролем.';
             }
-            $php = "<?php\nreturn " . var_export($cfg, true) . ";\n";
-            if (file_put_contents(config_path(), $php) === false) {
-                throw new RuntimeException('Не удалось сохранить настройки в папку api.');
+            if (!save_config($cfg)) {
+                throw new RuntimeException('Не удалось сохранить настройки: нет прав на запись в папку api.');
             }
-            @chmod(config_path(), 0600);
-            if (file_put_contents(__DIR__ . '/server.js', "window.ASAP_API = 'auto';\n") === false) {
-                throw new RuntimeException('Не удалось переключить сайт: нет прав на запись файла api/server.js.');
-            }
+            @file_put_contents(__DIR__ . '/server.js', "window.ASAP_API = 'auto';\n");
             $installed = true;
         } catch (Throwable $e) {
             $errors[] = 'Ошибка: ' . $e->getMessage();
@@ -137,7 +133,7 @@ if (!$installed && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     <h1>Сервер установлен</h1>
     <?php foreach ($messages as $m): ?><div class="ok"><?= h($m) ?></div><?php endforeach; ?>
     <p>Сайт переключён на ваш сервер и больше не зависит от poehali.dev. Сотрудникам нужно один раз войти заново.</p>
-    <p><b>Важно:</b> удалите файл <code>api/install.php</code> с хостинга. Повторно установщик не запустится, пока существует файл <code>api/config.php</code>.</p>
+    <p><b>Важно:</b> удалите файл <code>api/install.php</code> с хостинга. Повторно установщик не запустится, пока сохранены настройки сервера.</p>
     <a class="btn" href="../">Открыть сайт</a>
 <?php else: ?>
     <h1>Установка сервера</h1>

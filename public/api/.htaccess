@@ -1,5 +1,10 @@
 Options -Indexes
 
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^server\.js$ server.php [L]
+</IfModule>
+
 <FilesMatch "^(lib|schema|config)\.php$">
   <IfModule mod_authz_core.c>
     Require all denied

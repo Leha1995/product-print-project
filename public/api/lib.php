@@ -11,14 +11,61 @@ function config_path(): string
     return __DIR__ . '/config.php';
 }
 
-function load_config(): ?array
+function backup_config_path(): string
 {
-    $path = config_path();
-    if (!is_file($path)) {
+    return dirname(__DIR__, 2) . '/asap-config-' . substr(md5(dirname(__DIR__)), 0, 10) . '.php';
+}
+
+function read_config_file(string $path): ?array
+{
+    if (!@is_file($path) || !@is_readable($path)) {
         return null;
     }
     $cfg = include $path;
     return is_array($cfg) ? $cfg : null;
+}
+
+function save_config(array $cfg): bool
+{
+    $php = "<?php\nreturn " . var_export($cfg, true) . ";\n";
+    $ok = @file_put_contents(config_path(), $php) !== false;
+    if ($ok) {
+        @chmod(config_path(), 0600);
+    }
+    if (@file_put_contents(backup_config_path(), $php) !== false) {
+        @chmod(backup_config_path(), 0600);
+        $ok = true;
+    }
+    return $ok;
+}
+
+function load_config(): ?array
+{
+    static $cache = false;
+    if ($cache !== false) {
+        return $cache;
+    }
+    $cfg = read_config_file(config_path());
+    if ($cfg === null) {
+        $cfg = read_config_file(backup_config_path());
+        if ($cfg !== null) {
+            $php = "<?php\nreturn " . var_export($cfg, true) . ";\n";
+            if (@file_put_contents(config_path(), $php) !== false) {
+                @chmod(config_path(), 0600);
+            }
+        }
+    } elseif (!@is_file(backup_config_path())) {
+        $php = "<?php\nreturn " . var_export($cfg, true) . ";\n";
+        if (@file_put_contents(backup_config_path(), $php) !== false) {
+            @chmod(backup_config_path(), 0600);
+        }
+    }
+    return $cache = $cfg;
+}
+
+function is_installed(): bool
+{
+    return load_config() !== null;
 }
 
 function connect_db(array $cfg): PDO
