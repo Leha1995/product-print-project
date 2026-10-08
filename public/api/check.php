@@ -101,7 +101,33 @@ if ($cfg && $authorized) {
                     [$until] = effective_access($db, (int)$found['id'], (string)$found['role'], $found['manager_id']);
                     $loginResult = ($until && $until <= now_utc())
                         ? [false, 'Пароль верный, но срок доступа истёк: ' . $until]
-                        : [true, 'Пароль верный — вход должен работать'];
+                        : [true, 'Пароль верный'];
+                    if ($loginResult[0]) {
+                        $step = 'удаление старых сеансов';
+                        $db->beginTransaction();
+                        try {
+                            run($db, 'DELETE FROM app_sessions WHERE user_id = ?', [(int)$found['id']]);
+                            $step = 'создание сеанса';
+                            $tok = bin2hex(random_bytes(24));
+                            run($db, 'INSERT INTO app_sessions (token, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)', [$tok, (int)$found['id'], now_utc(), now_utc(SESSION_DAYS * 86400)]);
+                            $step = 'чтение сеанса';
+                            $me = session_user($db, $tok, true);
+                            if (!$me) {
+                                throw new RuntimeException('сеанс создан, но не читается');
+                            }
+                            $step = 'формирование ответа';
+                            $json = json_encode(['token' => $tok, 'user' => $me], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                            if ($json === false) {
+                                throw new RuntimeException(json_last_error_msg());
+                            }
+                            $loginResult = [true, 'Полный тест входа пройден — сервер работает правильно'];
+                        } catch (Throwable $ex) {
+                            $loginResult = [false, 'Пароль верный, но ошибка на шаге «' . $step . '»: ' . get_class($ex) . ': ' . $ex->getMessage()];
+                        }
+                        if ($db->inTransaction()) {
+                            $db->rollBack();
+                        }
+                    }
                 } catch (Throwable $ex) {
                     $loginResult = [false, 'Ошибка проверки срока доступа: ' . $ex->getMessage()];
                 }
@@ -149,6 +175,12 @@ $serverJs = @file_get_contents(__DIR__ . '/server.js');
 
     <?php if ($loginResult): ?>
         <div class="res <?= $loginResult[0] ? 'ok' : 'bad' ?>"><b>Проверка входа:</b> <?= e($loginResult[1]) ?></div>
+    <?php endif; ?>
+
+    <?php if ($authorized): $errs = read_server_errors(); ?>
+        <h3>Последние ошибки сервера (<?= count($errs) ?>)</h3>
+        <?php if (!$errs): ?><div class="d">Ошибок не записано. Попробуйте войти на сайт и обновите эту страницу.</div><?php endif; ?>
+        <?php foreach (array_slice($errs, 0, 10) as $line): ?><div class="d bad" style="padding:4px 0;border-bottom:1px solid #eee"><?= e($line) ?></div><?php endforeach; ?>
     <?php endif; ?>
 
     <?php if ($users): ?>

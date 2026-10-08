@@ -56,7 +56,7 @@ const LoginScreen = ({ onLogin, kicked }: LoginScreenProps) => {
       } else if (text.includes('not_installed')) {
         setError('Сервер на хостинге не установлен — откройте api/install.php');
       } else if (text.includes('server_error') || /\b5\d\d\b/.test(text)) {
-        setError('Ошибка на сервере — откройте страницу api/check.php, там будет причина');
+        setError(`Ошибка на сервере (${text.replace(/^Error:\s*/, '')}) — откройте страницу api/check.php, там будет причина`);
       } else if (!text.includes('invalid_credentials')) {
         setError(`Сервер ответил ошибкой (${text.replace(/^Error:\s*/, '')}) — откройте api/check.php`);
       } else {

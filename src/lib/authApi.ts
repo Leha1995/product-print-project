@@ -134,8 +134,11 @@ const call = async <T>(body: Record<string, unknown>): Promise<T> => {
   return data as T;
 };
 
-export const apiLogin = (username: string, password: string) =>
-  call<{ token: string; user: AuthUser }>({ action: 'login', username, password });
+export const apiLogin = async (username: string, password: string) => {
+  const res = await call<{ token: string; user: AuthUser }>({ action: 'login', username, password });
+  if (!res || !res.token || !res.user) throw new Error('bad_response');
+  return res;
+};
 
 const USER_KEY = 'asap-auth-user';
 

@@ -79,7 +79,7 @@ function connect_db(array $cfg): PDO
             (int)($cfg['port'] ?? 3306),
             $cfg['name']
         );
-        $pdo = new PDO($dsn, $cfg['user'], $cfg['pass'], [PDO::MYSQL_ATTR_FOUND_ROWS => true]);
+        $pdo = new PDO($dsn, $cfg['user'], $cfg['pass'], [class_exists('Pdo\\Mysql') ? constant('Pdo\\Mysql::ATTR_FOUND_ROWS') : PDO::MYSQL_ATTR_FOUND_ROWS => true]);
         $pdo->exec("SET time_zone = '+00:00'");
     }
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -114,7 +114,14 @@ function boot(): PDO
     }
     set_exception_handler(function (Throwable $e) {
         error_log('[asap] ' . $e->getMessage());
+        log_server_error($e);
         out(['error' => 'server_error'], 500);
+    });
+    register_shutdown_function(function () {
+        $err = error_get_last();
+        if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+            log_server_error(new ErrorException($err['message'], 0, $err['type'], $err['file'], $err['line']));
+        }
     });
     $cfg = load_config();
     if (!$cfg) {
@@ -125,6 +132,29 @@ function boot(): PDO
     } catch (Throwable $e) {
         out(['error' => 'db_unavailable'], 503);
     }
+}
+
+function error_log_path(): string
+{
+    return __DIR__ . '/.errors.log';
+}
+
+function log_server_error(Throwable $e): void
+{
+    $line = gmdate('Y-m-d H:i:s') . ' | ' . basename((string)($_SERVER['SCRIPT_NAME'] ?? ''))
+        . ' | ' . (string)(body()['action'] ?? '') . ' | ' . get_class($e) . ': ' . $e->getMessage()
+        . ' @ ' . basename($e->getFile()) . ':' . $e->getLine();
+    $path = error_log_path();
+    $old = @is_file($path) ? (array)@file($path, FILE_IGNORE_NEW_LINES) : [];
+    $old = array_slice($old, -29);
+    $old[] = str_replace(["\r", "\n"], ' ', $line);
+    @file_put_contents($path, implode("\n", $old) . "\n");
+}
+
+function read_server_errors(): array
+{
+    $path = error_log_path();
+    return @is_file($path) ? array_reverse((array)@file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES)) : [];
 }
 
 function method(): string
