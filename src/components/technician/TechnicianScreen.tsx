@@ -17,6 +17,7 @@ import useHardwareScanner from '@/hooks/useHardwareScanner';
 import { playScanSound } from '@/lib/scanSound';
 import RepairPhotos from '@/components/equipment/RepairPhotos';
 import TelegramConnect from '@/components/TelegramConnect';
+import StructureFilter, { NO_STRUCTURE, StructureBadge, StructureTag } from '@/components/technician/StructureFilter';
 import TechMonthSummary from '@/components/technician/TechMonthSummary';
 
 interface TechnicianScreenProps {
@@ -63,6 +64,7 @@ const TechnicianScreen = ({ userName, onLogout, viewTechId = null, inline = fals
   const [stats, setStats] = useState<TechMonthStats | null>(null);
   const [month, setMonth] = useState('');
   const [statsLoading, setStatsLoading] = useState(false);
+  const [structureId, setStructureId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -92,15 +94,42 @@ const TechnicianScreen = ({ userName, onLogout, viewTechId = null, inline = fals
     return () => window.clearInterval(timer);
   }, [load]);
 
+  const inStructure = useCallback(
+    (tags?: StructureTag[]) =>
+      structureId === null ||
+      (structureId === NO_STRUCTURE ? !tags?.length : Boolean(tags?.some((s) => s.id === structureId))),
+    [structureId],
+  );
+
+  const structureOptions = useMemo(() => {
+    const items: { structures?: StructureTag[] }[] = [...tasks.filter((t) => t.status === 'open'), ...list];
+    const map = new Map<number, StructureTag & { count: number }>();
+    let none = 0;
+    items.forEach((it) => {
+      if (!it.structures?.length) none += 1;
+      it.structures?.forEach((s) => {
+        const prev = map.get(s.id);
+        map.set(s.id, { ...s, count: (prev?.count ?? 0) + 1 });
+      });
+    });
+    return { options: [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'ru')), none };
+  }, [tasks, list]);
+
+  useEffect(() => {
+    if (structureId === null || structureId === NO_STRUCTURE) return;
+    if (!structureOptions.options.some((o) => o.id === structureId)) setStructureId(null);
+  }, [structureOptions, structureId]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter((r) =>
+    const scoped = list.filter((r) => inStructure(r.structures));
+    if (!q) return scoped;
+    return scoped.filter((r) =>
       [r.name, r.location, r.ownerName, r.code, r.description].some((v) => v.toLowerCase().includes(q)),
     );
-  }, [list, query]);
+  }, [list, query, inStructure]);
 
-  const owners = useMemo(() => new Set(list.map((r) => r.ownerId)).size, [list]);
+  const owners = useMemo(() => new Set(filtered.map((r) => r.ownerId)).size, [filtered]);
 
   const openReturn = (r: TechRepair) => {
     setCurrent(r);
@@ -117,8 +146,8 @@ const TechnicianScreen = ({ userName, onLogout, viewTechId = null, inline = fals
     else toast({ title: 'Этой позиции нет в ремонте', description: `Код: ${code}` });
   });
 
-  const openTasks = tasks.filter((t) => t.status === 'open');
-  const closedTasks = tasks.filter((t) => t.status !== 'open');
+  const openTasks = tasks.filter((t) => t.status === 'open' && inStructure(t.structures));
+  const closedTasks = tasks.filter((t) => t.status !== 'open' && inStructure(t.structures));
 
   const confirmDone = async (task: EquipmentTask, comment: string, cost: number) => {
     try {
@@ -187,11 +216,17 @@ const TechnicianScreen = ({ userName, onLogout, viewTechId = null, inline = fals
           </div>
         )}
         <TechMonthSummary stats={stats} loading={statsLoading} onShift={shiftMonth} />
+        <StructureFilter
+          options={structureOptions.options}
+          noneCount={structureOptions.none}
+          value={structureId}
+          onChange={setStructureId}
+        />
         <div className="mb-4 grid grid-cols-2 border-2 border-primary sm:inline-grid sm:w-auto">
           {(
             [
               ['tasks', 'ClipboardList', `Задачи · ${openTasks.length}`],
-              ['repairs', 'Wrench', `В ремонте · ${list.length}`],
+              ['repairs', 'Wrench', `В ремонте · ${filtered.length}`],
             ] as const
           ).map(([key, icon, text]) => (
             <button
@@ -268,7 +303,7 @@ const TechnicianScreen = ({ userName, onLogout, viewTechId = null, inline = fals
             <p className="mt-1 text-[13px] text-muted-foreground">
               {loading
                 ? 'Загружаю…'
-                : `${list.length} ${list.length === 1 ? 'позиция' : 'позиций'}${owners > 1 ? ` · точек: ${owners}` : ''} · отсканируй QR, чтобы принять`}
+                : `${filtered.length} ${filtered.length === 1 ? 'позиция' : 'позиций'}${owners > 1 ? ` · точек: ${owners}` : ''} · отсканируй QR, чтобы принять`}
             </p>
           </div>
           <button
@@ -309,6 +344,9 @@ const TechnicianScreen = ({ userName, onLogout, viewTechId = null, inline = fals
                   <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
                     {[r.ownerName, r.location, r.serial].filter(Boolean).join(' · ') || '—'}
                   </p>
+                  <div className="mt-1">
+                    <StructureBadge structures={r.structures} />
+                  </div>
                   <p className="mt-1.5 inline-flex items-center gap-1 border-2 border-warning bg-warning px-1.5 py-0.5 font-head text-[0.6rem] font-bold uppercase text-warning-foreground">
                     <Icon name="Clock" size={12} strokeWidth={2.5} />
                     {`С ${day(r.repairSentAt)} · ${daysIn(r.repairSentAt)} дн.`}
@@ -331,6 +369,10 @@ const TechnicianScreen = ({ userName, onLogout, viewTechId = null, inline = fals
             </div>
           ))}
         </div>
+
+        {!loading && list.length > 0 && !filtered.length && (
+          <p className="mt-4 text-[13px] text-muted-foreground">В выбранной структуре ничего не найдено.</p>
+        )}
 
         {!loading && !list.length && (
           <div className="mt-6 border-2 border-dashed border-primary px-4 py-10 text-center">

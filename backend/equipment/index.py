@@ -155,6 +155,22 @@ def members_sql(me, column: str) -> str:
     return f" AND {column} IN ({', '.join(str(i) for i in members) or '0'})"
 
 
+def attach_structures(cur, rows: list) -> list:
+    """Добавляет к каждой записи список структур, в которые входит её точка (ownerId)."""
+    owners = sorted({int(r['ownerId']) for r in rows if r.get('ownerId')})
+    by_owner: dict = {}
+    if owners:
+        cur.execute(
+            'SELECT m.user_id, s.id, s.name FROM structure_members m JOIN structures s ON s.id = m.structure_id '
+            f"WHERE m.user_id IN ({', '.join(str(o) for o in owners)}) ORDER BY s.name"
+        )
+        for uid, sid, name in cur.fetchall():
+            by_owner.setdefault(uid, []).append({'id': sid, 'name': name})
+    for r in rows:
+        r['structures'] = by_owner.get(int(r['ownerId']), []) if r.get('ownerId') else []
+    return rows
+
+
 def technician_owners(cur, me):
     """Владельцы оборудования, ремонты которых видит техник (в пределах активной структуры). None — все."""
     owners = technician_owners_all(cur, me)
@@ -199,7 +215,7 @@ def technician_items(cur, me):
         'FROM equipment e LEFT JOIN app_users u ON u.id = e.user_id '
         f'WHERE e.in_repair = TRUE AND e.active = TRUE{scope} ORDER BY e.repair_sent_at'
     )
-    return [
+    return attach_structures(cur, [
         {
             'ownerId': r[0],
             'id': r[1],
@@ -215,7 +231,7 @@ def technician_items(cur, me):
             'photos': r[11] or [],
         }
         for r in cur.fetchall()
-    ]
+    ])
 
 
 def can_manage(cur, me, target_id: int) -> bool:
@@ -511,11 +527,11 @@ def owner_tasks(cur, uid: int):
 def technician_tasks(cur, me):
     owners = technician_owners(cur, me)
     scope = '' if owners is None else f" AND t.user_id IN ({', '.join(str(o) for o in owners) or '0'})"
-    return task_rows(
+    return attach_structures(cur, task_rows(
         cur,
         f"(t.technician_id IS NULL OR t.technician_id = {int(me['id'])}){scope} "
         "AND (t.status = 'open' OR t.done_at > NOW() - INTERVAL '7 days')",
-    )
+    ))
 
 
 def technician_month_stats(cur, tech_id: int, month: str = '') -> dict:

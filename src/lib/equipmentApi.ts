@@ -98,6 +98,7 @@ export interface EquipmentTask {
   priority?: 'urgent' | 'soon' | 'normal';
   cost?: number;
   kind?: 'task' | 'repair';
+  structures?: { id: number; name: string }[];
 }
 
 export interface TechnicianRef {
@@ -180,6 +181,7 @@ export interface TechRepair {
   repairCost: number;
   description: string;
   photos?: string[];
+  structures?: { id: number; name: string }[];
 }
 
 export interface TechMonthStats {

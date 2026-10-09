@@ -277,14 +277,35 @@ function owner_tasks(PDO $db, int $uid): array
     return task_rows($db, "t.user_id = ? AND (t.status = 'open' OR t.done_at > ?)", [$uid, now_utc(-30 * 86400)]);
 }
 
+function attach_structures(PDO $db, array $rows): array
+{
+    $owners = array_values(array_unique(array_filter(array_map(fn($r) => (int)($r['ownerId'] ?? 0), $rows))));
+    $byOwner = [];
+    if ($owners) {
+        $found = all_rows(
+            $db,
+            'SELECT m.user_id, s.id, s.name FROM structure_members m JOIN structures s ON s.id = m.structure_id '
+            . 'WHERE m.user_id IN (' . in_list($owners) . ') ORDER BY s.name'
+        );
+        foreach ($found as $f) {
+            $byOwner[(int)$f['user_id']][] = ['id' => (int)$f['id'], 'name' => (string)$f['name']];
+        }
+    }
+    foreach ($rows as &$r) {
+        $r['structures'] = $byOwner[(int)($r['ownerId'] ?? 0)] ?? [];
+    }
+    unset($r);
+    return $rows;
+}
+
 function technician_tasks(PDO $db, int $techId): array
 {
     $scope = owner_scope_sql(technician_owners($db, $techId), 't.user_id');
-    return task_rows(
+    return attach_structures($db, task_rows(
         $db,
         "(t.technician_id IS NULL OR t.technician_id = ?)$scope AND (t.status = 'open' OR t.done_at > ?)",
         [$techId, now_utc(-7 * 86400)]
-    );
+    ));
 }
 
 function technician_items(PDO $db, int $techId): array
@@ -297,7 +318,7 @@ function technician_items(PDO $db, int $techId): array
         . 'FROM equipment e LEFT JOIN app_users u ON u.id = e.user_id '
         . "WHERE e.in_repair = 1 AND e.active = 1$scope ORDER BY e.repair_sent_at"
     );
-    return array_map(function ($r) use ($db) {
+    return attach_structures($db, array_map(function ($r) use ($db) {
         $open = one_row(
             $db,
             'SELECT description, photos FROM equipment_repairs WHERE user_id = ? AND equipment_id = ? AND returned_at IS NULL ORDER BY sent_at DESC LIMIT 1',
@@ -317,7 +338,7 @@ function technician_items(PDO $db, int $techId): array
             'description' => (string)($open['description'] ?? ''),
             'photos' => json_list($open['photos'] ?? null),
         ];
-    }, $rows);
+    }, $rows));
 }
 
 function technician_month_stats(PDO $db, int $techId, string $month): array

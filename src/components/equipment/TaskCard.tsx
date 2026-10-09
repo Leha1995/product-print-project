@@ -2,6 +2,7 @@ import Icon from '@/components/ui/icon';
 import RepairPhotos from '@/components/equipment/RepairPhotos';
 import { EquipmentTask } from '@/lib/equipmentApi';
 import { priorityOf } from '@/lib/taskPriority';
+import { StructureBadge } from '@/components/technician/StructureFilter';
 
 interface TaskCardProps {
   task: EquipmentTask;
@@ -57,6 +58,7 @@ const TaskCard = ({ task, showOwner = false, action, large = false }: TaskCardPr
             </span>
           )}
           <span className="text-[11px] text-muted-foreground">{`№${task.id} · ${dateTime(task.createdAt)}`}</span>
+          {showOwner && <StructureBadge structures={task.structures} />}
         </div>
 
         {where && (
