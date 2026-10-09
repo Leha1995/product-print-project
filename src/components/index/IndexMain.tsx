@@ -11,6 +11,7 @@ type MenuProps = ComponentProps<typeof MenuSection>;
 interface IndexMainProps {
   inventoryOnly: boolean;
   readOnly?: boolean;
+  canTransfer?: boolean;
   managerPicked: boolean;
   activeTarget: number | null;
   section: 'labels' | 'equipment';
@@ -45,6 +46,7 @@ interface IndexMainProps {
 const IndexMain = ({
   inventoryOnly,
   readOnly = false,
+  canTransfer = false,
   managerPicked,
   activeTarget,
   section,
@@ -89,7 +91,13 @@ const IndexMain = ({
         </p>
       </div>
     ) : (section === 'equipment' || (inventoryOnly && !managerPicked)) && canInventory ? (
-      <EquipmentSection userId={userId} targetId={activeTarget} isAdmin={isAdmin} readOnly={readOnly} />
+      <EquipmentSection
+        userId={userId}
+        targetId={activeTarget}
+        isAdmin={isAdmin}
+        readOnly={readOnly}
+        canTransfer={canTransfer}
+      />
     ) : (
       <MenuSection
         products={items}

@@ -300,6 +300,7 @@ export interface IncomingTransfer {
   image: string;
   note: string;
   fromName: string;
+  toName?: string;
 }
 
 export const fetchTransferAdmins = async (): Promise<AdminRef[]> => {

@@ -277,7 +277,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <IncomingTransfers enabled={user?.role === 'admin'} />
+      <IncomingTransfers enabled={user?.role === 'manager'} />
       <TerminalHeader
         printedCount={jobs.length}
         onNavigate={scrollTo}
@@ -325,6 +325,7 @@ const Index = () => {
       <IndexMain
         inventoryOnly={inventoryOnly}
         readOnly={isAccountant}
+        canTransfer={user?.role === 'manager'}
         managerPicked={managerPicked}
         activeTarget={activeTarget}
         section={section}

@@ -38,7 +38,7 @@ const IncomingTransfers = ({ enabled, onAccepted }: IncomingTransfersProps) => {
       setList(rest);
       toast({
         title: accept ? 'Перемещение подтверждено' : 'Перемещение отклонено',
-        description: accept ? `${current.name} — добавлено в инвентаризацию` : current.name,
+        description: accept ? `${current.name} → ${current.toName || 'админ'}` : current.name,
       });
       if (accept) onAccepted?.();
     } catch {
@@ -59,10 +59,10 @@ const IncomingTransfers = ({ enabled, onAccepted }: IncomingTransfersProps) => {
       >
         <h3 className="flex items-center gap-2 font-head text-lg font-black uppercase text-primary">
           <Icon name="PackageCheck" size={20} strokeWidth={2.5} />
-          Вам перемещено оборудование
+          Перемещение оборудования
         </h3>
         <p className="text-[13px] text-muted-foreground">
-          {`От: ${current.fromName}`}
+          {`От: ${current.fromName}${current.toName ? ` → ${current.toName}` : ''}`}
           {list.length > 1 && ` · ещё ${list.length - 1} в очереди`}
         </p>
 
@@ -88,7 +88,7 @@ const IncomingTransfers = ({ enabled, onAccepted }: IncomingTransfersProps) => {
         </div>
 
         <p className="text-[12px] text-muted-foreground">
-          После подтверждения карточка появится в вашем оборудовании и попадёт в инвентаризацию.
+          {`После подтверждения карточка появится в оборудовании${current.toName ? ` админа ${current.toName}` : ''} и попадёт в его инвентаризацию.`}
         </p>
 
         <div className="mt-2 flex gap-2">

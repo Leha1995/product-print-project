@@ -505,13 +505,29 @@ def upload_photos(raw_list, prefix: str):
 TRANSFER_PASSWORD = '1234'
 
 
-def incoming_transfers(cur, uid: int):
+def transfer_head(cur, admin_id: int) -> int:
+    cur.execute(f"SELECT manager_id FROM app_users WHERE id = {int(admin_id)} AND role = 'admin'")
+    row = cur.fetchone()
+    return int(row[0]) if row and row[0] else 0
+
+
+def can_send_from(cur, me, uid: int) -> bool:
+    if me['role'] != 'manager':
+        return False
+    if int(uid) == int(me['id']):
+        return True
+    return transfer_head(cur, uid) == int(me['id'])
+
+
+def incoming_transfers(cur, manager_id: int):
     cur.execute(
         'SELECT t.id, t.created_at, e.name, e.code, e.price, e.location, e.serial, e.image, e.note, '
-        "COALESCE(NULLIF(u.full_name, ''), u.username) FROM equipment_transfers t "
+        "COALESCE(NULLIF(u.full_name, ''), u.username), COALESCE(NULLIF(r.full_name, ''), r.username) "
+        'FROM equipment_transfers t '
         'JOIN equipment e ON e.user_id = t.from_user AND e.id = t.equipment_id '
         'LEFT JOIN app_users u ON u.id = t.from_user '
-        f"WHERE t.to_user = {int(uid)} AND t.status = 'pending' ORDER BY t.created_at"
+        'JOIN app_users r ON r.id = t.to_user '
+        f"WHERE r.role = 'admin' AND r.manager_id = {int(manager_id)} AND t.status = 'pending' ORDER BY t.created_at"
     )
     return [
         {
@@ -525,27 +541,30 @@ def incoming_transfers(cur, uid: int):
             'image': r[7] or '',
             'note': r[8] or '',
             'fromName': r[9] or '',
+            'toName': r[10] or '',
         }
         for r in cur.fetchall()
     ]
 
 
-def decide_transfer(cur, uid: int, me, body: dict) -> dict:
+def decide_transfer(cur, me, body: dict) -> dict:
+    mid = int(me['id'])
     tid = int(body.get('transferId') or 0)
     cur.execute(
-        'SELECT from_user, equipment_id FROM equipment_transfers '
-        f"WHERE id = {tid} AND to_user = {int(uid)} AND status = 'pending'"
+        'SELECT t.from_user, t.equipment_id, t.to_user FROM equipment_transfers t '
+        'JOIN app_users r ON r.id = t.to_user '
+        f"WHERE t.id = {tid} AND t.status = 'pending' AND r.role = 'admin' AND r.manager_id = {mid}"
     )
     row = cur.fetchone()
-    if not row:
-        return {'error': 'not_found', 'transfers': incoming_transfers(cur, uid)}
-    from_user, eid = int(row[0]), row[1]
+    if me['role'] != 'manager' or not row:
+        return {'error': 'not_found', 'transfers': incoming_transfers(cur, mid)}
+    from_user, eid, uid = int(row[0]), row[1], int(row[2])
     if body.get('action') == 'transfer_decline':
         cur.execute(
             "UPDATE equipment_transfers SET status = 'declined', decided_at = NOW(), "
             f"decided_by = {int(me['id'])} WHERE id = {tid}"
         )
-        return {'ok': True, 'transfers': incoming_transfers(cur, uid)}
+        return {'ok': True, 'transfers': incoming_transfers(cur, mid)}
     new_id = eid
     cur.execute(f'SELECT 1 FROM equipment WHERE user_id = {int(uid)} AND id = {q(eid)}')
     if cur.fetchone():
@@ -556,7 +575,7 @@ def decide_transfer(cur, uid: int, me, body: dict) -> dict:
     )
     if not cur.fetchone():
         cur.execute(f"UPDATE equipment_transfers SET status = 'cancelled', decided_at = NOW() WHERE id = {tid}")
-        return {'error': 'not_found', 'transfers': incoming_transfers(cur, uid)}
+        return {'error': 'not_found', 'transfers': incoming_transfers(cur, mid)}
     cur.execute(
         f'UPDATE equipment_repairs SET user_id = {int(uid)}, equipment_id = {q(new_id)} '
         f'WHERE user_id = {from_user} AND equipment_id = {q(eid)}'
@@ -569,11 +588,11 @@ def decide_transfer(cur, uid: int, me, body: dict) -> dict:
         "UPDATE equipment_transfers SET status = 'cancelled', decided_at = NOW() "
         f"WHERE from_user = {from_user} AND equipment_id = {q(eid)} AND status = 'pending'"
     )
-    return {'ok': True, 'transfers': incoming_transfers(cur, uid)}
+    return {'ok': True, 'transfers': incoming_transfers(cur, mid)}
 
 
 def handler(event: dict, context) -> dict:
-    """Инвентаризация оборудования кухни: карточки с QR-кодом, стоимостью и расходами на ремонт, сессии сканирования."""
+    """Инвентаризация оборудования кухни: карточки с QR-кодом, стоимостью, ремонтами и перемещениями через управляющего."""
     method = event.get('httpMethod', 'GET')
     if method == 'OPTIONS':
         return {'statusCode': 200, 'headers': CORS, 'body': ''}
@@ -810,10 +829,7 @@ def handler(event: dict, context) -> dict:
     if me['role'] == 'admin':
         qs_adm = event.get('queryStringParameters') or {}
         if method == 'GET' and qs_adm.get('transfers') == 'incoming':
-            return finish({'transfers': incoming_transfers(cur, me['id'])})
-        abody = json.loads(event.get('body') or '{}') if method == 'POST' else {}
-        if abody.get('action') in ('transfer_accept', 'transfer_decline'):
-            return finish(decide_transfer(cur, me['id'], me, abody))
+            return finish({'transfers': []})
         return finish({'error': 'forbidden'}, 403)
 
     if me['role'] not in ('superadmin', 'manager'):
@@ -833,12 +849,12 @@ def handler(event: dict, context) -> dict:
         return finish(tasks_report(cur, uid, int(sid) if sid.isdigit() else 0))
 
     if method == 'GET' and qs.get('transfers') == 'incoming':
-        return finish({'transfers': incoming_transfers(cur, uid)})
+        return finish({'transfers': incoming_transfers(cur, me['id']) if me['role'] == 'manager' else []})
 
     if method == 'GET' and qs.get('report') == 'admins':
         cur.execute(
             "SELECT id, COALESCE(NULLIF(full_name, ''), username) FROM app_users "
-            f"WHERE role = 'admin' AND active AND id <> {int(uid)} ORDER BY 2"
+            f"WHERE role = 'admin' AND active AND manager_id IS NOT NULL AND id <> {int(uid)} ORDER BY 2"
         )
         return finish({'admins': [{'id': r[0], 'name': r[1]} for r in cur.fetchall()]})
 
@@ -885,16 +901,18 @@ def handler(event: dict, context) -> dict:
         return finish({'ok': True, 'tasks': owner_tasks(cur, uid)})
 
     if action in ('transfer_accept', 'transfer_decline'):
-        res = decide_transfer(cur, uid, me, body)
+        res = decide_transfer(cur, me, body)
         res['items'] = read_items(cur, uid)
         return finish(res)
 
     if action == 'transfer':
+        if not can_send_from(cur, me, uid):
+            return finish({'error': 'not_your_admin'}, 403)
         if str(body.get('password') or '') != TRANSFER_PASSWORD:
             return finish({'error': 'bad_password'}, 403)
         to_user = int(body.get('toUser') or 0)
         eid = str(body.get('id') or '')
-        cur.execute(f"SELECT 1 FROM app_users WHERE id = {to_user} AND role = 'admin' AND active")
+        cur.execute(f"SELECT 1 FROM app_users WHERE id = {to_user} AND role = 'admin' AND active AND manager_id IS NOT NULL")
         if not cur.fetchone() or to_user == uid:
             return finish({'error': 'bad_target'}, 400)
         cur.execute(

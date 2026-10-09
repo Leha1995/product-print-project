@@ -39,12 +39,19 @@ interface EquipmentSectionProps {
   userId?: number;
   targetId?: number | null;
   isAdmin: boolean;
+  canTransfer?: boolean;
   readOnly?: boolean;
 }
 
 const money = (value: number) => `${Math.round(value).toLocaleString('ru-RU')} ₽`;
 
-const EquipmentSection = ({ userId, targetId, isAdmin, readOnly = false }: EquipmentSectionProps) => {
+const EquipmentSection = ({
+  userId,
+  targetId,
+  isAdmin,
+  readOnly = false,
+  canTransfer = false,
+}: EquipmentSectionProps) => {
   const {
     items,
     sessions,
@@ -675,7 +682,7 @@ const EquipmentSection = ({ userId, targetId, isAdmin, readOnly = false }: Equip
         open={formOpen}
         onOpenChange={setFormOpen}
         onTransfer={
-          readOnly
+          readOnly || !canTransfer
             ? undefined
             : (item) => {
                 setTransferItem(item);
