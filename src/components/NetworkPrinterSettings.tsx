@@ -132,6 +132,11 @@ const NetworkPrinterSettings = ({ settings, onChange }: NetworkPrinterSettingsPr
           запусти его на компьютере в точке.
         </p>
       )}
+      {config?.personal && !config.canSetup && (
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          Принтеры для вас настроил админ — они сохранены за вашим аккаунтом.
+        </p>
+      )}
       {config?.canSetup && (
         <p className="text-[11px] leading-snug text-muted-foreground">
           Один помощник на компьютере печатает задания этого аккаунта и всех привязанных к нему

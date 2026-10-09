@@ -130,6 +130,23 @@ def clean_printers(raw) -> list:
     return result[:20]
 
 
+def can_edit_staff(cur, me, target: int) -> bool:
+    """Админ настраивает своих сотрудников, супер-админ — любых сотрудников."""
+    cur.execute(f'SELECT role, manager_id FROM app_users WHERE id = {int(target)}')
+    row = cur.fetchone()
+    if not row or row[0] != 'user':
+        return False
+    if me['role'] == 'superadmin':
+        return True
+    return me['role'] == 'admin' and row[1] == me['id']
+
+
+def staff_printers(cur, uid: int):
+    cur.execute(f'SELECT printers FROM user_printers WHERE user_id = {int(uid)}')
+    row = cur.fetchone()
+    return json.loads(row[0] or '[]') if row else None
+
+
 def take_jobs(cur, team: list):
     ids = ','.join(str(i) for i in team)
     cur.execute(
@@ -202,9 +219,27 @@ def handler(event: dict, context) -> dict:
     owner = owner_of(me)
     can_setup = me['role'] in ('admin', 'superadmin', 'manager')
 
+    if action in ('staff_printers', 'save_staff_printers'):
+        target = int(body.get('userId') or params.get('userId') or 0)
+        if not can_edit_staff(cur, me, target):
+            return done({'error': 'forbidden'}, 403)
+        if action == 'save_staff_printers':
+            printers = clean_printers(body.get('printers'))
+            cur.execute(
+                'INSERT INTO user_printers (user_id, printers, updated_by, updated_at) VALUES '
+                f"({target}, {q(json.dumps(printers, ensure_ascii=False))}, {int(me['id'])}, NOW()) "
+                'ON CONFLICT (user_id) DO UPDATE SET printers = EXCLUDED.printers, '
+                'updated_by = EXCLUDED.updated_by, updated_at = NOW()'
+            )
+        personal = staff_printers(cur, target)
+        return done({'printers': personal or []})
+
     if action == 'config':
         key, printers, _ = ensure_key(cur, owner)
         own = json.loads(printers or '[]')
+        personal = staff_printers(cur, me['id']) if me['role'] == 'user' else None
+        if personal:
+            own = personal
         if not own:
             for upper in chain_ids(cur, owner)[1:]:
                 cur.execute(f'SELECT printers FROM print_keys WHERE owner_id = {upper}')
@@ -218,6 +253,7 @@ def handler(event: dict, context) -> dict:
                 'online': is_online(cur, owner),
                 'key': key if can_setup else None,
                 'canSetup': can_setup,
+                'personal': bool(personal),
             }
         )
 

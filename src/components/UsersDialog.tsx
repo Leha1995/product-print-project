@@ -14,6 +14,7 @@ import { toast } from '@/hooks/use-toast';
 import TechScopePicker from '@/components/users/TechScopePicker';
 import TechPicker from '@/components/users/TechPicker';
 import StructuresPanel from '@/components/users/StructuresPanel';
+import StaffPrintersDialog from '@/components/users/StaffPrintersDialog';
 
 interface UsersDialogProps {
   open: boolean;
@@ -97,6 +98,7 @@ const UsersDialog = ({
   const [collapsed, setCollapsed] = useState<number[]>([]);
   const [editStructures, setEditStructures] = useState<number[]>([]);
   const [newStructures, setNewStructures] = useState<number[]>([]);
+  const [printerUser, setPrinterUser] = useState<ManagedUser | null>(null);
   const outsideRole = role === 'technician' || role === 'superadmin';
 
   useEffect(() => {
@@ -645,6 +647,15 @@ const UsersDialog = ({
                     ))}
                   </select>
                 )}
+                {!readOnly && u.role === 'user' && (
+                  <button
+                    onClick={() => setPrinterUser(u)}
+                    className="flex items-center gap-1 border-2 border-primary bg-background px-2 py-1 font-head text-[0.7rem] uppercase text-primary transition-colors hover:bg-muted"
+                  >
+                    <Icon name="Printer" size={14} strokeWidth={2.5} />
+                    Принтер
+                  </button>
+                )}
                 {!readOnly && (
                 <button
                   onClick={() => startEdit(u)}
@@ -683,6 +694,11 @@ const UsersDialog = ({
             })}
           </div>
         </div>
+        <StaffPrintersDialog
+          userId={printerUser?.id ?? null}
+          userName={printerUser ? printerUser.fullName || printerUser.username : ''}
+          onClose={() => setPrinterUser(null)}
+        />
         {editId !== null && (
           <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-primary/40 p-6">
             <div className="w-full max-w-[420px] border-2 border-primary bg-background">

@@ -15,6 +15,7 @@ export interface PrintConfig {
   online: boolean;
   key: string | null;
   canSetup: boolean;
+  personal?: boolean;
 }
 
 const request = async <T>(body: Record<string, unknown>, query = ''): Promise<T> => {
@@ -32,6 +33,12 @@ export const apiPrintConfig = () => request<PrintConfig>({}, '?action=config');
 
 export const apiSavePrinters = (printers: NetPrinter[]) =>
   request<{ printers: NetPrinter[] }>({ action: 'printers', printers });
+
+export const apiStaffPrinters = (userId: number) =>
+  request<{ printers: NetPrinter[] }>({}, `?action=staff_printers&userId=${userId}`);
+
+export const apiSaveStaffPrinters = (userId: number, printers: NetPrinter[]) =>
+  request<{ printers: NetPrinter[] }>({ action: 'save_staff_printers', userId, printers });
 
 export const apiRegenPrintKey = () => request<{ key: string }>({ action: 'regen_key' });
 

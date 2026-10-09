@@ -8,6 +8,11 @@ $db = boot();
 upgrade_schema($db);
 
 $driver = (load_config()['driver'] ?? 'mysql') === 'sqlite' ? 'sqlite' : 'mysql';
+$db->exec(
+    'CREATE TABLE IF NOT EXISTS user_printers (user_id INT NOT NULL PRIMARY KEY, printers '
+    . ($driver === 'sqlite' ? 'TEXT' : 'LONGTEXT') . ' NULL, updated_by INT NULL, updated_at DATETIME NULL)'
+    . ($driver === 'sqlite' ? '' : ' ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci')
+);
 foreach (schema_sql($driver) as $sql) {
     if (strpos($sql, 'print_') !== false) {
         $db->exec($sql);
@@ -110,6 +115,24 @@ function clean_printers($raw): array
     return array_slice($result, 0, 20);
 }
 
+function can_edit_staff(PDO $db, array $me, int $target): bool
+{
+    $row = one_row($db, 'SELECT role, manager_id FROM app_users WHERE id = ?', [$target]);
+    if (!$row || $row['role'] !== 'user') {
+        return false;
+    }
+    if ($me['role'] === 'superadmin') {
+        return true;
+    }
+    return $me['role'] === 'admin' && (int)$row['manager_id'] === (int)$me['id'];
+}
+
+function staff_printers(PDO $db, int $uid): ?array
+{
+    $raw = one_value($db, 'SELECT printers FROM user_printers WHERE user_id = ?', [$uid]);
+    return ($raw === null || $raw === false) ? null : json_list((string)$raw);
+}
+
 function take_jobs(PDO $db, array $team): array
 {
     $ids = in_list($team);
@@ -174,9 +197,29 @@ if (!$me) {
 $owner = print_owner($me);
 $canSetup = in_array($me['role'], ['admin', 'superadmin', 'manager'], true);
 
+if ($action === 'staff_printers' || $action === 'save_staff_printers') {
+    $target = (int)($body['userId'] ?? ($_GET['userId'] ?? 0));
+    if (!can_edit_staff($db, $me, $target)) {
+        out(['error' => 'forbidden'], 403);
+    }
+    if ($action === 'save_staff_printers') {
+        $printers = json_text(clean_printers($body['printers'] ?? []));
+        if (one_value($db, 'SELECT 1 FROM user_printers WHERE user_id = ?', [$target])) {
+            run($db, 'UPDATE user_printers SET printers = ?, updated_by = ?, updated_at = ? WHERE user_id = ?', [$printers, $me['id'], now_utc(), $target]);
+        } else {
+            run($db, 'INSERT INTO user_printers (user_id, printers, updated_by, updated_at) VALUES (?, ?, ?, ?)', [$target, $printers, $me['id'], now_utc()]);
+        }
+    }
+    out(['printers' => staff_printers($db, $target) ?? []]);
+}
+
 if ($action === 'config') {
     $row = print_key_row($db, $owner);
     $printers = json_list($row['printers']);
+    $personal = $me['role'] === 'user' ? staff_printers($db, $me['id']) : null;
+    if ($personal) {
+        $printers = $personal;
+    }
     if (!$printers) {
         foreach (array_slice(chain_ids($db, $owner), 1) as $upper) {
             $printers = json_list(one_value($db, 'SELECT printers FROM print_keys WHERE owner_id = ?', [$upper]));
@@ -190,6 +233,7 @@ if ($action === 'config') {
         'online' => helper_online($db, $owner),
         'key' => $canSetup ? $row['print_key'] : null,
         'canSetup' => $canSetup,
+        'personal' => (bool)$personal,
     ]);
 }
 
