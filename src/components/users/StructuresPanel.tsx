@@ -38,7 +38,7 @@ const StructuresPanel = ({ structures, activeId, users, onChanged, onStructuresC
   const [renameId, setRenameId] = useState<number | null>(null);
   const [renameText, setRenameText] = useState('');
 
-  const candidates = users.filter((u) => u.role !== 'superadmin');
+  const candidates = users.filter((u) => u.role !== 'superadmin' && u.role !== 'technician');
 
   const create = async () => {
     if (!name.trim()) {
@@ -108,7 +108,8 @@ const StructuresPanel = ({ structures, activeId, users, onChanged, onStructuresC
       </div>
       <p className="mt-1 text-[12px] text-muted-foreground">
         У каждой структуры свои люди, оборудование, каталог и отчёты — они не видны другим структурам. Один
-        человек может состоять в нескольких структурах.
+        человек может состоять в нескольких структурах. Техники и супер-админы — вне структур и работают со
+        всеми.
       </p>
 
       {creating && (

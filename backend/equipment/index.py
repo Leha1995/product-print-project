@@ -120,7 +120,9 @@ def session_user(cur, token: str):
 
 
 def structure_members(cur, token: str, me):
-    """Участники активной структуры сессии. None — без ограничений (супер-админ без структур)."""
+    """Участники активной структуры сессии. None — без ограничений (техник или супер-админ без структур)."""
+    if me['role'] == 'technician':
+        return None
     if me['role'] == 'superadmin':
         cur.execute('SELECT id FROM structures ORDER BY id')
     else:
@@ -136,7 +138,7 @@ def structure_members(cur, token: str, me):
         return None if me['role'] == 'superadmin' else [int(me['id'])]
     cur.execute(
         f'SELECT user_id FROM structure_members WHERE structure_id = {int(sid)} '
-        "UNION SELECT id FROM app_users WHERE role = 'superadmin'"
+        "UNION SELECT id FROM app_users WHERE role IN ('superadmin', 'technician')"
     )
     return sorted(r[0] for r in cur.fetchall())
 
@@ -397,7 +399,7 @@ def return_repair(cur, uid: int, body: dict, by_user: int = 0, close_task: bool 
 
 
 def owner_technicians(cur, uid: int):
-    """Техники, закреплённые за точкой uid и состоящие с ней в одной структуре."""
+    """Техники, закреплённые за точкой uid (техники вне структур и обслуживают все)."""
     cur.execute(f'SELECT role, manager_id FROM app_users WHERE id = {int(uid)}')
     row = cur.fetchone()
     heads = [int(uid)]
@@ -409,9 +411,7 @@ def owner_technicians(cur, uid: int):
         'NOT EXISTS (SELECT 1 FROM technician_scopes s WHERE s.technician_id = u.id) '
         'OR EXISTS (SELECT 1 FROM technician_scopes s LEFT JOIN app_users h ON h.id = s.head_id '
         f"WHERE s.technician_id = u.id AND (s.head_id IN ({', '.join(str(h) for h in heads)}) OR h.role = 'superadmin'))"
-        ') AND (NOT EXISTS (SELECT 1 FROM structure_members p WHERE p.user_id = ' + str(int(uid)) + ') '
-        'OR EXISTS (SELECT 1 FROM structure_members a JOIN structure_members b ON a.structure_id = b.structure_id '
-        f'WHERE a.user_id = u.id AND b.user_id = {int(uid)})) ORDER BY 2'
+        ') ORDER BY 2'
     )
     return [{'id': r[0], 'name': r[1]} for r in cur.fetchall()]
 

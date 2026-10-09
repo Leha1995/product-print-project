@@ -81,7 +81,8 @@ function structures_payload(PDO $db, array $me, ?int $sid): array
     }
     $rows = all_rows(
         $db,
-        'SELECT s.id, s.name, (SELECT COUNT(*) FROM structure_members m WHERE m.structure_id = s.id) AS members '
+        'SELECT s.id, s.name, (SELECT COUNT(*) FROM structure_members m JOIN app_users mu ON mu.id = m.user_id '
+        . "WHERE m.structure_id = s.id AND mu.role NOT IN ('superadmin', 'technician')) AS members "
         . 'FROM structures s WHERE s.id IN (' . in_list($allowed) . ') ORDER BY s.name'
     );
     return [
@@ -93,7 +94,8 @@ function structures_payload(PDO $db, array $me, ?int $sid): array
 function set_user_structures(PDO $db, int $userId, $ids): void
 {
     run($db, 'DELETE FROM structure_members WHERE user_id = ?', [$userId]);
-    $clean = clean_ids($ids);
+    $role = (string)one_value($db, 'SELECT role FROM app_users WHERE id = ?', [$userId]);
+    $clean = in_array($role, OUTSIDE_ROLES, true) ? [] : clean_ids($ids);
     if ($clean) {
         foreach (all_rows($db, 'SELECT id FROM structures WHERE id IN (' . in_list($clean) . ')') as $r) {
             run($db, 'INSERT INTO structure_members (structure_id, user_id) VALUES (?, ?)', [(int)$r['id'], $userId]);
@@ -103,6 +105,7 @@ function set_user_structures(PDO $db, int $userId, $ids): void
 
 function list_users(PDO $db, array $me, ?array $members = null): array
 {
+    run($db, "DELETE FROM structure_members WHERE user_id IN (SELECT id FROM app_users WHERE role IN ('superadmin', 'technician'))");
     $where = '';
     if ($me['role'] === 'admin') {
         $where = 'WHERE (manager_id = ' . (int)$me['id'] . ' OR id = ' . (int)$me['id'] . ')';
@@ -318,7 +321,7 @@ if (in_array($action, ['structures', 'create_structure', 'rename_structure', 'de
         $newSid = (int)$db->lastInsertId();
         $ids = clean_ids($body['userIds'] ?? []);
         if ($ids) {
-            foreach (all_rows($db, "SELECT id FROM app_users WHERE role <> 'superadmin' AND id IN (" . in_list($ids) . ')') as $r) {
+            foreach (all_rows($db, "SELECT id FROM app_users WHERE role NOT IN ('superadmin', 'technician') AND id IN (" . in_list($ids) . ')') as $r) {
                 run($db, 'INSERT INTO structure_members (structure_id, user_id) VALUES (?, ?)', [$newSid, (int)$r['id']]);
             }
         }
@@ -412,7 +415,7 @@ if ($action === 'create_user') {
         [$username, $fullName, hash_password($password), $role, now_utc(), $manager, $until]
     );
     $newId = (int)$db->lastInsertId();
-    if ($role !== 'superadmin') {
+    if (!in_array($role, OUTSIDE_ROLES, true)) {
         $wanted = $body['structureIds'] ?? null;
         set_user_structures($db, $newId, is_array($wanted) && $wanted ? $wanted : ($sid ? [$sid] : []));
     }
@@ -485,7 +488,7 @@ if ($action === 'update_user') {
     if (isset($body['structureIds']) && is_array($body['structureIds'])) {
         set_user_structures($db, $userId, $body['structureIds']);
     }
-    if ($newRole === 'superadmin') {
+    if ($newRole && in_array($newRole, OUTSIDE_ROLES, true)) {
         set_user_structures($db, $userId, []);
     }
     if (array_key_exists('techIds', $body)) {
@@ -504,6 +507,9 @@ if ($action === 'update_user') {
     }
     $params[] = $userId;
     run($db, 'UPDATE app_users SET ' . implode(', ', $sets) . ' WHERE id = ?', $params);
+    if ($newRole && in_array($newRole, OUTSIDE_ROLES, true)) {
+        set_user_structures($db, $userId, []);
+    }
     if ($renew) {
         unlock_branch($db, $userId);
     }

@@ -68,6 +68,8 @@ def manager_branch_ids(cur, manager_id: int):
 
 def structure_members(cur, token: str, me):
     """Участники активной структуры сессии. None — без ограничений."""
+    if me['role'] == 'technician':
+        return None
     if me['role'] == 'superadmin':
         cur.execute('SELECT id FROM structures ORDER BY id')
     else:
@@ -82,7 +84,7 @@ def structure_members(cur, token: str, me):
         return None if me['role'] == 'superadmin' else [int(me['id'])]
     cur.execute(
         f'SELECT user_id FROM structure_members WHERE structure_id = {int(sid)} '
-        "UNION SELECT id FROM app_users WHERE role = 'superadmin'"
+        "UNION SELECT id FROM app_users WHERE role IN ('superadmin', 'technician')"
     )
     return sorted(r[0] for r in cur.fetchall())
 

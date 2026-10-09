@@ -375,8 +375,13 @@ function session_user(PDO $db, string $token, bool $full = false): ?array
     ];
 }
 
+const OUTSIDE_ROLES = ['superadmin', 'technician'];
+
 function allowed_structures(PDO $db, array $me): array
 {
+    if ($me['role'] === 'technician') {
+        return [];
+    }
     $rows = $me['role'] === 'superadmin'
         ? all_rows($db, 'SELECT id AS sid FROM structures ORDER BY id')
         : all_rows($db, 'SELECT structure_id AS sid FROM structure_members WHERE user_id = ? ORDER BY structure_id', [(int)$me['id']]);
@@ -397,12 +402,15 @@ function active_structure(PDO $db, string $token, array $me): ?int
 
 function structure_member_ids(PDO $db, ?int $sid, array $me): ?array
 {
+    if ($me['role'] === 'technician') {
+        return null;
+    }
     if (!$sid) {
         return $me['role'] === 'superadmin' ? null : [(int)$me['id']];
     }
     $rows = all_rows(
         $db,
-        "SELECT user_id AS uid FROM structure_members WHERE structure_id = ? UNION SELECT id AS uid FROM app_users WHERE role = 'superadmin'",
+        "SELECT user_id AS uid FROM structure_members WHERE structure_id = ? UNION SELECT id AS uid FROM app_users WHERE role IN ('superadmin', 'technician')",
         [$sid]
     );
     $ids = array_map('intval', array_column($rows, 'uid'));

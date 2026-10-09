@@ -253,7 +253,9 @@ const UsersDialog = ({
         ...(isSuperAdmin && u.role === 'admin' && editAccess !== 'keep'
           ? { accessDays: editAccess === '' ? null : editAccess }
           : {}),
-        ...(isSuperAdmin && u.role !== 'superadmin' && structures.length ? { structureIds: editStructures } : {}),
+        ...(isSuperAdmin && u.role !== 'superadmin' && u.role !== 'technician' && structures.length
+          ? { structureIds: editStructures }
+          : {}),
       });
       apply(r.users);
       cancelEdit();
@@ -473,7 +475,10 @@ const UsersDialog = ({
                       </span>
                     )}
                   </p>
-                  {isSuperAdmin && structures.length > 1 && u.role !== 'superadmin' && (
+                  {isSuperAdmin && structures.length > 0 && (u.role === 'technician' || u.role === 'superadmin') && (
+                    <p className="truncate text-[11px] font-semibold text-muted-foreground">Вне структур · видит все</p>
+                  )}
+                  {isSuperAdmin && structures.length > 1 && u.role !== 'superadmin' && u.role !== 'technician' && (
                     <p className="truncate text-[11px] font-semibold text-primary">
                       {(u.structureIds || []).length
                         ? `Структуры: ${(u.structureIds || [])
@@ -682,7 +687,9 @@ const UsersDialog = ({
                 className={inputClass}
               />
             </div>
-            {isSuperAdmin && structures.length > 0 && users.find((x) => x.id === editId)?.role !== 'superadmin' && (
+            {isSuperAdmin &&
+              structures.length > 0 &&
+              !['superadmin', 'technician'].includes(users.find((x) => x.id === editId)?.role ?? '') && (
               <div>
                 <p className="mb-1 font-head text-[0.7rem] font-bold uppercase text-primary">Структуры</p>
                 <div className="grid gap-1 border-2 border-primary bg-card p-2">

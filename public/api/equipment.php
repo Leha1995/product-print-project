@@ -135,7 +135,7 @@ function owner_technicians(PDO $db, int $uid): array
         . 'NOT EXISTS (SELECT 1 FROM technician_scopes s WHERE s.technician_id = u.id) '
         . 'OR EXISTS (SELECT 1 FROM technician_scopes s LEFT JOIN app_users h ON h.id = s.head_id '
         . "WHERE s.technician_id = u.id AND (s.head_id IN (" . in_list($heads) . ") OR h.role = 'superadmin'))"
-        . ') AND ' . shares_structure_sql($uid, 'u.id') . ' ORDER BY name'
+        . ') ORDER BY name'
     );
     return array_map(fn($r) => ['id' => (int)$r['id'], 'name' => (string)$r['name']], $rows);
 }

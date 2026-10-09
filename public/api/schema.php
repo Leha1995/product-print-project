@@ -282,7 +282,7 @@ function seed_structures(PDO $db): void
         return;
     }
     if ((int)one_value($db, 'SELECT COUNT(*) FROM structure_members') === 0) {
-        foreach (all_rows($db, "SELECT id FROM app_users WHERE role <> 'superadmin'") as $u) {
+        foreach (all_rows($db, "SELECT id FROM app_users WHERE role NOT IN ('superadmin', 'technician')") as $u) {
             run($db, 'INSERT INTO structure_members (structure_id, user_id) VALUES (?, ?)', [$first, (int)$u['id']]);
         }
     }

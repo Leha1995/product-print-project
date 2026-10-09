@@ -108,7 +108,12 @@ def session_user(cur, token: str):
     }
 
 
+OUTSIDE_ROLES = ('superadmin', 'technician')
+
+
 def allowed_structures(cur, me):
+    if me['role'] == 'technician':
+        return []
     if me['role'] == 'superadmin':
         cur.execute('SELECT id FROM structures ORDER BY id')
     else:
@@ -136,7 +141,7 @@ def structure_member_ids(cur, sid, me):
         return None if me['role'] == 'superadmin' else [int(me['id'])]
     cur.execute(
         f'SELECT user_id FROM structure_members WHERE structure_id = {int(sid)} '
-        "UNION SELECT id FROM app_users WHERE role = 'superadmin'"
+        "UNION SELECT id FROM app_users WHERE role IN ('superadmin', 'technician')"
     )
     return [r[0] for r in cur.fetchall()]
 
@@ -146,7 +151,8 @@ def structures_payload(cur, me, sid):
     if not allowed:
         return {'structures': [], 'activeStructureId': None}
     cur.execute(
-        "SELECT s.id, s.name, (SELECT COUNT(*) FROM structure_members m WHERE m.structure_id = s.id) "
+        "SELECT s.id, s.name, (SELECT COUNT(*) FROM structure_members m JOIN app_users mu ON mu.id = m.user_id "
+        "WHERE m.structure_id = s.id AND mu.role NOT IN ('superadmin', 'technician')) "
         f"FROM structures s WHERE s.id IN ({', '.join(str(i) for i in allowed)}) ORDER BY s.name"
     )
     return {
@@ -165,6 +171,10 @@ def user_structures(cur) -> dict:
 
 def set_user_structures(cur, user_id: int, ids) -> None:
     clean = sorted({int(i) for i in (ids or []) if str(i).isdigit()})
+    cur.execute(f'SELECT role FROM app_users WHERE id = {int(user_id)}')
+    role_row = cur.fetchone()
+    if role_row and role_row[0] in OUTSIDE_ROLES:
+        clean = []
     cur.execute(f'DELETE FROM structure_members WHERE user_id = {int(user_id)}')
     if clean:
         cur.execute(
@@ -175,6 +185,10 @@ def set_user_structures(cur, user_id: int, ids) -> None:
 
 
 def list_users(cur, me=None, members=None):
+    cur.execute(
+        'DELETE FROM structure_members WHERE user_id IN '
+        "(SELECT id FROM app_users WHERE role IN ('superadmin', 'technician'))"
+    )
     where = ''
     if me and me['role'] == 'admin':
         where = f"WHERE (manager_id = {me['id']} OR id = {me['id']})"
@@ -528,7 +542,7 @@ def handler(event: dict, context) -> dict:
                 if set_ids:
                     cur.execute(
                         'INSERT INTO structure_members (structure_id, user_id) '
-                        f"SELECT {new_sid}, id FROM app_users WHERE role <> 'superadmin' "
+                        f"SELECT {new_sid}, id FROM app_users WHERE role NOT IN ('superadmin', 'technician') "
                         f"AND id IN ({', '.join(str(i) for i in set_ids)}) ON CONFLICT DO NOTHING"
                     )
             elif action == 'rename_structure':
@@ -606,7 +620,7 @@ def handler(event: dict, context) -> dict:
                 'RETURNING id'
             )
             new_id = cur.fetchone()[0]
-            if role != 'superadmin':
+            if role not in OUTSIDE_ROLES:
                 wanted = body.get('structureIds')
                 set_user_structures(cur, new_id, wanted if isinstance(wanted, list) and wanted else ([sid] if sid else []))
             if role == 'technician':
@@ -660,7 +674,7 @@ def handler(event: dict, context) -> dict:
                     renew_branch = True
             if 'structureIds' in body and isinstance(body.get('structureIds'), list):
                 set_user_structures(cur, user_id, body.get('structureIds'))
-            if body.get('role') == 'superadmin':
+            if body.get('role') in OUTSIDE_ROLES:
                 set_user_structures(cur, user_id, [])
             if 'techIds' in body:
                 save_accountant_techs(cur, user_id, body.get('techIds'))
@@ -675,6 +689,8 @@ def handler(event: dict, context) -> dict:
             if not sets:
                 return done({'users': list_users(cur, me, structure_member_ids(cur, sid, me))})
             cur.execute(f'UPDATE app_users SET {", ".join(sets)} WHERE id = {user_id}')
+            if body.get('role') in OUTSIDE_ROLES:
+                set_user_structures(cur, user_id, [])
             if renew_branch:
                 unlock_branch(cur, user_id)
             if body.get('active') is False:
