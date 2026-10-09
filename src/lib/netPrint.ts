@@ -10,6 +10,7 @@ import {
   apiPrintStatus,
 } from '@/lib/printApi';
 import { TsplOptions, nodeToLabelCanvas, nodeToTspl, toBase64 } from '@/lib/tspl';
+import { readTextLabel, textLabelToTspl } from '@/lib/tsplText';
 
 type Listener = (config: PrintConfig | null) => void;
 
@@ -351,7 +352,13 @@ export const printNodesNetwork = async (
   const total = nodes.length;
   if (!total) return false;
   const opts = { ...networkOptions(settings, copies), ...override };
-  const render = (i: number) => nodeToTspl(nodes[i], opts);
+  const render = async (i: number) => {
+    const text = settings.netTextMode ? readTextLabel(nodes[i]) : null;
+    if (text) {
+      return textLabelToTspl(text, { ...opts, codepage: settings.netCodepage, sizeShift: settings.netTextSize });
+    }
+    return nodeToTspl(nodes[i], opts);
+  };
   const prepareRest = async (from: number) => {
     const out: Uint8Array[] = [];
     for (let i = from; i < total; i += 1) out.push(await render(i));

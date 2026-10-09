@@ -6,6 +6,7 @@ import { NetPrinter, PrintConfig, apiRegenPrintKey, apiSavePrinters, printEndpoi
 import { loadPrintConfig, networkOptions, pickPrinter, sendRaw, setPrintConfig, subscribePrintConfig } from '@/lib/netPrint';
 import { downloadHelper } from '@/lib/printHelper';
 import { testLabelTspl } from '@/lib/tspl';
+import { testTextLabel, textLabelToTspl } from '@/lib/tsplText';
 
 interface NetworkPrinterSettingsProps {
   settings: LabelSettings;
@@ -81,7 +82,14 @@ const NetworkPrinterSettings = ({ settings, onChange }: NetworkPrinterSettingsPr
 
   const test = async (p: NetPrinter) => {
     setTesting(p.id);
-    const ok = await sendRaw(p, testLabelTspl(networkOptions(settings), `${p.name} · ${p.ip}`));
+    const bytes = settings.netTextMode
+      ? textLabelToTspl(testTextLabel(p.ip), {
+          ...networkOptions(settings),
+          codepage: settings.netCodepage,
+          sizeShift: settings.netTextSize,
+        })
+      : testLabelTspl(networkOptions(settings), `${p.name} · ${p.ip}`);
+    const ok = await sendRaw(p, bytes);
     setTesting('');
     if (ok) toast({ title: 'Тестовая этикетка напечатана' });
   };
@@ -257,6 +265,56 @@ const NetworkPrinterSettings = ({ settings, onChange }: NetworkPrinterSettingsPr
         />
         Этикетка выходит вверх ногами — перевернуть
       </label>
+
+      <div className="grid gap-2 border-t-2 border-dashed border-primary pt-3">
+        <label className="flex items-center gap-2 text-[12px] font-semibold text-primary">
+          <input
+            type="checkbox"
+            checked={settings.netTextMode}
+            onChange={(e) => onChange({ netTextMode: e.target.checked })}
+            className="h-4 w-4 accent-[hsl(var(--primary))]"
+          />
+          Печатать текстом (быстрее и чётче)
+        </label>
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          Этикетка уходит на принтер текстом, а не картинкой: в десятки раз меньше данных, буквы
+          печатаются шрифтом принтера. QR-коды оборудования по-прежнему печатаются картинкой.
+        </p>
+        {settings.netTextMode && (
+          <div className="grid grid-cols-2 gap-2">
+            <label className="grid gap-1">
+              <span className={labelClass}>Кодировка</span>
+              <select
+                value={settings.netCodepage}
+                onChange={(e) => onChange({ netCodepage: e.target.value as LabelSettings['netCodepage'] })}
+                className={fieldClass}
+              >
+                <option value="1251">Windows-1251</option>
+                <option value="866">DOS-866</option>
+                <option value="UTF-8">UTF-8</option>
+              </select>
+            </label>
+            <label className="grid gap-1">
+              <span className={labelClass}>Размер текста</span>
+              <select
+                value={settings.netTextSize}
+                onChange={(e) => onChange({ netTextSize: Number(e.target.value) })}
+                className={fieldClass}
+              >
+                <option value={1}>Крупнее</option>
+                <option value={0}>Обычный</option>
+                <option value={-1}>Мельче</option>
+                <option value={-2}>Совсем мелкий</option>
+              </select>
+            </label>
+          </div>
+        )}
+        {settings.netTextMode && (
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            Нажми «Тест» у принтера. Если вместо русских букв значки — смени кодировку и повтори тест.
+          </p>
+        )}
+      </div>
 
       {canSetup && (
         <div className="grid gap-2 border-t-2 border-dashed border-primary pt-3">
