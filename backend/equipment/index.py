@@ -7,6 +7,8 @@ import uuid
 import boto3
 import psycopg2
 
+from notify import notify_transfer
+
 CORS = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
@@ -933,6 +935,10 @@ def handler(event: dict, context) -> dict:
             f"SELECT {q(eid)}, {uid}, {to_user}, {int(me['id'])}, name, code, COALESCE(price, 0) "
             f'FROM equipment WHERE user_id = {uid} AND id = {q(eid)}'
         )
+        try:
+            notify_transfer(cur, uid, to_user, eid, int(me['id']))
+        except Exception as err:
+            print(f'transfer notify failed: {err}')
         return finish({'ok': True, 'items': read_items(cur, uid)})
 
     if action == 'transfer_cancel':

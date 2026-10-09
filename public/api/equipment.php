@@ -863,6 +863,10 @@ if ($action === 'transfer') {
         . "VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?)",
         [$eid, $uid, $toUser, $me['id'], now_utc(), $row['name'], $row['code'], (float)$row['price']]
     );
+    try {
+        notify_transfer($db, $uid, $toUser, $eid, (int)$me['id']);
+    } catch (Throwable $e) {
+    }
     out(['ok' => true, 'items' => read_items($db, $uid)]);
 }
 

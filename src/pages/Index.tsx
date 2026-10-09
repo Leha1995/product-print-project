@@ -11,6 +11,7 @@ import useCategories from '@/hooks/useCategories';
 import AdminLoginDialog from '@/components/AdminLoginDialog';
 import LoginScreen from '@/components/LoginScreen';
 import IncomingTransfers from '@/components/equipment/IncomingTransfers';
+import TelegramConnect from '@/components/TelegramConnect';
 import UsersDialog from '@/components/UsersDialog';
 import useAuth from '@/hooks/useAuth';
 import usePrintHistory from '@/hooks/usePrintHistory';
@@ -297,6 +298,11 @@ const Index = () => {
       {isAccountant && <AccountantExportButton />}
       {isAccountant && <AccountantTechsPanel />}
       {isAccountant && <AccountantTransfersPanel />}
+      {user?.role === 'manager' && (
+        <div className="px-4 pt-4 md:px-8">
+          <TelegramConnect compact hint="Сообщим в Telegram, когда придёт передача оборудования на подтверждение" />
+        </div>
+      )}
       {(isAdmin || isAccountant) && user && (
         <WorkspaceSwitcher
           managed={managed}

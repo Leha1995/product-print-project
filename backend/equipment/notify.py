@@ -116,3 +116,30 @@ def notify_task_done(cur, task_id: int) -> None:
         + (f'\n\nЧто сделано: {esc(comment[:1500])}' if comment else '')
     )
     send_to_users(cur, [uid, created_by], text)
+
+
+def notify_transfer(cur, from_uid: int, to_uid: int, eid, sender_id: int) -> None:
+    cur.execute(f"SELECT manager_id FROM app_users WHERE id = {int(to_uid)} AND role = 'admin'")
+    row = cur.fetchone()
+    if not row or not row[0]:
+        return
+    cur.execute(
+        'SELECT name, location, serial, price FROM equipment WHERE user_id = '
+        f"{int(from_uid)} AND id = '{str(eid).replace(chr(39), chr(39) * 2)}'"
+    )
+    eq = cur.fetchone()
+    if not eq:
+        return
+    name, location, serial, price = eq
+    price_text = f'{round(float(price or 0)):,}'.replace(',', ' ')
+    text = (
+        '📦 <b>Передача оборудования ждёт подтверждения</b>\n'
+        f'⚙️ {esc(name)}\n'
+        + (f'🏷 S/N: {esc(serial)}\n' if serial else '')
+        + (f'💰 Стоимость: {price_text} ₽\n' if float(price or 0) > 0 else '')
+        + f'📤 Откуда: {esc(point_name(cur, from_uid))}' + (f' · {esc(location)}' if location else '') + '\n'
+        f'📥 Куда: {esc(point_name(cur, to_uid))}\n'
+        f'👤 Отправил: {esc(point_name(cur, sender_id))}\n'
+        '\nОткройте сайт, чтобы подтвердить или отклонить.'
+    )
+    send_to_users(cur, [int(row[0])], text)

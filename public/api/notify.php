@@ -116,6 +116,30 @@ function notify_repair(PDO $db, int $uid, $eid, string $description, array $tech
     send_to_users($db, array_column($techs, 'id'), $text);
 }
 
+function notify_transfer(PDO $db, int $fromUid, int $toUid, string $eid, int $senderId): void
+{
+    $head = (int)one_value($db, "SELECT manager_id FROM app_users WHERE id = ? AND role = 'admin'", [$toUid]);
+    if (!$head) {
+        return;
+    }
+    $eq = one_row($db, 'SELECT name, location, serial, price FROM equipment WHERE user_id = ? AND id = ?', [$fromUid, $eid]);
+    if (!$eq) {
+        return;
+    }
+    $price = (float)$eq['price'];
+    $location = (string)$eq['location'];
+    $serial = (string)$eq['serial'];
+    $text = "📦 <b>Передача оборудования ждёт подтверждения</b>\n"
+        . '⚙️ ' . tg_esc($eq['name']) . "\n"
+        . ($serial !== '' ? '🏷 S/N: ' . tg_esc($serial) . "\n" : '')
+        . ($price > 0 ? '💰 Стоимость: ' . number_format(round($price), 0, '', ' ') . " ₽\n" : '')
+        . '📤 Откуда: ' . tg_esc(point_name($db, $fromUid)) . ($location !== '' ? ' · ' . tg_esc($location) : '') . "\n"
+        . '📥 Куда: ' . tg_esc(point_name($db, $toUid)) . "\n"
+        . '👤 Отправил: ' . tg_esc(point_name($db, $senderId)) . "\n"
+        . "\nОткройте сайт, чтобы подтвердить или отклонить.";
+    send_to_users($db, [$head], $text);
+}
+
 function notify_task_done(PDO $db, int $taskId): void
 {
     $row = one_row(
