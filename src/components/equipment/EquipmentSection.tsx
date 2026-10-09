@@ -13,6 +13,7 @@ import TaskCreateDialog, { TaskDraft } from '@/components/equipment/TaskCreateDi
 import TasksPanel from '@/components/equipment/TasksPanel';
 import TransferDialog from '@/components/equipment/TransferDialog';
 import ImportEquipmentDialog from '@/components/equipment/ImportEquipmentDialog';
+import TelegramConnect from '@/components/TelegramConnect';
 import useHardwareScanner from '@/hooks/useHardwareScanner';
 import { playScanSound } from '@/lib/scanSound';
 import useEquipment from '@/hooks/useEquipment';
@@ -371,6 +372,11 @@ const EquipmentSection = ({
         </button>
       )}
 
+      {isAdmin && !readOnly && (!targetId || targetId === userId) && (
+        <div className="mt-4">
+          <TelegramConnect compact hint="Сообщим в Telegram, когда техник выполнит задачу" />
+        </div>
+      )}
       <TasksPanel tasks={tasks} canManage={isAdmin} onCancel={handleCancelTask} />
 
       {items.length > 0 && (

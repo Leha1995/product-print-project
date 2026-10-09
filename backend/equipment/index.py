@@ -7,7 +7,14 @@ import uuid
 import boto3
 import psycopg2
 
-from notify import notify_transfer
+from notify import notify_new_task, notify_repair, notify_task_done, notify_transfer
+
+
+def safe_notify(fn, *args) -> None:
+    try:
+        fn(*args)
+    except Exception as err:
+        print(f'notify failed: {err}')
 
 CORS = {
     'Access-Control-Allow-Origin': '*',
@@ -594,7 +601,7 @@ def decide_transfer(cur, me, body: dict) -> dict:
 
 
 def handler(event: dict, context) -> dict:
-    """Инвентаризация оборудования кухни: карточки с QR-кодом, стоимостью, ремонтами и перемещениями через управляющего."""
+    """Инвентаризация оборудования кухни: карточки с QR-кодом, стоимостью, ремонтами, перемещениями и уведомлениями в Telegram."""
     method = event.get('httpMethod', 'GET')
     if method == 'OPTIONS':
         return {'statusCode': 200, 'headers': CORS, 'body': ''}
@@ -671,6 +678,8 @@ def handler(event: dict, context) -> dict:
                         int(me['id']),
                         close_task=False,
                     )
+            if closed:
+                safe_notify(notify_task_done, cur, tid)
             return finish({'ok': True, 'tasks': technician_tasks(cur, me), 'repairs': technician_items(cur, me)})
         if tbody.get('action') != 'return_repair':
             return finish({'error': 'forbidden'}, 403)
@@ -898,7 +907,15 @@ def handler(event: dict, context) -> dict:
         photos = upload_photos(body.get('photos'), f'{uid}-{uuid.uuid4().hex[:6]}')
         cur.execute(
             'INSERT INTO equipment_tasks (user_id, equipment_id, technician_id, created_by, description, photos, priority) '
-            f"VALUES ({uid}, {eq_sql}, {tech_sql}, {int(me['id'])}, {q(description)}, {q(json.dumps(photos))}::jsonb, {q(priority)})"
+            f"VALUES ({uid}, {eq_sql}, {tech_sql}, {int(me['id'])}, {q(description)}, {q(json.dumps(photos))}::jsonb, {q(priority)}) "
+            'RETURNING id'
+        )
+        new_id = cur.fetchone()[0]
+        safe_notify(
+            notify_new_task, cur, uid, new_id, description, priority,
+            eid if eq_sql != 'NULL' else None,
+            int(tech_id) if tech_sql != 'NULL' else None,
+            techs,
         )
         return finish({'ok': True, 'tasks': owner_tasks(cur, uid)})
 
@@ -935,10 +952,7 @@ def handler(event: dict, context) -> dict:
             f"SELECT {q(eid)}, {uid}, {to_user}, {int(me['id'])}, name, code, COALESCE(price, 0) "
             f'FROM equipment WHERE user_id = {uid} AND id = {q(eid)}'
         )
-        try:
-            notify_transfer(cur, uid, to_user, eid, int(me['id']))
-        except Exception as err:
-            print(f'transfer notify failed: {err}')
+        safe_notify(notify_transfer, cur, uid, to_user, eid, int(me['id']))
         return finish({'ok': True, 'items': read_items(cur, uid)})
 
     if action == 'transfer_cancel':
@@ -1053,6 +1067,7 @@ def handler(event: dict, context) -> dict:
                 f"VALUES ({uid}, {q(eid)}, NULL, {int(me['id'])}, {q(task_text[:2000])}, {q(json.dumps(photos))}::jsonb, "
                 f"{q(body.get('priority') if body.get('priority') in PRIORITIES else 'soon')}, 'repair')"
             )
+            safe_notify(notify_repair, cur, uid, eid, description, owner_technicians(cur, uid))
         return finish({'ok': True, 'items': read_items(cur, uid), 'tasks': owner_tasks(cur, uid)})
 
     if action == 'return_repair':
