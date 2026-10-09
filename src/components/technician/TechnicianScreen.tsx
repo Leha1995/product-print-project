@@ -232,6 +232,7 @@ const TechnicianScreen = ({ userName, onLogout, viewTechId = null, inline = fals
                   key={t.id}
                   task={t}
                   showOwner
+                  large
                   action={
                     t.status === 'open' && !viewOnly ? (
                       <button
@@ -312,7 +313,7 @@ const TechnicianScreen = ({ userName, onLogout, viewTechId = null, inline = fals
                     <Icon name="Clock" size={12} strokeWidth={2.5} />
                     {`С ${day(r.repairSentAt)} · ${daysIn(r.repairSentAt)} дн.`}
                   </p>
-                  <p className="mt-2 whitespace-pre-line text-[13px] text-primary">
+                  <p className="mt-2 whitespace-pre-line text-[17px] font-semibold leading-snug text-primary md:text-[18px]">
                     {r.description || <span className="text-muted-foreground">Описание поломки не указано</span>}
                   </p>
                   <RepairPhotos photos={r.photos || []} size={64} />

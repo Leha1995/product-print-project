@@ -7,6 +7,7 @@ interface TaskCardProps {
   task: EquipmentTask;
   showOwner?: boolean;
   action?: React.ReactNode;
+  large?: boolean;
 }
 
 const dateTime = (iso: string | null) =>
@@ -14,7 +15,7 @@ const dateTime = (iso: string | null) =>
     ? new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
     : '';
 
-const TaskCard = ({ task, showOwner = false, action }: TaskCardProps) => {
+const TaskCard = ({ task, showOwner = false, action, large = false }: TaskCardProps) => {
   const open = task.status === 'open';
   const pr = priorityOf(task.priority);
   const where = [showOwner ? task.ownerName : '', task.equipmentName, task.location].filter(Boolean).join(' · ');
@@ -61,7 +62,13 @@ const TaskCard = ({ task, showOwner = false, action }: TaskCardProps) => {
         {where && (
           <p className="mt-1.5 truncate font-head text-[0.85rem] font-black uppercase text-primary">{where}</p>
         )}
-        <p className="mt-1 whitespace-pre-line text-[13px] text-primary">{task.description}</p>
+        <p
+          className={`whitespace-pre-line text-primary ${
+            large ? 'mt-2 text-[17px] font-semibold leading-snug md:text-[18px]' : 'mt-1 text-[13px]'
+          }`}
+        >
+          {task.description}
+        </p>
         <RepairPhotos photos={task.photos} size={56} />
 
         <p className="mt-2 text-[11px] text-muted-foreground">
