@@ -32,20 +32,8 @@ const DefrostLabel = ({ info, printedAt, settings }: DefrostLabelProps) => {
     ? fmt(new Date(printedAt.getTime() + info.hours * 3600000))
     : null;
 
-  const textLabel = JSON.stringify({
-    title: 'Дефрост',
-    center: true,
-    rows: [
-      { label: 'Выложено', value: stamp },
-      ...(bestBefore ? [{ label: 'Годен до', value: bestBefore, bold: true }] : []),
-      { label: 'Выложил', value: info.staff || '—' },
-    ],
-    footer: info.temp,
-  });
-
   return (
     <div
-      data-text-label={textLabel}
       className={`print-area animate-print-out mx-auto border-y-2 border-primary bg-white font-body text-primary ${micro ? 'p-1' : tiny ? 'p-2' : 'p-4'}`}
       style={{ maxWidth: `${paper.widthMm * 3.5}px`, minHeight: micro ? `${paper.heightMm! * 3.5}px` : undefined }}
     >

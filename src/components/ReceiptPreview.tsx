@@ -32,23 +32,11 @@ const ReceiptPreview = ({
   const expiry = fmt(new Date(printedAt.getTime() + hours * 3600000));
   const compact = paper.widthMm <= 58;
   const large = paper.widthMm >= 105;
-  const textLabel = JSON.stringify({
-    title: product.name,
-    rows: [
-      ...(settings.showDate ? [{ label: 'Изготовлено', value: stamp }] : []),
-      ...(settings.showStaff
-        ? [{ label: 'Изг./пров.', value: `${settings.makerName || '—'} / ${settings.checkerName || '—'}` }]
-        : []),
-      ...(settings.showExpiry ? [{ label: 'Годен до', value: expiry, bold: true }] : []),
-    ],
-    footer: settings.showStorage ? product.storageText || settings.storageText : undefined,
-  });
 
   return (
     <div
       className={`print-area animate-print-out mx-auto border-y-2 border-primary bg-white font-body text-primary ${micro ? 'p-1.5' : tiny ? 'p-2' : 'p-4'}`}
       style={{ maxWidth: `${paper.widthMm * 3.5}px` }}
-      data-text-label={textLabel}
     >
       {settings.logo && !micro && (
         <img
