@@ -5,6 +5,7 @@ require __DIR__ . '/lib.php';
 require __DIR__ . '/schema.php';
 
 $db = boot();
+upgrade_schema($db);
 
 $driver = (load_config()['driver'] ?? 'mysql') === 'sqlite' ? 'sqlite' : 'mysql';
 foreach (schema_sql($driver) as $sql) {
@@ -53,7 +54,7 @@ function team_ids(PDO $db, int $owner): array
     $ids = [$owner];
     $level = [$owner];
     for ($i = 0; $i < 8 && $level; $i++) {
-        $rows = all_rows($db, 'SELECT id FROM app_users WHERE manager_id IN (' . in_list($level) . ')');
+        $rows = all_rows($db, 'SELECT id FROM app_users WHERE manager_id IN (' . in_list($level) . ') AND ' . shares_structure_sql($owner));
         $level = [];
         foreach ($rows as $r) {
             $id = (int)$r['id'];
@@ -71,7 +72,7 @@ function chain_ids(PDO $db, int $owner): array
     $ids = [$owner];
     $current = $owner;
     for ($i = 0; $i < 8; $i++) {
-        $up = one_value($db, 'SELECT manager_id FROM app_users WHERE id = ?', [$current]);
+        $up = one_value($db, 'SELECT manager_id FROM app_users WHERE id = ? AND ' . shares_structure_sql($owner), [$current]);
         if (!$up || in_array((int)$up, $ids, true)) {
             break;
         }

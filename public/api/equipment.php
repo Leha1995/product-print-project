@@ -50,7 +50,13 @@ function make_code(int $uid): string
 
 function equipment_can_manage(PDO $db, array $me, int $target): bool
 {
-    if ($target === $me['id'] || $me['role'] === 'superadmin') {
+    if ($target === $me['id']) {
+        return true;
+    }
+    if (!in_members($GLOBALS['structureMembers'] ?? null, $target)) {
+        return false;
+    }
+    if ($me['role'] === 'superadmin') {
         return true;
     }
     if ($me['role'] !== 'manager') {
@@ -71,6 +77,19 @@ function equipment_can_manage(PDO $db, array $me, int $target): bool
 }
 
 function technician_owners(PDO $db, int $techId): ?array
+{
+    $owners = technician_owners_all($db, $techId);
+    $members = $GLOBALS['structureMembers'] ?? null;
+    if ($members === null) {
+        return $owners;
+    }
+    if ($owners === null) {
+        return $members;
+    }
+    return array_values(array_filter($owners, fn($o) => in_array($o, $members, true)));
+}
+
+function technician_owners_all(PDO $db, int $techId): ?array
 {
     $heads = all_rows(
         $db,
@@ -116,7 +135,7 @@ function owner_technicians(PDO $db, int $uid): array
         . 'NOT EXISTS (SELECT 1 FROM technician_scopes s WHERE s.technician_id = u.id) '
         . 'OR EXISTS (SELECT 1 FROM technician_scopes s LEFT JOIN app_users h ON h.id = s.head_id '
         . "WHERE s.technician_id = u.id AND (s.head_id IN (" . in_list($heads) . ") OR h.role = 'superadmin'))"
-        . ') ORDER BY name'
+        . ') AND ' . shares_structure_sql($uid, 'u.id') . ' ORDER BY name'
     );
     return array_map(fn($r) => ['id' => (int)$r['id'], 'name' => (string)$r['name']], $rows);
 }
@@ -460,7 +479,7 @@ function can_send_from(PDO $db, array $me, int $uid): bool
     return $uid === (int)$me['id'] || transfer_head($db, $uid) === (int)$me['id'];
 }
 
-function incoming_transfers(PDO $db, int $managerId): array
+function incoming_transfers(PDO $db, int $managerId, string $extra = ''): array
 {
     $rows = all_rows(
         $db,
@@ -470,7 +489,7 @@ function incoming_transfers(PDO $db, int $managerId): array
         . 'JOIN equipment e ON e.user_id = t.from_user AND e.id = t.equipment_id '
         . 'LEFT JOIN app_users u ON u.id = t.from_user '
         . 'JOIN app_users r ON r.id = t.to_user '
-        . "WHERE r.role = 'admin' AND r.manager_id = ? AND t.status = 'pending' ORDER BY t.created_at, t.id",
+        . "WHERE r.role = 'admin' AND r.manager_id = ? AND t.status = 'pending'$extra ORDER BY t.created_at, t.id",
         [$managerId]
     );
     return array_map(fn($r) => [
@@ -551,6 +570,8 @@ $me = session_user($db, header_value('X-Auth-Token'));
 if (!$me) {
     out(['error' => 'unauthorized'], 401);
 }
+$structureMembers = session_members($db, header_value('X-Auth-Token'), $me);
+$GLOBALS['structureMembers'] = $structureMembers;
 if (method() === 'GET') {
     cleanup_photos($db);
 }
@@ -562,7 +583,7 @@ if (method() === 'GET' && $viewTech !== '') {
         out(['error' => 'forbidden'], 403);
     }
     $tech = one_row($db, "SELECT id, COALESCE(NULLIF(full_name, ''), username) AS name FROM app_users WHERE id = ? AND role = 'technician'", [(int)$viewTech]);
-    if (!$tech) {
+    if (!$tech || !in_members($structureMembers, $tech['id'])) {
         out(['error' => 'not_found'], 404);
     }
     $tid = (int)$tech['id'];
@@ -635,7 +656,7 @@ if ($me['role'] === 'accountant') {
         $techs = all_rows(
             $db,
             "SELECT u.id, COALESCE(NULLIF(u.full_name, ''), u.username) AS name FROM accountant_technicians a "
-            . "JOIN app_users u ON u.id = a.technician_id WHERE a.accountant_id = ? AND u.role = 'technician' ORDER BY name",
+            . "JOIN app_users u ON u.id = a.technician_id WHERE a.accountant_id = ? AND u.role = 'technician'" . members_sql($structureMembers, 'u.id') . ' ORDER BY name',
             [$aid]
         );
         $result = [];
@@ -679,7 +700,7 @@ if ($me['role'] === 'accountant') {
     }
 
     if ($report === 'transfers') {
-        $scope = 'SELECT admin_id FROM accountant_scopes WHERE accountant_id = ?';
+        $scope = 'SELECT admin_id FROM accountant_scopes WHERE accountant_id = ?' . members_sql($structureMembers, 'admin_id');
         $p = [$aid, $aid];
         $period = period_sql('t.created_at', $p);
         $rows = all_rows(
@@ -712,7 +733,7 @@ if ($me['role'] === 'accountant') {
         $points = all_rows(
             $db,
             "SELECT u.id, COALESCE(NULLIF(u.full_name, ''), u.username) AS name FROM accountant_scopes s "
-            . "JOIN app_users u ON u.id = s.admin_id WHERE s.accountant_id = ? AND u.role = 'admin' AND u.active = 1 ORDER BY name",
+            . "JOIN app_users u ON u.id = s.admin_id WHERE s.accountant_id = ? AND u.role = 'admin' AND u.active = 1" . members_sql($structureMembers, 'u.id') . ' ORDER BY name',
             [$aid]
         );
         $result = [];
@@ -739,7 +760,7 @@ if ($me['role'] === 'accountant') {
         "SELECT 1 FROM accountant_scopes s JOIN app_users u ON u.id = s.admin_id WHERE s.accountant_id = ? AND s.admin_id = ? AND u.role = 'admin' AND u.active = 1",
         [$aid, (int)$raw]
     );
-    if (!$ok) {
+    if (!$ok || !in_members($structureMembers, (int)$raw)) {
         out(['error' => 'forbidden'], 403);
     }
     $accUid = (int)$raw;
@@ -765,12 +786,14 @@ if (method() === 'GET' && ($_GET['report'] ?? '') === 'tasks') {
     out(tasks_report($db, $uid, (int)($_GET['sessionId'] ?? 0)));
 }
 if (method() === 'GET' && ($_GET['transfers'] ?? '') === 'incoming') {
-    out(['transfers' => $me['role'] === 'manager' ? incoming_transfers($db, (int)$me['id']) : []]);
+    out(['transfers' => $me['role'] === 'manager'
+        ? incoming_transfers($db, (int)$me['id'], members_sql($structureMembers, 't.from_user') . members_sql($structureMembers, 't.to_user'))
+        : []]);
 }
 if (method() === 'GET' && ($_GET['report'] ?? '') === 'admins') {
     $rows = all_rows(
         $db,
-        "SELECT id, COALESCE(NULLIF(full_name, ''), username) AS name FROM app_users WHERE role = 'admin' AND active = 1 AND manager_id IS NOT NULL AND id <> ? ORDER BY name",
+        "SELECT id, COALESCE(NULLIF(full_name, ''), username) AS name FROM app_users WHERE role = 'admin' AND active = 1 AND manager_id IS NOT NULL AND id <> ?" . members_sql($structureMembers, 'id') . ' ORDER BY name',
         [$uid]
     );
     out(['admins' => array_map(fn($r) => ['id' => (int)$r['id'], 'name' => (string)$r['name']], $rows)]);
@@ -842,7 +865,7 @@ if ($action === 'transfer') {
     $toUser = (int)($body['toUser'] ?? 0);
     $eid = (string)($body['id'] ?? '');
     $isAdmin = one_value($db, "SELECT 1 FROM app_users WHERE id = ? AND role = 'admin' AND active = 1 AND manager_id IS NOT NULL", [$toUser]);
-    if (!$isAdmin || $toUser === $uid) {
+    if (!$isAdmin || $toUser === $uid || !in_members($structureMembers, $toUser)) {
         out(['error' => 'bad_target'], 400);
     }
     $row = one_row($db, 'SELECT active, in_repair, name, code, price FROM equipment WHERE user_id = ? AND id = ?', [$uid, $eid]);

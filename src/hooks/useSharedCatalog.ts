@@ -1,4 +1,5 @@
 import { apiUrl } from '@/lib/apiBase';
+import { getToken } from '@/lib/authApi';
 import { useCallback, useEffect, useState } from 'react';
 import { Product } from '@/data/products';
 import { toast } from '@/hooks/use-toast';
@@ -18,7 +19,7 @@ export const useSharedCatalog = () => {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(API);
+      const res = await fetch(API, { headers: { 'X-Auth-Token': getToken() } });
       const data = await res.json();
       setItems(Array.isArray(data.items) ? data.items : []);
     } catch {
@@ -39,7 +40,7 @@ export const useSharedCatalog = () => {
       try {
         const res = await fetch(API, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': pin },
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': pin, 'X-Auth-Token': getToken() },
           body: JSON.stringify({ items: list, author }),
         });
         if (!res.ok) throw new Error('fail');
@@ -62,7 +63,7 @@ export const useSharedCatalog = () => {
     try {
       const res = await fetch(API, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': pin },
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Pin': pin, 'X-Auth-Token': getToken() },
         body: JSON.stringify({ id }),
       });
       if (!res.ok) throw new Error('fail');

@@ -3,12 +3,20 @@ const API = apiUrl('auth');
 
 export type Role = 'user' | 'admin' | 'manager' | 'superadmin' | 'technician' | 'accountant';
 
+export interface StructureRef {
+  id: number;
+  name: string;
+  members: number;
+}
+
 export interface AuthUser {
   id: number;
   username: string;
   fullName: string;
   role: Role;
   accessUntil?: string | null;
+  structures?: StructureRef[];
+  activeStructureId?: number | null;
 }
 
 export interface ManagedUser extends AuthUser {
@@ -19,6 +27,7 @@ export interface ManagedUser extends AuthUser {
   accessOwn?: boolean;
   scopeIds?: number[];
   techIds?: number[];
+  structureIds?: number[];
 }
 
 export interface ManagedTarget {
@@ -217,6 +226,7 @@ export const apiCreateUser = (payload: {
   accessDays?: number | null;
   scopeIds?: number[];
   techIds?: number[];
+  structureIds?: number[];
 }) => call<{ users: ManagedUser[] }>({ action: 'create_user', ...payload });
 
 export const apiUpdateUser = (payload: {
@@ -230,10 +240,24 @@ export const apiUpdateUser = (payload: {
   accessDays?: number | null;
   scopeIds?: number[];
   techIds?: number[];
+  structureIds?: number[];
 }) => call<{ users: ManagedUser[] }>({ action: 'update_user', ...payload });
 
 export const apiDeleteUser = (id: number) =>
   call<{ users: ManagedUser[] }>({ action: 'delete_user', id });
+
+export const apiSwitchStructure = (id: number) =>
+  call<{ user: AuthUser }>({ action: 'switch_structure', id });
+
+type StructuresResult = { structures: StructureRef[]; activeStructureId: number | null; users: ManagedUser[] };
+
+export const apiCreateStructure = (name: string, userIds: number[] = []) =>
+  call<StructuresResult>({ action: 'create_structure', name, userIds });
+
+export const apiRenameStructure = (id: number, name: string) =>
+  call<StructuresResult>({ action: 'rename_structure', id, name });
+
+export const apiDeleteStructure = (id: number) => call<StructuresResult>({ action: 'delete_structure', id });
 
 export const apiExportAll = () => call<{ version: number; tables: Record<string, unknown[]> }>({ action: 'export' });
 

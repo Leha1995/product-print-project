@@ -2,12 +2,20 @@
 declare(strict_types=1);
 
 require __DIR__ . '/lib.php';
+require __DIR__ . '/schema.php';
 
 $db = boot();
+upgrade_schema($db);
 
 function catalog_can_manage(PDO $db, array $me, int $target): bool
 {
-    if ($target === $me['id'] || $me['role'] === 'superadmin') {
+    if ($target === $me['id']) {
+        return true;
+    }
+    if (!in_members($me['members'] ?? null, $target)) {
+        return false;
+    }
+    if ($me['role'] === 'superadmin') {
         return true;
     }
     if ($me['role'] === 'manager') {
@@ -153,6 +161,8 @@ function build_overview(PDO $db, array $me): array
     } else {
         $staff = all_rows($db, 'SELECT id, username, full_name FROM app_users WHERE active = 1 AND manager_id = ? ORDER BY username', [$me['id']]);
     }
+    $members = $me['members'] ?? null;
+    $staff = array_values(array_filter($staff, fn($r) => in_members($members, $r['id'])));
     $nowMs = (int)round(microtime(true) * 1000);
     $soonMs = 3600000;
     $result = [];
@@ -193,6 +203,7 @@ $me = session_user($db, header_value('X-Auth-Token'));
 if (!$me) {
     out(['error' => 'unauthorized'], 401);
 }
+$me['members'] = session_members($db, header_value('X-Auth-Token'), $me);
 $uid = target_user($db, $me, 'catalog_can_manage');
 
 if (method() === 'GET' && ($_GET['action'] ?? '') === 'overview') {

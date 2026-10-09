@@ -108,14 +108,88 @@ def session_user(cur, token: str):
     }
 
 
-def list_users(cur, me=None):
+def allowed_structures(cur, me):
+    if me['role'] == 'superadmin':
+        cur.execute('SELECT id FROM structures ORDER BY id')
+    else:
+        cur.execute(
+            f"SELECT structure_id FROM structure_members WHERE user_id = {int(me['id'])} ORDER BY structure_id"
+        )
+    return [r[0] for r in cur.fetchall()]
+
+
+def active_structure(cur, token: str, me):
+    """Активная структура сессии: проверяется членство, при необходимости выбирается первая доступная."""
+    cur.execute(f'SELECT structure_id FROM app_sessions WHERE token = {q(token)}')
+    row = cur.fetchone()
+    sid = row[0] if row else None
+    allowed = allowed_structures(cur, me)
+    if sid not in allowed:
+        sid = allowed[0] if allowed else None
+        cur.execute(f"UPDATE app_sessions SET structure_id = {sid or 'NULL'} WHERE token = {q(token)}")
+    return sid
+
+
+def structure_member_ids(cur, sid, me):
+    """Кто виден в активной структуре. None — без ограничений."""
+    if not sid:
+        return None if me['role'] == 'superadmin' else [int(me['id'])]
+    cur.execute(
+        f'SELECT user_id FROM structure_members WHERE structure_id = {int(sid)} '
+        "UNION SELECT id FROM app_users WHERE role = 'superadmin'"
+    )
+    return [r[0] for r in cur.fetchall()]
+
+
+def structures_payload(cur, me, sid):
+    allowed = allowed_structures(cur, me)
+    if not allowed:
+        return {'structures': [], 'activeStructureId': None}
+    cur.execute(
+        "SELECT s.id, s.name, (SELECT COUNT(*) FROM structure_members m WHERE m.structure_id = s.id) "
+        f"FROM structures s WHERE s.id IN ({', '.join(str(i) for i in allowed)}) ORDER BY s.name"
+    )
+    return {
+        'structures': [{'id': r[0], 'name': r[1], 'members': r[2]} for r in cur.fetchall()],
+        'activeStructureId': sid,
+    }
+
+
+def user_structures(cur) -> dict:
+    cur.execute('SELECT user_id, structure_id FROM structure_members ORDER BY structure_id')
+    out: dict = {}
+    for uid, sid in cur.fetchall():
+        out.setdefault(uid, []).append(sid)
+    return out
+
+
+def set_user_structures(cur, user_id: int, ids) -> None:
+    clean = sorted({int(i) for i in (ids or []) if str(i).isdigit()})
+    cur.execute(f'DELETE FROM structure_members WHERE user_id = {int(user_id)}')
+    if clean:
+        cur.execute(
+            'INSERT INTO structure_members (structure_id, user_id) '
+            f"SELECT id, {int(user_id)} FROM structures WHERE id IN ({', '.join(str(i) for i in clean)}) "
+            'ON CONFLICT DO NOTHING'
+        )
+
+
+def list_users(cur, me=None, members=None):
     where = ''
     if me and me['role'] == 'admin':
-        where = f"WHERE manager_id = {me['id']} OR id = {me['id']}"
+        where = f"WHERE (manager_id = {me['id']} OR id = {me['id']})"
     elif me and me['role'] == 'manager':
         branch = manager_branch_ids(cur, me['id'])
         ids = ', '.join(str(i) for i in branch) if branch else '0'
         where = f'WHERE id IN ({ids})'
+    if members is not None:
+        member_sql = ', '.join(str(i) for i in members) or '0'
+        extra = (
+            f'(id IN ({member_sql}) OR NOT EXISTS (SELECT 1 FROM structure_members m WHERE m.user_id = app_users.id))'
+            if me and me['role'] == 'superadmin'
+            else f'id IN ({member_sql})'
+        )
+        where = f'{where} AND {extra}' if where else f'WHERE {extra}'
     cur.execute(
         'SELECT id, username, full_name, role, active, created_at, manager_id, access_until '
         f'FROM app_users {where} ORDER BY id'
@@ -124,6 +198,7 @@ def list_users(cur, me=None):
     scopes = read_scopes(cur)
     acc_scopes = read_accountant_scopes(cur)
     acc_techs = read_accountant_techs(cur)
+    memberships = user_structures(cur)
     own = {r[0]: r[7] for r in rows}
     result = []
     for r in rows:
@@ -151,6 +226,7 @@ def list_users(cur, me=None):
                 'scopeIds': scopes.get(r[0], []) if r[3] == 'technician'
                 else acc_scopes.get(r[0], []) if r[3] == 'accountant' else [],
                 'techIds': acc_techs.get(r[0], []) if r[3] == 'accountant' else [],
+                'structureIds': memberships.get(r[0], []),
             }
         )
     return result
@@ -240,8 +316,16 @@ def manager_branch_ids(cur, manager_id: int):
     return ids
 
 
-def managed_ids(cur, me):
-    """Список id пользователей, чьим каталогом может управлять текущий аккаунт."""
+def managed_ids(cur, me, members=None):
+    """Список id пользователей активной структуры, чьим каталогом может управлять текущий аккаунт."""
+    ids = managed_ids_all(cur, me)
+    if members is None:
+        return ids
+    allowed = set(members)
+    return [i for i in ids if i in allowed or i == me['id']]
+
+
+def managed_ids_all(cur, me):
     if me['role'] == 'manager':
         return manager_branch_ids(cur, me['id'])
     if me['role'] == 'accountant':
@@ -260,13 +344,15 @@ def managed_ids(cur, me):
 EXPORT_TABLES = {
     'app_users': 'id, username, full_name, password_hash, role, active, created_at, manager_id, access_until',
     'app_sessions': 'token, user_id, created_at, expires_at',
+    'structures': 'id, name, created_at',
+    'structure_members': 'structure_id, user_id',
     'user_products': 'user_id, id, name, category, categories, weight, composition, image, barcode, hit, '
                      'shelf_life_hours, storage_text, updated_at',
     'user_categories': 'user_id, id, label, icon, position, updated_at',
     'user_prefs': 'user_id, key, value, updated_at',
     'user_meta': 'user_id, seeded, created_at',
     'shared_products': 'id, name, category, categories, weight, composition, image, barcode, hit, '
-                       'shelf_life_hours, storage_text, author, created_at, updated_at',
+                       'shelf_life_hours, storage_text, author, created_at, updated_at, structure_id',
     'equipment': 'user_id, id, name, code, price, location, note, image, serial, active, created_at, '
                  'updated_at, qr_broken, written_off_at, write_off_reason, commissioned_at, '
                  'depreciation_per_day, repair_cost, in_repair, repair_sent_at',
@@ -310,7 +396,7 @@ def export_all(cur) -> dict:
 
 
 def handler(event: dict, context) -> dict:
-    """Вход по логину и паролю, сессии и управление пользователями (супер-админ)."""
+    """Вход по логину и паролю, сессии, структуры и управление пользователями (супер-админ)."""
     method = event.get('httpMethod', 'GET')
     if method == 'OPTIONS':
         return {'statusCode': 200, 'headers': CORS, 'body': ''}
@@ -356,6 +442,8 @@ def handler(event: dict, context) -> dict:
                 'INSERT INTO app_sessions (token, user_id, expires_at) VALUES '
                 f"({q(new_token)}, {row[0]}, {q(expires.isoformat(sep=' ', timespec='seconds'))})"
             )
+            login_me = {'id': row[0], 'role': row[4]}
+            login_sid = active_structure(cur, new_token, login_me)
             return done({
                 'token': new_token,
                 'user': {
@@ -364,15 +452,18 @@ def handler(event: dict, context) -> dict:
                     'fullName': row[2],
                     'role': row[4],
                     'accessUntil': until.isoformat() if until else None,
+                    **structures_payload(cur, login_me, login_sid),
                 },
             })
 
         me = session_user(cur, token)
+        sid = active_structure(cur, token, me) if me else None
+        members = structure_member_ids(cur, sid, me) if me else None
 
         if action == 'me':
             if not me:
                 return done({'user': None}, 200)
-            return done({'user': me})
+            return done({'user': {**me, **structures_payload(cur, me, sid)}})
 
         if action == 'logout':
             if token:
@@ -393,10 +484,17 @@ def handler(event: dict, context) -> dict:
             )
             return done({'ok': True})
 
+        if action == 'switch_structure':
+            new_sid = int(body.get('id') or 0)
+            if new_sid not in allowed_structures(cur, me):
+                return done({'error': 'forbidden'}, 403)
+            cur.execute(f'UPDATE app_sessions SET structure_id = {new_sid} WHERE token = {q(token)}')
+            return done({'user': {**me, **structures_payload(cur, me, new_sid)}})
+
         if action == 'managed':
             cur.execute(
                 'SELECT id, username, full_name, role, manager_id FROM app_users WHERE id IN ('
-                + (', '.join(str(i) for i in managed_ids(cur, me)) or '0')
+                + (', '.join(str(i) for i in managed_ids(cur, me, members)) or '0')
                 + ') ORDER BY role, username'
             )
             return done({
@@ -415,7 +513,41 @@ def handler(event: dict, context) -> dict:
             return done({'error': 'forbidden'}, 403)
 
         if action == 'users':
-            return done({'users': list_users(cur, me)})
+            return done({'users': list_users(cur, me, structure_member_ids(cur, sid, me))})
+
+        if action in ('structures', 'create_structure', 'rename_structure', 'delete_structure'):
+            if me['role'] != 'superadmin':
+                return done({'error': 'forbidden'}, 403)
+            if action == 'create_structure':
+                name = str(body.get('name') or '').strip()[:120]
+                if not name:
+                    return done({'error': 'invalid_input'}, 400)
+                cur.execute(f'INSERT INTO structures (name) VALUES ({q(name)}) RETURNING id')
+                new_sid = cur.fetchone()[0]
+                set_ids = [int(i) for i in (body.get('userIds') or []) if str(i).isdigit()]
+                if set_ids:
+                    cur.execute(
+                        'INSERT INTO structure_members (structure_id, user_id) '
+                        f"SELECT {new_sid}, id FROM app_users WHERE role <> 'superadmin' "
+                        f"AND id IN ({', '.join(str(i) for i in set_ids)}) ON CONFLICT DO NOTHING"
+                    )
+            elif action == 'rename_structure':
+                name = str(body.get('name') or '').strip()[:120]
+                if not name:
+                    return done({'error': 'invalid_input'}, 400)
+                cur.execute(f"UPDATE structures SET name = {q(name)} WHERE id = {int(body.get('id') or 0)}")
+            elif action == 'delete_structure':
+                del_id = int(body.get('id') or 0)
+                cur.execute(f'SELECT COUNT(*) FROM structure_members WHERE structure_id = {del_id}')
+                if cur.fetchone()[0]:
+                    return done({'error': 'structure_not_empty'}, 409)
+                cur.execute('SELECT COUNT(*) FROM structures')
+                if cur.fetchone()[0] <= 1:
+                    return done({'error': 'last_structure'}, 400)
+                cur.execute(f'DELETE FROM shared_products WHERE structure_id = {del_id}')
+                cur.execute(f'DELETE FROM structures WHERE id = {del_id}')
+            cur_sid = active_structure(cur, token, me)
+            return done({**structures_payload(cur, me, cur_sid), 'users': list_users(cur, me, structure_member_ids(cur, cur_sid, me))})
 
         if me['role'] == 'manager':
             return done({'error': 'forbidden'}, 403)
@@ -444,7 +576,7 @@ def handler(event: dict, context) -> dict:
                         cur.execute(
                             f'UPDATE app_sessions SET expires_at = NOW() WHERE user_id = {target}'
                         )
-                return done({'users': list_users(cur, me)})
+                return done({'users': list_users(cur, me, structure_member_ids(cur, sid, me))})
 
             return done({'error': 'forbidden'}, 403)
 
@@ -474,12 +606,15 @@ def handler(event: dict, context) -> dict:
                 'RETURNING id'
             )
             new_id = cur.fetchone()[0]
+            if role != 'superadmin':
+                wanted = body.get('structureIds')
+                set_user_structures(cur, new_id, wanted if isinstance(wanted, list) and wanted else ([sid] if sid else []))
             if role == 'technician':
                 save_scopes(cur, new_id, body.get('scopeIds'))
             elif role == 'accountant':
                 save_accountant_scopes(cur, new_id, body.get('scopeIds'))
                 save_accountant_techs(cur, new_id, body.get('techIds'))
-            return done({'users': list_users(cur, me)})
+            return done({'users': list_users(cur, me, structure_member_ids(cur, sid, me))})
 
         if action == 'update_user':
             user_id = int(body.get('id') or 0)
@@ -523,6 +658,10 @@ def handler(event: dict, context) -> dict:
                     until = datetime.utcnow() + timedelta(days=int(days))
                     sets.append(f"access_until = {q(until.isoformat(sep=' ', timespec='seconds'))}")
                     renew_branch = True
+            if 'structureIds' in body and isinstance(body.get('structureIds'), list):
+                set_user_structures(cur, user_id, body.get('structureIds'))
+            if body.get('role') == 'superadmin':
+                set_user_structures(cur, user_id, [])
             if 'techIds' in body:
                 save_accountant_techs(cur, user_id, body.get('techIds'))
             if 'scopeIds' in body:
@@ -534,7 +673,7 @@ def handler(event: dict, context) -> dict:
                 else:
                     save_scopes(cur, user_id, body.get('scopeIds'))
             if not sets:
-                return done({'users': list_users(cur, me)})
+                return done({'users': list_users(cur, me, structure_member_ids(cur, sid, me))})
             cur.execute(f'UPDATE app_users SET {", ".join(sets)} WHERE id = {user_id}')
             if renew_branch:
                 unlock_branch(cur, user_id)
@@ -542,7 +681,7 @@ def handler(event: dict, context) -> dict:
                 cur.execute(f'UPDATE app_sessions SET expires_at = NOW() WHERE user_id = {user_id}')
             if body.get('role') in ROLES and body['role'] != 'admin':
                 cur.execute(f'UPDATE app_users SET access_until = NULL WHERE id = {user_id}')
-            return done({'users': list_users(cur, me)})
+            return done({'users': list_users(cur, me, structure_member_ids(cur, sid, me))})
 
         if action == 'delete_user':
             user_id = int(body.get('id') or 0)
@@ -559,6 +698,7 @@ def handler(event: dict, context) -> dict:
                 if cur.fetchone()[0] <= 1:
                     return done({'error': 'last_superadmin'}, 400)
             cur.execute(f'DELETE FROM app_sessions WHERE user_id = {user_id}')
+            cur.execute(f'DELETE FROM structure_members WHERE user_id = {user_id}')
             cur.execute(
                 f'DELETE FROM technician_scopes WHERE technician_id = {user_id} OR head_id = {user_id}'
             )
@@ -570,7 +710,7 @@ def handler(event: dict, context) -> dict:
             )
             cur.execute(f'UPDATE app_users SET manager_id = NULL WHERE manager_id = {user_id}')
             cur.execute(f'DELETE FROM app_users WHERE id = {user_id}')
-            return done({'users': list_users(cur, me)})
+            return done({'users': list_users(cur, me, structure_member_ids(cur, sid, me))})
 
         return done({'error': 'unknown_action'}, 400)
     finally:

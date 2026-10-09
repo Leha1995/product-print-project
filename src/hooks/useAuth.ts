@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  apiSwitchStructure,
   addKnownLogin,
   apiLogin,
   apiLogout,
@@ -94,6 +95,21 @@ export const useAuth = () => {
     return res.user;
   }, []);
 
+  const switchStructure = useCallback(async (id: number) => {
+    const res = await apiSwitchStructure(id);
+    setCachedUser(res.user);
+    setUser(res.user);
+    return res.user;
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    const res = await apiMe();
+    if (res.status === 'ok') {
+      setCachedUser(res.user);
+      setUser(res.user);
+    }
+  }, []);
+
   const logout = useCallback(async (forget = false) => {
     await apiLogout().catch(() => null);
     if (forget) forgetLogin();
@@ -109,6 +125,8 @@ export const useAuth = () => {
     kicked,
     login,
     logout,
+    switchStructure,
+    refreshUser,
     isAuthed: !!user,
     isAdmin:
       user?.role === 'admin' || user?.role === 'superadmin' || user?.role === 'manager',

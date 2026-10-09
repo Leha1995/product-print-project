@@ -8,10 +8,12 @@ import {
   apiUsers,
   ManagedUser,
   Role,
+  StructureRef,
 } from '@/lib/authApi';
 import { toast } from '@/hooks/use-toast';
 import TechScopePicker from '@/components/users/TechScopePicker';
 import TechPicker from '@/components/users/TechPicker';
+import StructuresPanel from '@/components/users/StructuresPanel';
 
 interface UsersDialogProps {
   open: boolean;
@@ -21,6 +23,9 @@ interface UsersDialogProps {
   readOnly?: boolean;
   onChanged?: () => void;
   onViewTechnician?: (id: number, name: string) => void;
+  structures?: StructureRef[];
+  activeStructureId?: number | null;
+  onStructuresChanged?: () => void;
 }
 
 const roleLabel: Record<Role, string> = {
@@ -70,6 +75,9 @@ const UsersDialog = ({
   readOnly = false,
   onChanged,
   onViewTechnician,
+  structures = [],
+  activeStructureId = null,
+  onStructuresChanged,
 }: UsersDialogProps) => {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [username, setUsername] = useState('');
@@ -87,6 +95,7 @@ const UsersDialog = ({
   const [accessDays, setAccessDays] = useState<number | ''>('');
   const [editAccess, setEditAccess] = useState<number | '' | 'keep'>('keep');
   const [collapsed, setCollapsed] = useState<number[]>([]);
+  const [editStructures, setEditStructures] = useState<number[]>([]);
 
   const toggleGroup = (id: number) =>
     setCollapsed((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -188,6 +197,7 @@ const UsersDialog = ({
     try {
       const r = await apiUpdateUser(payload);
       apply(r.users);
+      if (payload.structureIds) onStructuresChanged?.();
       toast({ title: msg });
     } catch {
       toast({ title: 'Не удалось сохранить' });
@@ -215,6 +225,7 @@ const UsersDialog = ({
     setEditLogin(u.username);
     setEditPass('');
     setEditAccess('keep');
+    setEditStructures(u.structureIds || []);
   };
 
   const cancelEdit = () => {
@@ -242,9 +253,11 @@ const UsersDialog = ({
         ...(isSuperAdmin && u.role === 'admin' && editAccess !== 'keep'
           ? { accessDays: editAccess === '' ? null : editAccess }
           : {}),
+        ...(isSuperAdmin && u.role !== 'superadmin' && structures.length ? { structureIds: editStructures } : {}),
       });
       apply(r.users);
       cancelEdit();
+      onStructuresChanged?.();
       toast({ title: 'Данные сохранены' });
     } catch (e) {
       toast({
@@ -278,7 +291,25 @@ const UsersDialog = ({
           </div>
 
           {isSuperAdmin && (
-          <div className="mt-5 grid gap-2 border-2 border-primary bg-card p-4 md:grid-cols-2">
+            <StructuresPanel
+              structures={structures}
+              activeId={activeStructureId}
+              users={users}
+              onChanged={apply}
+              onStructuresChanged={() => onStructuresChanged?.()}
+            />
+          )}
+
+          {isSuperAdmin && structures.length > 0 && (
+            <p className="mt-4 text-[12px] text-muted-foreground">
+              {`Новые пользователи добавляются в открытую структуру «${
+                structures.find((x) => x.id === activeStructureId)?.name || '—'
+              }». Другие структуры можно отметить в «Изменить».`}
+            </p>
+          )}
+
+          {isSuperAdmin && (
+          <div className="mt-2 grid gap-2 border-2 border-primary bg-card p-4 md:grid-cols-2">
             <input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -442,6 +473,16 @@ const UsersDialog = ({
                       </span>
                     )}
                   </p>
+                  {isSuperAdmin && structures.length > 1 && u.role !== 'superadmin' && (
+                    <p className="truncate text-[11px] font-semibold text-primary">
+                      {(u.structureIds || []).length
+                        ? `Структуры: ${(u.structureIds || [])
+                            .map((sid) => structures.find((x) => x.id === sid)?.name)
+                            .filter(Boolean)
+                            .join(', ')}`
+                        : 'Без структуры'}
+                    </p>
+                  )}
                   <p className="truncate text-[12px] text-muted-foreground">
                     {`${u.fullName || '—'} · ${roleLabel[u.role]}${
                       u.managerId && depth === 0
@@ -641,6 +682,33 @@ const UsersDialog = ({
                 className={inputClass}
               />
             </div>
+            {isSuperAdmin && structures.length > 0 && users.find((x) => x.id === editId)?.role !== 'superadmin' && (
+              <div>
+                <p className="mb-1 font-head text-[0.7rem] font-bold uppercase text-primary">Структуры</p>
+                <div className="grid gap-1 border-2 border-primary bg-card p-2">
+                  {structures.map((st) => (
+                    <label key={st.id} className="flex items-center gap-2 text-[13px] text-primary">
+                      <input
+                        type="checkbox"
+                        checked={editStructures.includes(st.id)}
+                        onChange={(e) =>
+                          setEditStructures((prev) =>
+                            e.target.checked ? [...prev, st.id] : prev.filter((x) => x !== st.id),
+                          )
+                        }
+                        className="h-4 w-4 accent-[hsl(var(--primary))]"
+                      />
+                      {st.name}
+                    </label>
+                  ))}
+                </div>
+                {!editStructures.length && (
+                  <p className="mt-1 text-[12px] text-destructive">
+                    Без структуры пользователь не увидит ни одного сотрудника и общей базы.
+                  </p>
+                )}
+              </div>
+            )}
             {isSuperAdmin && users.find((x) => x.id === editId)?.role === 'admin' && (
               <div>
                 <p className="mb-1 font-head text-[0.7rem] font-bold uppercase text-primary">

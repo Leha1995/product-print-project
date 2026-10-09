@@ -119,8 +119,53 @@ def session_user(cur, token: str):
     return {'id': row[0], 'username': row[1], 'role': row[2], 'managerId': row[4]}
 
 
+def structure_members(cur, token: str, me):
+    """Участники активной структуры сессии. None — без ограничений (супер-админ без структур)."""
+    if me['role'] == 'superadmin':
+        cur.execute('SELECT id FROM structures ORDER BY id')
+    else:
+        cur.execute(f"SELECT structure_id FROM structure_members WHERE user_id = {int(me['id'])} ORDER BY structure_id")
+    allowed = [r[0] for r in cur.fetchall()]
+    cur.execute(f'SELECT structure_id FROM app_sessions WHERE token = {q(token)}')
+    row = cur.fetchone()
+    sid = row[0] if row else None
+    if sid not in allowed:
+        sid = allowed[0] if allowed else None
+        cur.execute(f"UPDATE app_sessions SET structure_id = {sid or 'NULL'} WHERE token = {q(token)}")
+    if not sid:
+        return None if me['role'] == 'superadmin' else [int(me['id'])]
+    cur.execute(
+        f'SELECT user_id FROM structure_members WHERE structure_id = {int(sid)} '
+        "UNION SELECT id FROM app_users WHERE role = 'superadmin'"
+    )
+    return sorted(r[0] for r in cur.fetchall())
+
+
+def in_members(me, user_id) -> bool:
+    members = me.get('members')
+    return members is None or int(user_id) in members
+
+
+def members_sql(me, column: str) -> str:
+    members = me.get('members')
+    if members is None:
+        return ''
+    return f" AND {column} IN ({', '.join(str(i) for i in members) or '0'})"
+
+
 def technician_owners(cur, me):
-    """Владельцы оборудования, ремонты которых видит техник. None — все."""
+    """Владельцы оборудования, ремонты которых видит техник (в пределах активной структуры). None — все."""
+    owners = technician_owners_all(cur, me)
+    members = me.get('members')
+    if members is None:
+        return owners
+    if owners is None:
+        return list(members)
+    allowed = set(members)
+    return [o for o in owners if o in allowed]
+
+
+def technician_owners_all(cur, me):
     cur.execute(
         'SELECT s.head_id, u.role FROM technician_scopes s LEFT JOIN app_users u ON u.id = s.head_id '
         f"WHERE s.technician_id = {int(me['id'])}"
@@ -172,7 +217,11 @@ def technician_items(cur, me):
 
 
 def can_manage(cur, me, target_id: int) -> bool:
-    if target_id == me['id'] or me['role'] == 'superadmin':
+    if target_id == me['id']:
+        return True
+    if not in_members(me, target_id):
+        return False
+    if me['role'] == 'superadmin':
         return True
     if me['role'] == 'manager':
         cur.execute(
@@ -348,7 +397,7 @@ def return_repair(cur, uid: int, body: dict, by_user: int = 0, close_task: bool 
 
 
 def owner_technicians(cur, uid: int):
-    """Техники, закреплённые за точкой uid (напрямую, через управляющего или «все точки»)."""
+    """Техники, закреплённые за точкой uid и состоящие с ней в одной структуре."""
     cur.execute(f'SELECT role, manager_id FROM app_users WHERE id = {int(uid)}')
     row = cur.fetchone()
     heads = [int(uid)]
@@ -360,7 +409,9 @@ def owner_technicians(cur, uid: int):
         'NOT EXISTS (SELECT 1 FROM technician_scopes s WHERE s.technician_id = u.id) '
         'OR EXISTS (SELECT 1 FROM technician_scopes s LEFT JOIN app_users h ON h.id = s.head_id '
         f"WHERE s.technician_id = u.id AND (s.head_id IN ({', '.join(str(h) for h in heads)}) OR h.role = 'superadmin'))"
-        ') ORDER BY 2'
+        ') AND (NOT EXISTS (SELECT 1 FROM structure_members p WHERE p.user_id = ' + str(int(uid)) + ') '
+        'OR EXISTS (SELECT 1 FROM structure_members a JOIN structure_members b ON a.structure_id = b.structure_id '
+        f'WHERE a.user_id = u.id AND b.user_id = {int(uid)})) ORDER BY 2'
     )
     return [{'id': r[0], 'name': r[1]} for r in cur.fetchall()]
 
@@ -528,7 +579,7 @@ def can_send_from(cur, me, uid: int) -> bool:
     return transfer_head(cur, uid) == int(me['id'])
 
 
-def incoming_transfers(cur, manager_id: int):
+def incoming_transfers(cur, manager_id: int, extra: str = ''):
     cur.execute(
         'SELECT t.id, t.created_at, e.name, e.code, e.price, e.location, e.serial, e.image, e.note, '
         "COALESCE(NULLIF(u.full_name, ''), u.username), COALESCE(NULLIF(r.full_name, ''), r.username) "
@@ -536,7 +587,7 @@ def incoming_transfers(cur, manager_id: int):
         'JOIN equipment e ON e.user_id = t.from_user AND e.id = t.equipment_id '
         'LEFT JOIN app_users u ON u.id = t.from_user '
         'JOIN app_users r ON r.id = t.to_user '
-        f"WHERE r.role = 'admin' AND r.manager_id = {int(manager_id)} AND t.status = 'pending' ORDER BY t.created_at"
+        f"WHERE r.role = 'admin' AND r.manager_id = {int(manager_id)} AND t.status = 'pending'{extra} ORDER BY t.created_at"
     )
     return [
         {
@@ -621,6 +672,7 @@ def handler(event: dict, context) -> dict:
     me = session_user(cur, token)
     if not me:
         return finish({'error': 'unauthorized'}, 401)
+    me['members'] = structure_members(cur, token, me)
     if method == 'GET':
         cleanup_repair_photos(cur)
     view_tech = str((event.get('queryStringParameters') or {}).get('viewTech') or '')
@@ -633,9 +685,9 @@ def handler(event: dict, context) -> dict:
             f"WHERE id = {int(view_tech)} AND role = 'technician'"
         )
         row = cur.fetchone()
-        if not row:
+        if not row or not in_members(me, row[0]):
             return finish({'error': 'not_found'}, 404)
-        tech = {'id': row[0], 'username': row[1], 'role': row[2]}
+        tech = {'id': row[0], 'username': row[1], 'role': row[2], 'members': me['members']}
         return finish(
             {
                 'repairs': technician_items(cur, tech),
@@ -705,7 +757,7 @@ def handler(event: dict, context) -> dict:
             cur.execute(
                 "SELECT u.id, COALESCE(NULLIF(u.full_name, ''), u.username) FROM accountant_technicians a "
                 'JOIN app_users u ON u.id = a.technician_id '
-                f"WHERE a.accountant_id = {int(me['id'])} AND u.role = 'technician' ORDER BY 2"
+                f"WHERE a.accountant_id = {int(me['id'])} AND u.role = 'technician'{members_sql(me, 'u.id')} ORDER BY 2"
             )
             techs = [{'id': r[0], 'name': r[1]} for r in cur.fetchall()]
             d_from = date_sql(qs_acc.get('from'))
@@ -717,7 +769,7 @@ def handler(event: dict, context) -> dict:
                 done_period += f" AND t.done_at < {d_to}::date + INTERVAL '1 day'"
             for tech in techs:
                 tid = int(tech['id'])
-                owners = technician_owners(cur, {'id': tid})
+                owners = technician_owners(cur, {'id': tid, 'members': me['members']})
                 scope = '' if owners is None else f" AND t.user_id IN ({', '.join(str(o) for o in owners) or '0'})"
                 tech['done'] = task_rows(cur, f"t.status = 'done' AND t.done_by = {tid}{done_period}", 5000)
                 tech['open'] = task_rows(
@@ -761,6 +813,7 @@ def handler(event: dict, context) -> dict:
                 period += f" AND t.created_at < {d_to}::date + INTERVAL '1 day'"
             scope = (
                 f"SELECT admin_id FROM accountant_scopes WHERE accountant_id = {int(me['id'])}"
+                + members_sql(me, 'admin_id')
             )
             cur.execute(
                 'SELECT t.id, t.equipment_name, t.equipment_code, t.equipment_price, t.status, '
@@ -799,7 +852,7 @@ def handler(event: dict, context) -> dict:
             cur.execute(
                 "SELECT u.id, COALESCE(NULLIF(u.full_name, ''), u.username) FROM accountant_scopes s "
                 'JOIN app_users u ON u.id = s.admin_id '
-                f"WHERE s.accountant_id = {int(me['id'])} AND u.role = 'admin' AND u.active ORDER BY 2"
+                f"WHERE s.accountant_id = {int(me['id'])} AND u.role = 'admin' AND u.active{members_sql(me, 'u.id')} ORDER BY 2"
             )
             points = [{'id': r[0], 'name': r[1]} for r in cur.fetchall()]
             d_from = date_sql(qs_acc.get('from'))
@@ -822,7 +875,7 @@ def handler(event: dict, context) -> dict:
             f"WHERE s.accountant_id = {int(me['id'])} AND s.admin_id = {int(raw_acc)} "
             "AND u.role = 'admin' AND u.active"
         )
-        if not cur.fetchone():
+        if not cur.fetchone() or not in_members(me, int(raw_acc)):
             return finish({'error': 'forbidden'}, 403)
         acc_uid = int(raw_acc)
         if qs_acc.get('report') == 'tasks':
@@ -860,12 +913,15 @@ def handler(event: dict, context) -> dict:
         return finish(tasks_report(cur, uid, int(sid) if sid.isdigit() else 0))
 
     if method == 'GET' and qs.get('transfers') == 'incoming':
-        return finish({'transfers': incoming_transfers(cur, me['id']) if me['role'] == 'manager' else []})
+        return finish({
+            'transfers': incoming_transfers(cur, me['id'], members_sql(me, 't.from_user') + members_sql(me, 't.to_user'))
+            if me['role'] == 'manager' else []
+        })
 
     if method == 'GET' and qs.get('report') == 'admins':
         cur.execute(
             "SELECT id, COALESCE(NULLIF(full_name, ''), username) FROM app_users "
-            f"WHERE role = 'admin' AND active AND manager_id IS NOT NULL AND id <> {int(uid)} ORDER BY 2"
+            f"WHERE role = 'admin' AND active AND manager_id IS NOT NULL AND id <> {int(uid)}{members_sql(me, 'id')} ORDER BY 2"
         )
         return finish({'admins': [{'id': r[0], 'name': r[1]} for r in cur.fetchall()]})
 
@@ -932,7 +988,7 @@ def handler(event: dict, context) -> dict:
         to_user = int(body.get('toUser') or 0)
         eid = str(body.get('id') or '')
         cur.execute(f"SELECT 1 FROM app_users WHERE id = {to_user} AND role = 'admin' AND active AND manager_id IS NOT NULL")
-        if not cur.fetchone() or to_user == uid:
+        if not cur.fetchone() or to_user == uid or not in_members(me, to_user):
             return finish({'error': 'bad_target'}, 400)
         cur.execute(
             f'SELECT active, in_repair FROM equipment WHERE user_id = {uid} AND id = {q(eid)}'

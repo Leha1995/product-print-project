@@ -73,18 +73,54 @@ function accountant_admin_ids(PDO $db, int $accId): array
     return array_map('intval', array_column($rows, 'id'));
 }
 
-function list_users(PDO $db, array $me): array
+function structures_payload(PDO $db, array $me, ?int $sid): array
+{
+    $allowed = allowed_structures($db, $me);
+    if (!$allowed) {
+        return ['structures' => [], 'activeStructureId' => null];
+    }
+    $rows = all_rows(
+        $db,
+        'SELECT s.id, s.name, (SELECT COUNT(*) FROM structure_members m WHERE m.structure_id = s.id) AS members '
+        . 'FROM structures s WHERE s.id IN (' . in_list($allowed) . ') ORDER BY s.name'
+    );
+    return [
+        'structures' => array_map(fn($r) => ['id' => (int)$r['id'], 'name' => $r['name'], 'members' => (int)$r['members']], $rows),
+        'activeStructureId' => $sid,
+    ];
+}
+
+function set_user_structures(PDO $db, int $userId, $ids): void
+{
+    run($db, 'DELETE FROM structure_members WHERE user_id = ?', [$userId]);
+    $clean = clean_ids($ids);
+    if ($clean) {
+        foreach (all_rows($db, 'SELECT id FROM structures WHERE id IN (' . in_list($clean) . ')') as $r) {
+            run($db, 'INSERT INTO structure_members (structure_id, user_id) VALUES (?, ?)', [(int)$r['id'], $userId]);
+        }
+    }
+}
+
+function list_users(PDO $db, array $me, ?array $members = null): array
 {
     $where = '';
     if ($me['role'] === 'admin') {
-        $where = 'WHERE manager_id = ' . (int)$me['id'] . ' OR id = ' . (int)$me['id'];
+        $where = 'WHERE (manager_id = ' . (int)$me['id'] . ' OR id = ' . (int)$me['id'] . ')';
     } elseif ($me['role'] === 'manager') {
         $where = 'WHERE id IN (' . in_list(manager_branch_ids($db, $me['id'])) . ')';
+    }
+    if ($members !== null) {
+        $memberSql = in_list($members);
+        $extra = $me['role'] === 'superadmin'
+            ? "(id IN ($memberSql) OR NOT EXISTS (SELECT 1 FROM structure_members m WHERE m.user_id = app_users.id))"
+            : "id IN ($memberSql)";
+        $where = $where ? "$where AND $extra" : "WHERE $extra";
     }
     $rows = all_rows($db, "SELECT id, username, full_name, role, active, created_at, manager_id, access_until FROM app_users $where ORDER BY id");
     $scopes = scope_map($db, 'SELECT technician_id, head_id FROM technician_scopes ORDER BY head_id');
     $accScopes = scope_map($db, 'SELECT accountant_id, admin_id FROM accountant_scopes ORDER BY admin_id');
     $accTechs = scope_map($db, 'SELECT accountant_id, technician_id FROM accountant_technicians ORDER BY technician_id');
+    $memberships = scope_map($db, 'SELECT user_id, structure_id FROM structure_members ORDER BY structure_id');
     $own = [];
     foreach ($rows as $r) {
         $own[(int)$r['id']] = $r['access_until'];
@@ -115,12 +151,22 @@ function list_users(PDO $db, array $me): array
                 ? ($scopes[(int)$r['id']] ?? [])
                 : ($r['role'] === 'accountant' ? ($accScopes[(int)$r['id']] ?? []) : []),
             'techIds' => $r['role'] === 'accountant' ? ($accTechs[(int)$r['id']] ?? []) : [],
+            'structureIds' => $memberships[(int)$r['id']] ?? [],
         ];
     }
     return $result;
 }
 
-function managed_ids(PDO $db, array $me): array
+function managed_ids(PDO $db, array $me, ?array $members = null): array
+{
+    $ids = managed_ids_all($db, $me);
+    if ($members === null) {
+        return $ids;
+    }
+    return array_values(array_filter($ids, fn($i) => in_array($i, $members, true) || $i === (int)$me['id']));
+}
+
+function managed_ids_all(PDO $db, array $me): array
 {
     if ($me['role'] === 'manager') {
         return manager_branch_ids($db, $me['id']);
@@ -181,22 +227,29 @@ if ($action === 'login') {
         [$newToken, (int)$row['id'], now_utc(), now_utc(SESSION_DAYS * 86400)]
     );
     log_login_attempt($username, 'УСПЕХ');
+    $loginMe = ['id' => (int)$row['id'], 'role' => $row['role']];
+    $loginSid = active_structure($db, $newToken, $loginMe);
     out([
         'token' => $newToken,
-        'user' => [
+        'user' => array_merge([
             'id' => (int)$row['id'],
             'username' => $row['username'],
             'fullName' => $row['full_name'],
             'role' => $row['role'],
             'accessUntil' => iso($until),
-        ],
+        ], structures_payload($db, $loginMe, $loginSid)),
     ]);
 }
 
 $me = session_user($db, $token, true);
+$sid = $me ? active_structure($db, $token, $me) : null;
+$members = $me ? structure_member_ids($db, $sid, $me) : null;
+$freshMembers = function () use ($db, &$sid, $me): ?array {
+    return structure_member_ids($db, $sid, $me);
+};
 
 if ($action === 'me') {
-    out(['user' => $me]);
+    out(['user' => $me ? array_merge($me, structures_payload($db, $me, $sid)) : null]);
 }
 
 if ($action === 'logout') {
@@ -222,8 +275,17 @@ if ($action === 'change_password') {
     out(['ok' => true]);
 }
 
+if ($action === 'switch_structure') {
+    $newSid = (int)($body['id'] ?? 0);
+    if (!in_array($newSid, allowed_structures($db, $me), true)) {
+        out(['error' => 'forbidden'], 403);
+    }
+    run($db, 'UPDATE app_sessions SET structure_id = ? WHERE token = ?', [$newSid, $token]);
+    out(['user' => array_merge($me, structures_payload($db, $me, $newSid))]);
+}
+
 if ($action === 'managed') {
-    $rows = all_rows($db, 'SELECT id, username, full_name, role, manager_id FROM app_users WHERE id IN (' . in_list(managed_ids($db, $me)) . ') ORDER BY role, username');
+    $rows = all_rows($db, 'SELECT id, username, full_name, role, manager_id FROM app_users WHERE id IN (' . in_list(managed_ids($db, $me, $members)) . ') ORDER BY role, username');
     out([
         'managed' => array_map(fn($r) => [
             'id' => (int)$r['id'],
@@ -240,7 +302,45 @@ if (!in_array($me['role'], ['superadmin', 'admin', 'manager'], true)) {
 }
 
 if ($action === 'users') {
-    out(['users' => list_users($db, $me)]);
+    out(['users' => list_users($db, $me, $members)]);
+}
+
+if (in_array($action, ['structures', 'create_structure', 'rename_structure', 'delete_structure'], true)) {
+    if ($me['role'] !== 'superadmin') {
+        out(['error' => 'forbidden'], 403);
+    }
+    if ($action === 'create_structure') {
+        $name = mb_substr(trim((string)($body['name'] ?? '')), 0, 120);
+        if ($name === '') {
+            out(['error' => 'invalid_input'], 400);
+        }
+        run($db, 'INSERT INTO structures (name, created_at) VALUES (?, ?)', [$name, now_utc()]);
+        $newSid = (int)$db->lastInsertId();
+        $ids = clean_ids($body['userIds'] ?? []);
+        if ($ids) {
+            foreach (all_rows($db, "SELECT id FROM app_users WHERE role <> 'superadmin' AND id IN (" . in_list($ids) . ')') as $r) {
+                run($db, 'INSERT INTO structure_members (structure_id, user_id) VALUES (?, ?)', [$newSid, (int)$r['id']]);
+            }
+        }
+    } elseif ($action === 'rename_structure') {
+        $name = mb_substr(trim((string)($body['name'] ?? '')), 0, 120);
+        if ($name === '') {
+            out(['error' => 'invalid_input'], 400);
+        }
+        run($db, 'UPDATE structures SET name = ? WHERE id = ?', [$name, (int)($body['id'] ?? 0)]);
+    } elseif ($action === 'delete_structure') {
+        $delId = (int)($body['id'] ?? 0);
+        if ((int)one_value($db, 'SELECT COUNT(*) FROM structure_members WHERE structure_id = ?', [$delId]) > 0) {
+            out(['error' => 'structure_not_empty'], 409);
+        }
+        if ((int)one_value($db, 'SELECT COUNT(*) FROM structures') <= 1) {
+            out(['error' => 'last_structure'], 400);
+        }
+        run($db, 'DELETE FROM shared_products WHERE structure_id = ?', [$delId]);
+        run($db, 'DELETE FROM structures WHERE id = ?', [$delId]);
+    }
+    $sid = active_structure($db, $token, $me);
+    out(array_merge(structures_payload($db, $me, $sid), ['users' => list_users($db, $me, $freshMembers())]));
 }
 
 if ($me['role'] === 'manager') {
@@ -278,7 +378,7 @@ if ($me['role'] === 'admin') {
                 run($db, 'UPDATE app_sessions SET expires_at = ? WHERE user_id = ?', [now_utc(), $target]);
             }
         }
-        out(['users' => list_users($db, $me)]);
+        out(['users' => list_users($db, $me, $freshMembers())]);
     }
     out(['error' => 'forbidden'], 403);
 }
@@ -312,13 +412,17 @@ if ($action === 'create_user') {
         [$username, $fullName, hash_password($password), $role, now_utc(), $manager, $until]
     );
     $newId = (int)$db->lastInsertId();
+    if ($role !== 'superadmin') {
+        $wanted = $body['structureIds'] ?? null;
+        set_user_structures($db, $newId, is_array($wanted) && $wanted ? $wanted : ($sid ? [$sid] : []));
+    }
     if ($role === 'technician') {
         save_tech_scopes($db, $newId, $body['scopeIds'] ?? []);
     } elseif ($role === 'accountant') {
         save_accountant_scopes($db, $newId, $body['scopeIds'] ?? []);
         save_accountant_techs($db, $newId, $body['techIds'] ?? []);
     }
-    out(['users' => list_users($db, $me)]);
+    out(['users' => list_users($db, $me, $freshMembers())]);
 }
 
 if ($action === 'update_user') {
@@ -378,6 +482,12 @@ if ($action === 'update_user') {
             $renew = true;
         }
     }
+    if (isset($body['structureIds']) && is_array($body['structureIds'])) {
+        set_user_structures($db, $userId, $body['structureIds']);
+    }
+    if ($newRole === 'superadmin') {
+        set_user_structures($db, $userId, []);
+    }
     if (array_key_exists('techIds', $body)) {
         save_accountant_techs($db, $userId, $body['techIds']);
     }
@@ -390,7 +500,7 @@ if ($action === 'update_user') {
         }
     }
     if (!$sets) {
-        out(['users' => list_users($db, $me)]);
+        out(['users' => list_users($db, $me, $freshMembers())]);
     }
     $params[] = $userId;
     run($db, 'UPDATE app_users SET ' . implode(', ', $sets) . ' WHERE id = ?', $params);
@@ -403,7 +513,7 @@ if ($action === 'update_user') {
     if ($newRole && $newRole !== 'admin') {
         run($db, 'UPDATE app_users SET access_until = NULL WHERE id = ?', [$userId]);
     }
-    out(['users' => list_users($db, $me)]);
+    out(['users' => list_users($db, $me, $freshMembers())]);
 }
 
 if ($action === 'delete_user') {
@@ -422,13 +532,14 @@ if ($action === 'delete_user') {
         out(['error' => 'last_superadmin'], 400);
     }
     run($db, 'DELETE FROM app_sessions WHERE user_id = ?', [$userId]);
+    run($db, 'DELETE FROM structure_members WHERE user_id = ?', [$userId]);
     run($db, 'DELETE FROM technician_scopes WHERE technician_id = ? OR head_id = ?', [$userId, $userId]);
     run($db, 'DELETE FROM accountant_scopes WHERE accountant_id = ? OR admin_id = ?', [$userId, $userId]);
     run($db, 'DELETE FROM accountant_technicians WHERE accountant_id = ? OR technician_id = ?', [$userId, $userId]);
     run($db, 'DELETE FROM telegram_links WHERE user_id = ?', [$userId]);
     run($db, 'UPDATE app_users SET manager_id = NULL WHERE manager_id = ?', [$userId]);
     run($db, 'DELETE FROM app_users WHERE id = ?', [$userId]);
-    out(['users' => list_users($db, $me)]);
+    out(['users' => list_users($db, $me, $freshMembers())]);
 }
 
 out(['error' => 'unknown_action'], 400);

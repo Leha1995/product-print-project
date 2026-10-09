@@ -12,6 +12,7 @@ import AdminLoginDialog from '@/components/AdminLoginDialog';
 import LoginScreen from '@/components/LoginScreen';
 import IncomingTransfers from '@/components/equipment/IncomingTransfers';
 import TelegramConnect from '@/components/TelegramConnect';
+import StructureSwitcher from '@/components/StructureSwitcher';
 import UsersDialog from '@/components/UsersDialog';
 import useAuth from '@/hooks/useAuth';
 import usePrintHistory from '@/hooks/usePrintHistory';
@@ -48,6 +49,8 @@ const Index = () => {
     kicked,
     login,
     logout,
+    switchStructure,
+    refreshUser,
     isAuthed,
     isAdmin,
     isSuperAdmin,
@@ -295,6 +298,12 @@ const Index = () => {
         showSections={canInventory && (!inventoryOnly || managerPicked)}
         inventoryOnly={inventoryOnly && !managerPicked}
       />
+      <StructureSwitcher
+        structures={user?.structures ?? []}
+        activeId={user?.activeStructureId ?? null}
+        onSwitch={switchStructure}
+        alwaysShow={isSuperAdmin}
+      />
       {isAccountant && <AccountantExportButton />}
       {isAccountant && <AccountantTechsPanel />}
       {isAccountant && <AccountantTransfersPanel />}
@@ -467,6 +476,9 @@ const Index = () => {
         isSuperAdmin={isSuperAdmin}
         readOnly={user?.role === 'manager'}
         onChanged={refreshManaged}
+        structures={user?.structures ?? []}
+        activeStructureId={user?.activeStructureId ?? null}
+        onStructuresChanged={refreshUser}
         onViewTechnician={(id, name) => {
           setUsersOpen(false);
           setViewTech({ id, name });

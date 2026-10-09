@@ -52,6 +52,7 @@ if (!$installed && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             if ($data) {
                 $map = !empty($_POST['copy_images']) ? 'download_image' : null;
                 $counts = import_data($db, $data['tables'], $map);
+                seed_structures($db);
                 $messages[] = 'Перенесено: пользователей — ' . $counts['app_users']
                     . ', продуктов — ' . $counts['user_products']
                     . ', общая база — ' . $counts['shared_products']

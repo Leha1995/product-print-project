@@ -10,7 +10,7 @@ import psycopg2
 CORS = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Pin',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Pin, X-Auth-Token',
     'Access-Control-Max-Age': '86400',
     'Content-Type': 'application/json',
 }
@@ -63,11 +63,35 @@ def row_to_item(r) -> dict:
     }
 
 
-SELECT_SQL = (
-    'SELECT id, name, category, categories, weight, composition, image, barcode, '
-    'hit, shelf_life_hours, storage_text, author, updated_at '
-    'FROM shared_products ORDER BY updated_at DESC'
-)
+def select_sql(sid) -> str:
+    return (
+        'SELECT id, name, category, categories, weight, composition, image, barcode, '
+        'hit, shelf_life_hours, storage_text, author, updated_at '
+        f"FROM shared_products WHERE structure_id {'= ' + str(int(sid)) if sid else 'IS NULL'} "
+        'ORDER BY updated_at DESC'
+    )
+
+
+def session_structure(cur, token: str):
+    """Активная структура пользователя по токену. (найден_ли_пользователь, id_структуры)"""
+    if not token:
+        return False, None
+    cur.execute(
+        'SELECT u.id, u.role, s.structure_id FROM app_sessions s JOIN app_users u ON u.id = s.user_id '
+        f'WHERE s.token = {q(token)} AND s.expires_at > NOW() AND u.active'
+    )
+    row = cur.fetchone()
+    if not row:
+        return False, None
+    uid, role, sid = row
+    if role == 'superadmin':
+        cur.execute('SELECT id FROM structures ORDER BY id')
+    else:
+        cur.execute(f'SELECT structure_id FROM structure_members WHERE user_id = {int(uid)} ORDER BY structure_id')
+    allowed = [r[0] for r in cur.fetchall()]
+    if sid not in allowed:
+        sid = allowed[0] if allowed else None
+    return True, sid
 
 
 def handler(event: dict, context) -> dict:
@@ -79,15 +103,20 @@ def handler(event: dict, context) -> dict:
     conn = get_conn()
     conn.autocommit = True
     cur = conn.cursor()
+    headers = event.get('headers') or {}
+    found, sid = session_structure(cur, headers.get('X-Auth-Token') or headers.get('x-auth-token') or '')
+    if not found:
+        cur.close()
+        conn.close()
+        return {'statusCode': 401, 'headers': CORS, 'body': json.dumps({'error': 'unauthorized'})}
 
     if method == 'GET':
-        cur.execute(SELECT_SQL)
+        cur.execute(select_sql(sid))
         items = [row_to_item(r) for r in cur.fetchall()]
         cur.close()
         conn.close()
         return {'statusCode': 200, 'headers': CORS, 'body': json.dumps({'items': items})}
 
-    headers = event.get('headers') or {}
     pin = headers.get('X-Admin-Pin') or headers.get('x-admin-pin') or ''
     if pin.strip() != ADMIN_PIN:
         cur.close()
@@ -98,7 +127,9 @@ def handler(event: dict, context) -> dict:
 
     if method == 'DELETE':
         pid = str(body.get('id', ''))
-        cur.execute(f"DELETE FROM shared_products WHERE id = {q(pid)}")
+        cur.execute(
+            f"DELETE FROM shared_products WHERE id = {q(pid)} AND structure_id {'= ' + str(int(sid)) if sid else 'IS NULL'}"
+        )
         cur.close()
         conn.close()
         return {'statusCode': 200, 'headers': CORS, 'body': json.dumps({'ok': True})}
@@ -111,6 +142,14 @@ def handler(event: dict, context) -> dict:
         pid = str(p.get('id') or '')
         if not pid or not p.get('name'):
             continue
+        cur.execute(f'SELECT structure_id FROM shared_products WHERE id = {q(pid)}')
+        owner_row = cur.fetchone()
+        if owner_row and owner_row[0] != sid:
+            pid = f'{pid}-s{sid or 0}'
+            cur.execute(f'SELECT structure_id FROM shared_products WHERE id = {q(pid)}')
+            clash = cur.fetchone()
+            if clash and clash[0] != sid:
+                continue
         image = p.get('image') or ''
         if image.startswith('data:'):
             image = upload_image(image, pid)
@@ -121,11 +160,11 @@ def handler(event: dict, context) -> dict:
         shelf_sql = str(int(shelf)) if isinstance(shelf, (int, float)) and shelf else 'NULL'
         cur.execute(
             'INSERT INTO shared_products (id, name, category, categories, weight, composition, '
-            'image, barcode, hit, shelf_life_hours, storage_text, author, updated_at) VALUES ('
+            'image, barcode, hit, shelf_life_hours, storage_text, author, updated_at, structure_id) VALUES ('
             f"{q(pid)}, {q(p.get('name'))}, '', {q(cats)}::jsonb, "
             f"{q(p.get('weight') or '')}, {q(p.get('composition') or '')}, {q(image)}, "
             f"{q(p.get('barcode') or '')}, {'TRUE' if p.get('hit') else 'FALSE'}, {shelf_sql}, "
-            f"{q(p.get('storageText') or '')}, {q(author)}, NOW()) "
+            f"{q(p.get('storageText') or '')}, {q(author)}, NOW(), {int(sid) if sid else 'NULL'}) "
             'ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, category = EXCLUDED.category, '
             'categories = EXCLUDED.categories, weight = EXCLUDED.weight, '
             'composition = EXCLUDED.composition, image = EXCLUDED.image, '
@@ -135,7 +174,7 @@ def handler(event: dict, context) -> dict:
         )
         saved += 1
 
-    cur.execute(SELECT_SQL)
+    cur.execute(select_sql(sid))
     result = [row_to_item(r) for r in cur.fetchall()]
     cur.close()
     conn.close()

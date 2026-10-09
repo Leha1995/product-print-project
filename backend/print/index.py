@@ -49,12 +49,22 @@ def owner_of(me) -> int:
     return int(me['id'])
 
 
+def shares_structure(owner: int) -> str:
+    """Условие: пользователь u состоит хотя бы в одной структуре вместе с owner (или у owner нет структур)."""
+    return (
+        f'(NOT EXISTS (SELECT 1 FROM structure_members p WHERE p.user_id = {int(owner)}) '
+        'OR EXISTS (SELECT 1 FROM structure_members a JOIN structure_members b ON a.structure_id = b.structure_id '
+        f'WHERE a.user_id = app_users.id AND b.user_id = {int(owner)}))'
+    )
+
+
 def team_ids(cur, owner: int) -> list:
     ids = [owner]
     level = [owner]
-    for _ in range(3):
+    for _ in range(8):
         cur.execute(
-            'SELECT id FROM app_users WHERE manager_id IN (' + ','.join(str(i) for i in level) + ')'
+            'SELECT id FROM app_users WHERE manager_id IN (' + ','.join(str(i) for i in level) + ') '
+            f'AND {shares_structure(owner)}'
         )
         level = [int(r[0]) for r in cur.fetchall() if int(r[0]) not in ids]
         if not level:
@@ -66,8 +76,8 @@ def team_ids(cur, owner: int) -> list:
 def chain_ids(cur, owner: int) -> list:
     ids = [owner]
     current = owner
-    for _ in range(3):
-        cur.execute(f'SELECT manager_id FROM app_users WHERE id = {current}')
+    for _ in range(8):
+        cur.execute(f'SELECT manager_id FROM app_users WHERE id = {current} AND {shares_structure(owner)}')
         row = cur.fetchone()
         if not row or not row[0] or int(row[0]) in ids:
             break

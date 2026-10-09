@@ -66,9 +66,33 @@ def manager_branch_ids(cur, manager_id: int):
     return ids
 
 
+def structure_members(cur, token: str, me):
+    """Участники активной структуры сессии. None — без ограничений."""
+    if me['role'] == 'superadmin':
+        cur.execute('SELECT id FROM structures ORDER BY id')
+    else:
+        cur.execute(f"SELECT structure_id FROM structure_members WHERE user_id = {int(me['id'])} ORDER BY structure_id")
+    allowed = [r[0] for r in cur.fetchall()]
+    cur.execute(f'SELECT structure_id FROM app_sessions WHERE token = {q(token)}')
+    row = cur.fetchone()
+    sid = row[0] if row else None
+    if sid not in allowed:
+        sid = allowed[0] if allowed else None
+    if not sid:
+        return None if me['role'] == 'superadmin' else [int(me['id'])]
+    cur.execute(
+        f'SELECT user_id FROM structure_members WHERE structure_id = {int(sid)} '
+        "UNION SELECT id FROM app_users WHERE role = 'superadmin'"
+    )
+    return sorted(r[0] for r in cur.fetchall())
+
+
 def can_manage(cur, me, target_id: int) -> bool:
     if target_id == me['id']:
         return True
+    members = me.get('members')
+    if members is not None and int(target_id) not in members:
+        return False
     if me['role'] == 'superadmin':
         return True
     if me['role'] == 'manager':
@@ -101,7 +125,12 @@ def build_overview(cur, me, soon_ms: int = 3600000):
             'SELECT id, username, full_name FROM app_users WHERE active '
             f"AND manager_id = {me['id']} ORDER BY username"
         )
-    staff = [{'id': r[0], 'username': r[1], 'fullName': r[2]} for r in cur.fetchall()]
+    members = me.get('members')
+    staff = [
+        {'id': r[0], 'username': r[1], 'fullName': r[2]}
+        for r in cur.fetchall()
+        if members is None or r[0] in members
+    ]
     if not staff:
         return []
 
@@ -290,6 +319,7 @@ def handler(event: dict, context) -> dict:
     me = session_user(cur, token)
     if not me:
         return finish({'error': 'unauthorized'}, 401)
+    me['members'] = structure_members(cur, token, me)
 
     raw_target = headers.get('X-Target-User') or headers.get('x-target-user') or ''
     uid = me['id']

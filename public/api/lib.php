@@ -375,6 +375,66 @@ function session_user(PDO $db, string $token, bool $full = false): ?array
     ];
 }
 
+function allowed_structures(PDO $db, array $me): array
+{
+    $rows = $me['role'] === 'superadmin'
+        ? all_rows($db, 'SELECT id AS sid FROM structures ORDER BY id')
+        : all_rows($db, 'SELECT structure_id AS sid FROM structure_members WHERE user_id = ? ORDER BY structure_id', [(int)$me['id']]);
+    return array_map('intval', array_column($rows, 'sid'));
+}
+
+function active_structure(PDO $db, string $token, array $me): ?int
+{
+    $raw = one_value($db, 'SELECT structure_id FROM app_sessions WHERE token = ?', [$token]);
+    $sid = $raw === null || $raw === false ? null : (int)$raw;
+    $allowed = allowed_structures($db, $me);
+    if ($sid === null || !in_array($sid, $allowed, true)) {
+        $sid = $allowed[0] ?? null;
+        run($db, 'UPDATE app_sessions SET structure_id = ? WHERE token = ?', [$sid, $token]);
+    }
+    return $sid;
+}
+
+function structure_member_ids(PDO $db, ?int $sid, array $me): ?array
+{
+    if (!$sid) {
+        return $me['role'] === 'superadmin' ? null : [(int)$me['id']];
+    }
+    $rows = all_rows(
+        $db,
+        "SELECT user_id AS uid FROM structure_members WHERE structure_id = ? UNION SELECT id AS uid FROM app_users WHERE role = 'superadmin'",
+        [$sid]
+    );
+    $ids = array_map('intval', array_column($rows, 'uid'));
+    sort($ids);
+    return $ids;
+}
+
+function session_members(PDO $db, string $token, array $me): ?array
+{
+    return structure_member_ids($db, active_structure($db, $token, $me), $me);
+}
+
+function in_members(?array $members, $userId): bool
+{
+    return $members === null || in_array((int)$userId, $members, true);
+}
+
+function members_sql(?array $members, string $column): string
+{
+    if ($members === null) {
+        return '';
+    }
+    return " AND $column IN (" . ($members ? in_list($members) : '0') . ')';
+}
+
+function shares_structure_sql(int $owner, string $column = 'app_users.id'): string
+{
+    return "(NOT EXISTS (SELECT 1 FROM structure_members p WHERE p.user_id = $owner) "
+        . 'OR EXISTS (SELECT 1 FROM structure_members a JOIN structure_members b ON a.structure_id = b.structure_id '
+        . "WHERE a.user_id = $column AND b.user_id = $owner))";
+}
+
 function manager_branch_ids(PDO $db, int $managerId): array
 {
     $admins = array_map(

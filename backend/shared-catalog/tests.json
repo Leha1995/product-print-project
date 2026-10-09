@@ -1,23 +1,20 @@
 {
   "tests": [
     {
-      "name": "Список общей базы",
+      "name": "Без входа список закрыт",
       "method": "GET",
       "path": "/",
-      "expectedStatus": 200
-    },
-    {
-      "name": "Публикация без пина запрещена",
-      "method": "POST",
-      "path": "/",
-      "body": {
-        "items": []
-      },
-      "expectedStatus": 403,
+      "expectedStatus": 401,
       "expectedBody": {
         "error": "string"
       },
       "bodyMatcher": "partial"
+    },
+    {
+      "name": "CORS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
     }
   ]
 }

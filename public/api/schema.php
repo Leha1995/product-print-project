@@ -22,6 +22,16 @@ function schema_sql(string $driver): array
             manager_id INT NULL,
             access_until DATETIME NULL
         )$tail",
+        "CREATE TABLE IF NOT EXISTS structures (
+            id $auto,
+            name $short NOT NULL,
+            created_at DATETIME NULL
+        )$tail",
+        "CREATE TABLE IF NOT EXISTS structure_members (
+            structure_id INT NOT NULL,
+            user_id INT NOT NULL,
+            PRIMARY KEY (structure_id, user_id)
+        )$tail",
         "CREATE TABLE IF NOT EXISTS app_sessions (
             token VARCHAR(64) NOT NULL PRIMARY KEY,
             user_id INT NOT NULL,
@@ -206,9 +216,15 @@ function schema_sql(string $driver): array
     ];
 }
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 const SCHEMA_COLUMNS = [
+    'app_sessions' => [
+        'structure_id' => 'INT NULL',
+    ],
+    'shared_products' => [
+        'structure_id' => 'INT NULL',
+    ],
     'equipment' => [
         'commissioned_at' => 'DATE NULL',
         'depreciation_per_day' => 'DECIMAL(14,2) NULL DEFAULT 0',
@@ -252,17 +268,37 @@ function upgrade_schema(PDO $db, bool $force = false): void
             }
         }
     }
+    seed_structures($db);
     @file_put_contents($marker, date('c'));
+}
+
+function seed_structures(PDO $db): void
+{
+    if ((int)one_value($db, 'SELECT COUNT(*) FROM structures') === 0) {
+        run($db, 'INSERT INTO structures (name, created_at) VALUES (?, ?)', ['Автосуши Автопицца', now_utc()]);
+    }
+    $first = (int)one_value($db, 'SELECT MIN(id) FROM structures');
+    if (!$first) {
+        return;
+    }
+    if ((int)one_value($db, 'SELECT COUNT(*) FROM structure_members') === 0) {
+        foreach (all_rows($db, "SELECT id FROM app_users WHERE role <> 'superadmin'") as $u) {
+            run($db, 'INSERT INTO structure_members (structure_id, user_id) VALUES (?, ?)', [$first, (int)$u['id']]);
+        }
+    }
+    run($db, 'UPDATE shared_products SET structure_id = ? WHERE structure_id IS NULL', [$first]);
 }
 
 const IMPORT_COLUMNS = [
     'app_users' => ['id', 'username', 'full_name', 'password_hash', 'role', 'active', 'created_at', 'manager_id', 'access_until'],
     'app_sessions' => ['token', 'user_id', 'created_at', 'expires_at'],
+    'structures' => ['id', 'name', 'created_at'],
+    'structure_members' => ['structure_id', 'user_id'],
     'user_products' => ['user_id', 'id', 'name', 'category', 'categories', 'weight', 'composition', 'image', 'barcode', 'hit', 'shelf_life_hours', 'storage_text', 'updated_at'],
     'user_categories' => ['user_id', 'id', 'label', 'icon', 'position', 'updated_at'],
     'user_prefs' => ['user_id', 'pref_key', 'value', 'updated_at'],
     'user_meta' => ['user_id', 'seeded', 'created_at'],
-    'shared_products' => ['id', 'name', 'category', 'categories', 'weight', 'composition', 'image', 'barcode', 'hit', 'shelf_life_hours', 'storage_text', 'author', 'created_at', 'updated_at'],
+    'shared_products' => ['id', 'name', 'category', 'categories', 'weight', 'composition', 'image', 'barcode', 'hit', 'shelf_life_hours', 'storage_text', 'author', 'created_at', 'updated_at', 'structure_id'],
     'equipment' => ['user_id', 'id', 'name', 'code', 'price', 'location', 'note', 'image', 'serial', 'active', 'created_at', 'updated_at', 'qr_broken', 'written_off_at', 'write_off_reason', 'commissioned_at', 'depreciation_per_day', 'repair_cost', 'in_repair', 'repair_sent_at'],
     'equipment_repairs' => ['id', 'user_id', 'equipment_id', 'sent_at', 'returned_at', 'cost', 'description', 'photos', 'returned_by'],
     'equipment_tasks' => ['id', 'user_id', 'equipment_id', 'technician_id', 'created_by', 'description', 'photos', 'status', 'created_at', 'done_at', 'done_by', 'done_comment', 'priority', 'cost', 'kind'],
