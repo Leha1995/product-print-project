@@ -91,7 +91,7 @@ const NetworkPrinterSettings = ({ settings, onChange }: NetworkPrinterSettingsPr
     downloadHelper(printEndpoint(), config.key);
     toast({
       title: 'Помощник скачан',
-      description: 'Запусти файл asap-pechat.bat на компьютере в точке.',
+      description: 'Запусти файл asap-pechat.bat на компьютере в точке — он установится и будет работать в фоне.',
     });
   };
 
@@ -269,7 +269,8 @@ const NetworkPrinterSettings = ({ settings, onChange }: NetworkPrinterSettingsPr
           <p className="text-[11px] leading-snug text-muted-foreground">
             Браузер не может сам отправить этикетку на IP-адрес. Её передаёт маленький помощник на
             любом компьютере в той же Wi-Fi сети, что и принтер. Запусти скачанный файл один раз — он
-            сам добавится в автозапуск. Планшеты и телефоны печатают через него.
+            установится, будет работать в фоне без окна и сам запускаться при включении компьютера.
+            Повторный запуск файла перезапускает помощник. Планшеты и телефоны печатают через него.
           </p>
           <div className="grid grid-cols-[1fr_auto] gap-2">
             <button
