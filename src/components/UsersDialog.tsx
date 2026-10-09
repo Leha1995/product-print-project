@@ -96,6 +96,12 @@ const UsersDialog = ({
   const [editAccess, setEditAccess] = useState<number | '' | 'keep'>('keep');
   const [collapsed, setCollapsed] = useState<number[]>([]);
   const [editStructures, setEditStructures] = useState<number[]>([]);
+  const [newStructures, setNewStructures] = useState<number[]>([]);
+  const outsideRole = role === 'technician' || role === 'superadmin';
+
+  useEffect(() => {
+    if (open) setNewStructures(activeStructureId ? [activeStructureId] : []);
+  }, [open, activeStructureId]);
 
   const toggleGroup = (id: number) =>
     setCollapsed((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -162,6 +168,10 @@ const UsersDialog = ({
       toast({ title: 'Логин от 3 символов, пароль от 4' });
       return;
     }
+    if (!outsideRole && structures.length && !newStructures.length) {
+      toast({ title: 'Выберите хотя бы одну структуру' });
+      return;
+    }
     setBusy(true);
     try {
       const r = await apiCreateUser({
@@ -173,8 +183,10 @@ const UsersDialog = ({
         scopeIds: role === 'technician' || role === 'accountant' ? scopeIds : undefined,
         techIds: role === 'accountant' ? techIds : undefined,
         accessDays: role === 'admin' ? accessDays || null : null,
+        structureIds: !outsideRole && structures.length ? newStructures : undefined,
       });
       apply(r.users);
+      if (!outsideRole && structures.length) onStructuresChanged?.();
       setUsername('');
       setFullName('');
       setPassword('');
@@ -302,13 +314,6 @@ const UsersDialog = ({
             />
           )}
 
-          {isSuperAdmin && structures.length > 0 && (
-            <p className="mt-4 text-[12px] text-muted-foreground">
-              {`Новые пользователи добавляются в открытую структуру «${
-                structures.find((x) => x.id === activeStructureId)?.name || '—'
-              }». Другие структуры можно отметить в «Изменить».`}
-            </p>
-          )}
 
           {isSuperAdmin && (
           <div className="mt-2 grid gap-2 border-2 border-primary bg-card p-4 md:grid-cols-2">
@@ -396,6 +401,36 @@ const UsersDialog = ({
                   </option>
                 ))}
               </select>
+            )}
+            {isSuperAdmin && structures.length > 0 && (
+              <div className="md:col-span-2">
+                <p className="mb-1 font-head text-[0.7rem] font-bold uppercase text-primary">
+                  Привязать к структуре
+                </p>
+                {outsideRole ? (
+                  <p className="border-2 border-dashed border-primary px-3 py-2 text-[12px] text-muted-foreground">
+                    {role === 'technician' ? 'Техник' : 'Супер-админ'} работает вне структур и видит все.
+                  </p>
+                ) : (
+                  <div className="grid gap-1 border-2 border-primary bg-background p-2 sm:grid-cols-2">
+                    {structures.map((st) => (
+                      <label key={st.id} className="flex items-center gap-2 text-[13px] text-primary">
+                        <input
+                          type="checkbox"
+                          checked={newStructures.includes(st.id)}
+                          onChange={(e) =>
+                            setNewStructures((prev) =>
+                              e.target.checked ? [...prev, st.id] : prev.filter((x) => x !== st.id),
+                            )
+                          }
+                          className="h-4 w-4 accent-[hsl(var(--primary))]"
+                        />
+                        <span className="truncate">{st.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
             <button
               onClick={create}
