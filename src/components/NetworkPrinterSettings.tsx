@@ -125,6 +125,13 @@ const NetworkPrinterSettings = ({ settings, onChange }: NetworkPrinterSettingsPr
               : 'Помощник печати не запущен'}
         </span>
       </div>
+      {config && !config.online && (
+        <p className="text-[11px] leading-snug text-destructive">
+          Помощник привязан к сайту, с которого его скачали. Если сайт переехал на новый адрес —
+          скачай помощник заново здесь{config.canSetup ? '' : ' под старшим аккаунтом точки'} и
+          запусти его на компьютере в точке.
+        </p>
+      )}
       {config?.canSetup && (
         <p className="text-[11px] leading-snug text-muted-foreground">
           Один помощник на компьютере печатает задания этого аккаунта и всех привязанных к нему

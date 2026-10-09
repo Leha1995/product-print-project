@@ -279,6 +279,24 @@ $serverJs = @file_get_contents(__DIR__ . '/server.js');
         <div class="d" style="margin-top:8px">Папка для фото: <?= e(basename(uploads_dir())) ?> (вне папки сайта — обновления её не затрут)</div>
     <?php endif; ?>
 
+    <?php if ($authorized && isset($db) && $db):
+        $pk = [];
+        try {
+            $pk = all_rows($db, 'SELECT k.owner_id, k.last_seen, k.printers, u.username FROM print_keys k LEFT JOIN app_users u ON u.id = k.owner_id ORDER BY k.last_seen DESC');
+        } catch (Throwable $ex) {
+            $pk = [];
+        }
+    ?>
+        <h3>Помощник печати</h3>
+        <div class="d">Сейчас на сервере: <?= e(gmdate('Y-m-d H:i:s')) ?> UTC</div>
+        <?php if (!$pk): ?><div class="res bad">Помощник ещё ни разу не подключался к этому сайту. Скачайте его заново именно с этого сайта.</div><?php endif; ?>
+        <table><tr><th>Чей помощник</th><th>Последняя связь (UTC)</th><th>Принтеров</th><th>Статус</th></tr>
+        <?php foreach ($pk as $r): $on = $r['last_seen'] && strtotime($r['last_seen'] . ' UTC') > time() - 60; ?>
+            <tr><td><?= e($r['username'] ?: ('#' . $r['owner_id'])) ?></td><td><?= e($r['last_seen'] ?: 'никогда') ?></td><td><?= count(json_list($r['printers'])) ?></td><td class="<?= $on ? 'ok' : 'bad' ?>"><?= $on ? 'в сети' : 'не в сети' ?></td></tr>
+        <?php endforeach; ?>
+        </table>
+    <?php endif; ?>
+
     <?php if ($authorized): $tries = read_login_attempts(); ?>
         <h3>Последние попытки входа с сайта (<?= count($tries) ?>)</h3>
         <?php if (!$tries): ?><div class="d bad">Ни одна попытка входа с сайта не дошла до сервера.</div><?php endif; ?>

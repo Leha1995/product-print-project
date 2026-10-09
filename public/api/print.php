@@ -13,8 +13,8 @@ foreach (schema_sql($driver) as $sql) {
     }
 }
 
-const POLL_WAIT = 8.0;
-const ONLINE_SEC = 30;
+const POLL_WAIT = 1.5;
+const ONLINE_SEC = 60;
 const JOB_TTL_SEC = 600;
 const MAX_DATA = 2000000;
 
@@ -52,7 +52,7 @@ function team_ids(PDO $db, int $owner): array
 {
     $ids = [$owner];
     $level = [$owner];
-    for ($i = 0; $i < 3 && $level; $i++) {
+    for ($i = 0; $i < 8 && $level; $i++) {
         $rows = all_rows($db, 'SELECT id FROM app_users WHERE manager_id IN (' . in_list($level) . ')');
         $level = [];
         foreach ($rows as $r) {
@@ -70,7 +70,7 @@ function chain_ids(PDO $db, int $owner): array
 {
     $ids = [$owner];
     $current = $owner;
-    for ($i = 0; $i < 3; $i++) {
+    for ($i = 0; $i < 8; $i++) {
         $up = one_value($db, 'SELECT manager_id FROM app_users WHERE id = ?', [$current]);
         if (!$up || in_array((int)$up, $ids, true)) {
             break;
