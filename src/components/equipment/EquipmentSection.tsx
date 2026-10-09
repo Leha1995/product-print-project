@@ -12,6 +12,7 @@ import FindQrDialog from '@/components/equipment/FindQrDialog';
 import TaskCreateDialog, { TaskDraft } from '@/components/equipment/TaskCreateDialog';
 import TasksPanel from '@/components/equipment/TasksPanel';
 import TransferDialog from '@/components/equipment/TransferDialog';
+import ImportEquipmentDialog from '@/components/equipment/ImportEquipmentDialog';
 import useHardwareScanner from '@/hooks/useHardwareScanner';
 import { playScanSound } from '@/lib/scanSound';
 import useEquipment from '@/hooks/useEquipment';
@@ -60,6 +61,7 @@ const EquipmentSection = ({ userId, targetId, isAdmin, readOnly = false }: Equip
     targetId,
   );
   const [formOpen, setFormOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<Equipment | null>(null);
   const [qrItems, setQrItems] = useState<Equipment[]>([]);
   const [qrOpen, setQrOpen] = useState(false);
@@ -267,6 +269,15 @@ const EquipmentSection = ({ userId, targetId, isAdmin, readOnly = false }: Equip
             >
               <Icon name="Plus" size={16} strokeWidth={2.5} />
               Добавить
+            </button>
+          )}
+          {isAdmin && !readOnly && (
+            <button
+              onClick={() => setImportOpen(true)}
+              className="flex items-center gap-2 border-2 border-primary bg-card px-3 py-2.5 font-head text-[0.75rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
+            >
+              <Icon name="FileUp" fallback="Upload" size={16} strokeWidth={2.5} />
+              Загрузить Excel
             </button>
           )}
           {sessions.some((s) => s.finishedAt) && (
@@ -678,6 +689,12 @@ const EquipmentSection = ({ userId, targetId, isAdmin, readOnly = false }: Equip
             description: item.name,
           });
         }}
+      />
+      <ImportEquipmentDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        existing={items}
+        onDone={setItems}
       />
       <TransferDialog
         item={transferItem}

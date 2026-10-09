@@ -136,6 +136,9 @@ export const cancelTask = (taskId: number) =>
 export const saveEquipment = (item: Partial<Equipment>) =>
   send({ item }) as Promise<{ items: Equipment[] }>;
 
+export const saveEquipmentBatch = (items: Partial<Equipment>[]) =>
+  send({ items }) as Promise<{ saved: number; items: Equipment[] }>;
+
 export const deleteEquipment = (id: string) =>
   send({ id }, 'DELETE') as Promise<{ items: Equipment[] }>;
 
