@@ -582,29 +582,16 @@ const EquipmentSection = ({
                 </button>
               )}
               {item.active && isAdmin && (
-                item.inRepair ? (
-                  <button
-                    onClick={() => {
-                      setRepairItem(item);
-                      setRepairOpen(true);
-                    }}
-                    className="flex w-full items-center justify-center gap-1.5 border-2 border-primary bg-accent px-2 py-2 font-head text-[0.68rem] font-bold uppercase text-accent-foreground transition-transform hover:-translate-y-0.5"
-                  >
-                    <Icon name="CircleCheck" size={14} strokeWidth={2.5} />
-                    Принять с ремонта
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setSendItem(item);
-                      setSendOpen(true);
-                    }}
-                    className="flex w-full items-center justify-center gap-1.5 border-2 border-primary bg-card px-2 py-2 font-head text-[0.68rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
-                  >
-                    <Icon name="Wrench" size={14} strokeWidth={2.5} />
-                    Отправить в ремонт
-                  </button>
-                )
+                <button
+                  onClick={() => {
+                    setTaskItem(item);
+                    setTaskOpen(true);
+                  }}
+                  className="flex w-full items-center justify-center gap-1.5 border-2 border-primary bg-card px-2 py-2 font-head text-[0.68rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
+                >
+                  <Icon name="ClipboardPlus" fallback="ClipboardList" size={14} strokeWidth={2.5} />
+                  Заявка технику
+                </button>
               )}
               {!item.active && isAdmin && (
                 <button
@@ -620,17 +607,31 @@ const EquipmentSection = ({
                 </button>
               )}
               {item.active && isAdmin && (
-                <button
-                  onClick={() => {
-                    setTaskItem(item);
-                    setTaskOpen(true);
-                  }}
-                  aria-label="Создать задачу технику"
-                  title="Задача технику"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center border-2 border-primary bg-background text-primary transition-colors hover:bg-muted"
-                >
-                  <Icon name="ClipboardPlus" fallback="ClipboardList" size={14} strokeWidth={2.5} />
-                </button>
+                item.inRepair ? (
+                  <button
+                    onClick={() => {
+                      setRepairItem(item);
+                      setRepairOpen(true);
+                    }}
+                    aria-label="Принять с ремонта"
+                    title="Принять с ремонта"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center border-2 border-primary bg-accent text-accent-foreground transition-transform hover:-translate-y-0.5"
+                  >
+                    <Icon name="CircleCheck" size={14} strokeWidth={2.5} />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setSendItem(item);
+                      setSendOpen(true);
+                    }}
+                    aria-label="Отправить в ремонт"
+                    title="Отправить в ремонт"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center border-2 border-primary bg-background text-primary transition-colors hover:bg-muted"
+                  >
+                    <Icon name="Wrench" size={14} strokeWidth={2.5} />
+                  </button>
+                )
               )}
               <button
                 onClick={() => {
