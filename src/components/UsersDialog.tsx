@@ -11,10 +11,12 @@ import {
   StructureRef,
 } from '@/lib/authApi';
 import { toast } from '@/hooks/use-toast';
-import TechScopePicker from '@/components/users/TechScopePicker';
-import TechPicker from '@/components/users/TechPicker';
 import StructuresPanel from '@/components/users/StructuresPanel';
 import StaffPrintersDialog from '@/components/users/StaffPrintersDialog';
+import CreateUserForm from '@/components/users/CreateUserForm';
+import UserRow from '@/components/users/UserRow';
+import EditUserModal from '@/components/users/EditUserModal';
+import { joinFullName, splitFullName } from '@/components/users/userUi';
 
 interface UsersDialogProps {
   open: boolean;
@@ -28,45 +30,6 @@ interface UsersDialogProps {
   activeStructureId?: number | null;
   onStructuresChanged?: () => void;
 }
-
-const roleLabel: Record<Role, string> = {
-  user: 'Сотрудник',
-  admin: 'Админ',
-  manager: 'Управляющий',
-  superadmin: 'Супер-админ',
-  technician: 'Техник',
-  accountant: 'Бухгалтер',
-};
-
-const inputClass =
-  'w-full border-2 border-primary bg-background px-3 py-2 font-body text-[14px] text-primary outline-none';
-
-const accessOptions: { days: number | ''; label: string }[] = [
-  { days: '', label: 'Без ограничения' },
-  { days: 1, label: '1 день' },
-  { days: 7, label: '7 дней' },
-  { days: 14, label: '14 дней' },
-  { days: 30, label: '30 дней' },
-  { days: 90, label: '90 дней' },
-  { days: 180, label: '180 дней' },
-  { days: 365, label: '1 год' },
-];
-
-const accessInfo = (until: string | null, inherited = false) => {
-  if (!until) return { text: 'Доступ без срока', tone: 'muted' as const };
-  const prefix = inherited ? 'По руководителю: ' : '';
-  const end = new Date(until.endsWith('Z') ? until : `${until}Z`).getTime();
-  const left = end - Date.now();
-  const date = new Date(end).toLocaleDateString('ru-RU');
-  if (left <= 0) return { text: `${prefix}доступ истёк ${date}`, tone: 'bad' as const };
-  const days = Math.ceil(left / 86400000);
-  return {
-    text: `${prefix}доступ до ${date} · осталось ${days} дн.`,
-    tone: left < 7 * 86400000 ? ('bad' as const) : ('good' as const),
-  };
-};
-
-const toneClass = { good: 'text-success', bad: 'text-destructive', muted: 'text-muted-foreground' };
 
 const UsersDialog = ({
   open,
@@ -83,6 +46,7 @@ const UsersDialog = ({
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [username, setUsername] = useState('');
   const [fullName, setFullName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>('user');
   const [managerId, setManagerId] = useState<number | ''>('');
@@ -91,6 +55,7 @@ const UsersDialog = ({
   const [busy, setBusy] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [editName, setEditName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
   const [editLogin, setEditLogin] = useState('');
   const [editPass, setEditPass] = useState('');
   const [accessDays, setAccessDays] = useState<number | ''>('');
@@ -179,7 +144,7 @@ const UsersDialog = ({
       const r = await apiCreateUser({
         username: username.trim(),
         password,
-        fullName,
+        fullName: joinFullName(fullName, lastName),
         role,
         managerId: role === 'user' || role === 'admin' ? managerId || null : null,
         scopeIds: role === 'technician' || role === 'accountant' ? scopeIds : undefined,
@@ -191,6 +156,7 @@ const UsersDialog = ({
       if (!outsideRole && structures.length) onStructuresChanged?.();
       setUsername('');
       setFullName('');
+      setLastName('');
       setPassword('');
       setRole('user');
       setManagerId('');
@@ -234,8 +200,10 @@ const UsersDialog = ({
   };
 
   const startEdit = (u: ManagedUser) => {
+    const parts = splitFullName(u.fullName || '');
     setEditId(u.id);
-    setEditName(u.fullName || '');
+    setEditName(parts.first);
+    setEditLastName(parts.last);
     setEditLogin(u.username);
     setEditPass('');
     setEditAccess('keep');
@@ -262,7 +230,7 @@ const UsersDialog = ({
       const r = await apiUpdateUser({
         id: u.id,
         username: login !== u.username ? login : undefined,
-        fullName: editName.trim(),
+        fullName: joinFullName(editName, editLastName),
         password: editPass || undefined,
         ...(isSuperAdmin && u.role === 'admin' && editAccess !== 'keep'
           ? { accessDays: editAccess === '' ? null : editAccess }
@@ -301,7 +269,7 @@ const UsersDialog = ({
                   ? 'Добавляйте сотрудников и управляйте доступом'
                   : readOnly
                     ? 'Все админы и их сотрудники — только просмотр'
-                    : 'Ваши сотрудники: смена пароля и доступа'}
+                    : 'Ваши сотрудники: имя и фамилия, смена пароля и доступа'}
               </p>
             </div>
           </div>
@@ -316,133 +284,38 @@ const UsersDialog = ({
             />
           )}
 
-
           {isSuperAdmin && (
-          <div className="mt-2 grid gap-2 border-2 border-primary bg-card p-4 md:grid-cols-2">
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Логин"
-              className={inputClass}
+            <CreateUserForm
+              isSuperAdmin={isSuperAdmin}
+              username={username}
+              setUsername={setUsername}
+              fullName={fullName}
+              setFullName={setFullName}
+              lastName={lastName}
+              setLastName={setLastName}
+              password={password}
+              setPassword={setPassword}
+              role={role}
+              setRole={setRole}
+              managerId={managerId}
+              setManagerId={setManagerId}
+              scopeIds={scopeIds}
+              setScopeIds={setScopeIds}
+              techIds={techIds}
+              setTechIds={setTechIds}
+              accessDays={accessDays}
+              setAccessDays={setAccessDays}
+              newStructures={newStructures}
+              setNewStructures={setNewStructures}
+              outsideRole={outsideRole}
+              structures={structures}
+              scopeHeads={scopeHeads}
+              allTechs={allTechs}
+              admins={admins}
+              managers={managers}
+              busy={busy}
+              onCreate={create}
             />
-            <input
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              placeholder="Имя сотрудника"
-              className={inputClass}
-            />
-            <input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Пароль"
-              className={inputClass}
-            />
-            {isSuperAdmin && (
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as Role)}
-                className={inputClass}
-              >
-                <option value="user">Сотрудник</option>
-                <option value="admin">Админ</option>
-                <option value="manager">Управляющий</option>
-                <option value="technician">Техник</option>
-                <option value="accountant">Бухгалтер</option>
-                <option value="superadmin">Супер-админ</option>
-              </select>
-            )}
-            {isSuperAdmin && (role === 'technician' || role === 'accountant') && (
-              <TechScopePicker
-                heads={scopeHeads}
-                value={scopeIds}
-                onChange={setScopeIds}
-                adminsOnly={role === 'accountant'}
-                className="md:col-span-2"
-              />
-            )}
-            {isSuperAdmin && role === 'accountant' && (
-              <TechPicker technicians={allTechs} value={techIds} onChange={setTechIds} className="md:col-span-2" />
-            )}
-            {isSuperAdmin && role === 'user' && (
-              <select
-                value={managerId}
-                onChange={(e) => setManagerId(e.target.value ? Number(e.target.value) : '')}
-                className={`${inputClass} md:col-span-2`}
-              >
-                <option value="">Без руководителя</option>
-                {admins.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    Закрепить за: {a.fullName || a.username}
-                  </option>
-                ))}
-              </select>
-            )}
-            {isSuperAdmin && role === 'admin' && (
-              <select
-                value={managerId}
-                onChange={(e) => setManagerId(e.target.value ? Number(e.target.value) : '')}
-                className={`${inputClass} md:col-span-2`}
-              >
-                <option value="">Без управляющего</option>
-                {managers.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    Управляющий: {m.fullName || m.username}
-                  </option>
-                ))}
-              </select>
-            )}
-            {role === 'admin' && (
-              <select
-                value={accessDays}
-                onChange={(e) => setAccessDays(e.target.value ? Number(e.target.value) : '')}
-                className={`${inputClass} md:col-span-2`}
-              >
-                {accessOptions.map((o) => (
-                  <option key={String(o.days)} value={o.days}>
-                    Срок доступа: {o.label}
-                  </option>
-                ))}
-              </select>
-            )}
-            {isSuperAdmin && structures.length > 0 && (
-              <div className="md:col-span-2">
-                <p className="mb-1 font-head text-[0.7rem] font-bold uppercase text-primary">
-                  Привязать к структуре
-                </p>
-                {outsideRole ? (
-                  <p className="border-2 border-dashed border-primary px-3 py-2 text-[12px] text-muted-foreground">
-                    {role === 'technician' ? 'Техник' : 'Супер-админ'} работает вне структур и видит все.
-                  </p>
-                ) : (
-                  <div className="grid gap-1 border-2 border-primary bg-background p-2 sm:grid-cols-2">
-                    {structures.map((st) => (
-                      <label key={st.id} className="flex items-center gap-2 text-[13px] text-primary">
-                        <input
-                          type="checkbox"
-                          checked={newStructures.includes(st.id)}
-                          onChange={(e) =>
-                            setNewStructures((prev) =>
-                              e.target.checked ? [...prev, st.id] : prev.filter((x) => x !== st.id),
-                            )
-                          }
-                          className="h-4 w-4 accent-[hsl(var(--primary))]"
-                        />
-                        <span className="truncate">{st.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            <button
-              onClick={create}
-              disabled={busy}
-              className="flex items-center justify-center gap-2 border-2 border-primary bg-accent px-4 py-2 font-head text-[0.8rem] font-medium uppercase tracking-[0.06em] text-accent-foreground transition-transform hover:-translate-y-0.5 disabled:opacity-60 md:col-span-2"
-            >
-              <Icon name="UserPlus" size={16} strokeWidth={2.5} />
-              Добавить пользователя
-            </button>
-          </div>
           )}
 
           {treeMode && groupIds.length > 0 && (
@@ -462,236 +335,33 @@ const UsersDialog = ({
           )}
 
           <div className="mt-3 grid gap-2">
-            {rows.map(({ user: u, depth, ancestors, admins: adminCount, staff: staffCount }) => {
-              const isGroup = adminCount + staffCount > 0;
-              const isCollapsed = collapsed.includes(u.id);
-              const hiddenRow = ancestors.some((id) => collapsed.includes(id));
-              return (
-              <div
+            {rows.map(({ user: u, depth, ancestors, admins: adminCount, staff: staffCount }) => (
+              <UserRow
                 key={u.id}
-                hidden={hiddenRow}
-                className={`flex flex-wrap items-center gap-2 border-2 border-primary px-3 py-2 ${
-                  u.role === 'manager' && treeMode ? 'bg-muted' : 'bg-card'
-                } ${depth === 1 ? 'ml-4 border-l-8 md:ml-8' : ''} ${
-                  depth >= 2 ? 'ml-8 border-l-8 md:ml-16' : ''
-                } ${hiddenRow ? 'hidden' : ''}`}
-              >
-                {depth > 0 && (
-                  <Icon
-                    name="CornerDownRight"
-                    size={16}
-                    strokeWidth={2.5}
-                    className="shrink-0 text-muted-foreground"
-                  />
-                )}
-                {isGroup && (
-                  <button
-                    onClick={() => toggleGroup(u.id)}
-                    aria-label={isCollapsed ? 'Развернуть ветку' : 'Свернуть ветку'}
-                    className="flex h-7 w-7 shrink-0 items-center justify-center border-2 border-primary bg-background text-primary transition-colors hover:bg-muted"
-                  >
-                    <Icon
-                      name={isCollapsed ? 'ChevronRight' : 'ChevronDown'}
-                      size={16}
-                      strokeWidth={2.5}
-                    />
-                  </button>
-                )}
-                <div
-                  className={`min-w-0 flex-1 ${isGroup ? 'cursor-pointer' : ''}`}
-                  onClick={isGroup ? () => toggleGroup(u.id) : undefined}
-                >
-                  <p className="truncate font-head text-[0.85rem] font-bold uppercase text-primary">
-                    {u.username}
-                    {!u.active && <span className="ml-2 text-destructive">(отключён)</span>}
-                    {isGroup && (
-                      <span className="ml-2 text-[11px] font-bold text-muted-foreground">
-                        {`·${adminCount ? ` админов: ${adminCount} ·` : ''} сотрудников: ${staffCount}${
-                          isCollapsed ? ' (свёрнуто)' : ''
-                        }`}
-                      </span>
-                    )}
-                  </p>
-                  {isSuperAdmin && structures.length > 0 && (u.role === 'technician' || u.role === 'superadmin') && (
-                    <p className="truncate text-[11px] font-semibold text-muted-foreground">Вне структур · видит все</p>
-                  )}
-                  {isSuperAdmin && structures.length > 1 && u.role !== 'superadmin' && u.role !== 'technician' && (
-                    <p className="truncate text-[11px] font-semibold text-primary">
-                      {(u.structureIds || []).length
-                        ? `Структуры: ${(u.structureIds || [])
-                            .map((sid) => structures.find((x) => x.id === sid)?.name)
-                            .filter(Boolean)
-                            .join(', ')}`
-                        : 'Без структуры'}
-                    </p>
-                  )}
-                  <p className="truncate text-[12px] text-muted-foreground">
-                    {`${u.fullName || '—'} · ${roleLabel[u.role]}${
-                      u.managerId && depth === 0
-                        ? ` · руководитель: ${
-                            users.find((a) => a.id === u.managerId)?.fullName ||
-                            users.find((a) => a.id === u.managerId)?.username ||
-                            '—'
-                          }`
-                        : ''
-                    }${
-                      u.role === 'technician' || u.role === 'accountant'
-                        ? ` · ${
-                            u.scopeIds?.length
-                              ? u.scopeIds
-                                  .map((id) => {
-                                    const h = users.find((x) => x.id === id);
-                                    return h ? h.fullName || h.username : null;
-                                  })
-                                  .filter(Boolean)
-                                  .join(', ')
-                              : u.role === 'accountant'
-                                ? 'админы не закреплены'
-                                : 'все точки'
-                          }`
-                        : ''
-                    }`}
-                  </p>
-                  {u.role !== 'superadmin' && u.role !== 'technician' && u.role !== 'accountant' && (
-                    <p
-                      className={`truncate text-[12px] font-bold ${toneClass[accessInfo(u.accessUntil, !u.accessOwn).tone]}`}
-                    >
-                      {accessInfo(u.accessUntil, !u.accessOwn).text}
-                    </p>
-                  )}
-                </div>
-                {isSuperAdmin && (
-                  <select
-                    value={u.role}
-                    disabled={u.id === currentId}
-                    onChange={(e) =>
-                      patch({ id: u.id, role: e.target.value as Role }, 'Роль обновлена')
-                    }
-                    className="border-2 border-primary bg-background px-2 py-1 font-body text-[13px] text-primary outline-none disabled:opacity-50"
-                  >
-                    <option value="user">Сотрудник</option>
-                    <option value="admin">Админ</option>
-                    <option value="manager">Управляющий</option>
-                    <option value="technician">Техник</option>
-                    <option value="accountant">Бухгалтер</option>
-                    <option value="superadmin">Супер-админ</option>
-                  </select>
-                )}
-                {isSuperAdmin && u.role === 'technician' && onViewTechnician && (
-                  <button
-                    type="button"
-                    onClick={() => onViewTechnician(u.id, u.fullName || u.username)}
-                    className="flex items-center gap-1.5 border-2 border-primary bg-accent px-2 py-1 font-head text-[0.68rem] font-bold uppercase text-accent-foreground transition-transform hover:-translate-y-0.5"
-                  >
-                    <Icon name="Eye" size={14} strokeWidth={2.5} />
-                    Кабинет
-                  </button>
-                )}
-                {isSuperAdmin && (u.role === 'technician' || u.role === 'accountant') && (
-                  <TechScopePicker
-                    heads={scopeHeads}
-                    value={u.scopeIds || []}
-                    adminsOnly={u.role === 'accountant'}
-                    onChange={(ids) =>
-                      patch(
-                        { id: u.id, scopeIds: ids },
-                        u.role === 'accountant' ? 'Админы бухгалтера обновлены' : 'Точки техника обновлены',
-                      )
-                    }
-                    className="max-w-[260px] py-1 text-[13px]"
-                  />
-                )}
-                {isSuperAdmin && u.role === 'accountant' && (
-                  <TechPicker
-                    technicians={allTechs}
-                    value={u.techIds || []}
-                    onChange={(ids) => patch({ id: u.id, techIds: ids }, 'Техники бухгалтера обновлены')}
-                    className="max-w-[260px] py-1 text-[13px]"
-                  />
-                )}
-                {isSuperAdmin && u.role === 'user' && (
-                  <select
-                    value={u.managerId ?? ''}
-                    onChange={(e) =>
-                      patch(
-                        { id: u.id, managerId: e.target.value ? Number(e.target.value) : null },
-                        'Руководитель обновлён',
-                      )
-                    }
-                    className="border-2 border-primary bg-background px-2 py-1 font-body text-[13px] text-primary outline-none"
-                  >
-                    <option value="">Без руководителя</option>
-                    {admins.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.fullName || a.username}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {isSuperAdmin && u.role === 'admin' && (
-                  <select
-                    value={u.managerId ?? ''}
-                    onChange={(e) =>
-                      patch(
-                        { id: u.id, managerId: e.target.value ? Number(e.target.value) : null },
-                        'Управляющий обновлён',
-                      )
-                    }
-                    className="border-2 border-primary bg-background px-2 py-1 font-body text-[13px] text-primary outline-none"
-                  >
-                    <option value="">Без управляющего</option>
-                    {managers.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.fullName || m.username}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {!readOnly && u.role === 'user' && (
-                  <button
-                    onClick={() => setPrinterUser(u)}
-                    className="flex items-center gap-1 border-2 border-primary bg-background px-2 py-1 font-head text-[0.7rem] uppercase text-primary transition-colors hover:bg-muted"
-                  >
-                    <Icon name="Printer" size={14} strokeWidth={2.5} />
-                    Принтер
-                  </button>
-                )}
-                {!readOnly && (
-                <button
-                  onClick={() => startEdit(u)}
-                  className="flex items-center gap-1 border-2 border-primary bg-background px-2 py-1 font-head text-[0.7rem] uppercase text-primary transition-colors hover:bg-muted"
-                >
-                  <Icon name="Pencil" size={14} strokeWidth={2.5} />
-                  Изменить
-                </button>
-                )}
-                {!readOnly && (
-                <button
-                  onClick={() => patch({ id: u.id, active: !u.active }, u.active ? 'Доступ закрыт' : 'Доступ открыт')}
-                  disabled={u.id === currentId}
-                  className={`flex items-center gap-1 border-2 px-2 py-1 font-head text-[0.7rem] uppercase transition-colors disabled:opacity-40 ${
-                    u.active
-                      ? 'border-destructive bg-background text-destructive hover:bg-destructive hover:text-destructive-foreground'
-                      : 'border-primary bg-background text-primary hover:bg-muted'
-                  }`}
-                >
-                  <Icon name={u.active ? 'UserX' : 'UserCheck'} size={14} strokeWidth={2.5} />
-                  {u.active ? 'Отключить' : 'Включить'}
-                </button>
-                )}
-                {isSuperAdmin && (
-                  <button
-                    onClick={() => remove(u)}
-                    disabled={u.id === currentId}
-                    className="flex items-center gap-1 border-2 border-destructive bg-destructive px-2 py-1 font-head text-[0.7rem] uppercase text-destructive-foreground transition-transform hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-40"
-                  >
-                    <Icon name="Trash2" size={14} strokeWidth={2.5} />
-                    Удалить
-                  </button>
-                )}
-              </div>
-              );
-            })}
+                u={u}
+                depth={depth}
+                ancestors={ancestors}
+                adminCount={adminCount}
+                staffCount={staffCount}
+                collapsed={collapsed}
+                toggleGroup={toggleGroup}
+                treeMode={treeMode}
+                isSuperAdmin={isSuperAdmin}
+                readOnly={readOnly}
+                currentId={currentId}
+                structures={structures}
+                users={users}
+                scopeHeads={scopeHeads}
+                allTechs={allTechs}
+                admins={admins}
+                managers={managers}
+                patch={patch}
+                onViewTechnician={onViewTechnician}
+                onPrinter={setPrinterUser}
+                onEdit={startEdit}
+                onRemove={remove}
+              />
+            ))}
           </div>
         </div>
         <StaffPrintersDialog
@@ -700,121 +370,27 @@ const UsersDialog = ({
           onClose={() => setPrinterUser(null)}
         />
         {editId !== null && (
-          <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-primary/40 p-6">
-            <div className="w-full max-w-[420px] border-2 border-primary bg-background">
-              <div className="border-b-2 border-primary bg-primary px-5 py-3">
-                <div className="flex items-center gap-2 font-head text-base font-black uppercase tracking-[0.08em] text-primary-foreground">
-                  <Icon name="Pencil" size={18} strokeWidth={2.5} />
-                  Изменить пользователя
-                </div>
-              </div>
-              <div className="grid gap-3 p-5">
-            <div>
-              <p className="mb-1 font-head text-[0.7rem] font-bold uppercase text-primary">Логин</p>
-              <input
-                value={editLogin}
-                onChange={(e) => setEditLogin(e.target.value)}
-                placeholder="Логин"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <p className="mb-1 font-head text-[0.7rem] font-bold uppercase text-primary">Имя</p>
-              <input
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                placeholder="Имя сотрудника"
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <p className="mb-1 font-head text-[0.7rem] font-bold uppercase text-primary">
-                Новый пароль
-              </p>
-              <input
-                value={editPass}
-                onChange={(e) => setEditPass(e.target.value)}
-                placeholder="Оставьте пустым, чтобы не менять"
-                className={inputClass}
-              />
-            </div>
-            {isSuperAdmin &&
-              structures.length > 0 &&
-              !['superadmin', 'technician'].includes(users.find((x) => x.id === editId)?.role ?? '') && (
-              <div>
-                <p className="mb-1 font-head text-[0.7rem] font-bold uppercase text-primary">Структуры</p>
-                <div className="grid gap-1 border-2 border-primary bg-card p-2">
-                  {structures.map((st) => (
-                    <label key={st.id} className="flex items-center gap-2 text-[13px] text-primary">
-                      <input
-                        type="checkbox"
-                        checked={editStructures.includes(st.id)}
-                        onChange={(e) =>
-                          setEditStructures((prev) =>
-                            e.target.checked ? [...prev, st.id] : prev.filter((x) => x !== st.id),
-                          )
-                        }
-                        className="h-4 w-4 accent-[hsl(var(--primary))]"
-                      />
-                      {st.name}
-                    </label>
-                  ))}
-                </div>
-                {!editStructures.length && (
-                  <p className="mt-1 text-[12px] text-destructive">
-                    Без структуры пользователь не увидит ни одного сотрудника и общей базы.
-                  </p>
-                )}
-              </div>
-            )}
-            {isSuperAdmin && users.find((x) => x.id === editId)?.role === 'admin' && (
-              <div>
-                <p className="mb-1 font-head text-[0.7rem] font-bold uppercase text-primary">
-                  Срок доступа админа и его сотрудников
-                </p>
-                <select
-                  value={editAccess}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setEditAccess(v === 'keep' ? 'keep' : v === '' ? '' : Number(v));
-                  }}
-                  className={inputClass}
-                >
-                  <option value="keep">Не менять</option>
-                  {accessOptions.map((o) => (
-                    <option key={String(o.days)} value={o.days}>
-                      {o.days === '' ? 'Снять ограничение' : `Продлить на ${o.label}`}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1 text-[12px] text-muted-foreground">
-                  {accessInfo(users.find((x) => x.id === editId)?.accessUntil ?? null).text}
-                </p>
-              </div>
-            )}
-            <div className="mt-1 flex gap-2">
-              <button
-                onClick={() => {
-                  const target = users.find((x) => x.id === editId);
-                  if (target) saveEdit(target);
-                }}
-                disabled={busy}
-                className="flex flex-1 items-center justify-center gap-1.5 border-2 border-primary bg-accent px-4 py-2 font-head text-[0.75rem] font-bold uppercase text-accent-foreground transition-transform hover:-translate-y-0.5 disabled:opacity-60"
-              >
-                <Icon name="Check" size={15} strokeWidth={2.5} />
-                Сохранить
-              </button>
-              <button
-                onClick={cancelEdit}
-                className="flex items-center justify-center gap-1.5 border-2 border-primary bg-background px-4 py-2 font-head text-[0.75rem] font-bold uppercase text-primary transition-colors hover:bg-muted"
-              >
-                <Icon name="X" size={15} strokeWidth={2.5} />
-                Отмена
-              </button>
-            </div>
-              </div>
-            </div>
-          </div>
+          <EditUserModal
+            editId={editId}
+            users={users}
+            isSuperAdmin={isSuperAdmin}
+            structures={structures}
+            editLogin={editLogin}
+            setEditLogin={setEditLogin}
+            editName={editName}
+            setEditName={setEditName}
+            editLastName={editLastName}
+            setEditLastName={setEditLastName}
+            editPass={editPass}
+            setEditPass={setEditPass}
+            editStructures={editStructures}
+            setEditStructures={setEditStructures}
+            editAccess={editAccess}
+            setEditAccess={setEditAccess}
+            busy={busy}
+            onSave={saveEdit}
+            onCancel={cancelEdit}
+          />
         )}
       </DialogContent>
     </Dialog>
