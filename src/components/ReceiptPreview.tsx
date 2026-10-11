@@ -1,5 +1,6 @@
 import { Product } from '@/data/products';
 import { LabelSettings, defaultLabelSettings, getPaper } from '@/hooks/useLabelSettings';
+import type { TextLabelSpec } from '@/lib/tsplText';
 
 interface ReceiptPreviewProps {
   product: Product;
@@ -31,10 +32,19 @@ const ReceiptPreview = ({
   const hours = product.shelfLifeHours ?? settings.shelfLifeHours;
   const expiry = fmt(new Date(printedAt.getTime() + hours * 3600000));
   const compact = paper.widthMm <= 58;
+  const tspl: TextLabelSpec = {
+    kind: 'product',
+    name: product.name,
+    made: settings.showDate ? stamp : undefined,
+    staff: settings.showStaff ? `${settings.makerName || '—'} / ${settings.checkerName || '—'}` : undefined,
+    expiry: settings.showExpiry ? expiry : undefined,
+    storage: settings.showStorage ? product.storageText || settings.storageText : undefined,
+  };
   const large = paper.widthMm >= 105;
 
   return (
     <div
+      data-tspl={JSON.stringify(tspl)}
       className={`print-area animate-print-out mx-auto border-y-2 border-primary bg-white font-body text-primary ${micro ? 'p-1.5' : tiny ? 'p-2' : 'p-4'}`}
       style={{ maxWidth: `${paper.widthMm * 3.5}px` }}
     >

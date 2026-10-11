@@ -25,7 +25,9 @@ const QrLabel = ({ item }: QrLabelProps) => {
   }, [item.code]);
 
   return (
-    <div className="print-area mx-auto w-full max-w-[320px] border-2 border-primary bg-white p-3 text-black">
+    <div
+      data-tspl={JSON.stringify({ kind: 'qr', name: item.name, code: item.code })}
+      className="print-area mx-auto w-full max-w-[320px] border-2 border-primary bg-white p-3 text-black">
       <p className="text-center font-head text-[13px] font-black uppercase leading-tight">
         {item.name}
       </p>

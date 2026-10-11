@@ -1,4 +1,5 @@
 import { LabelSettings, getPaper } from '@/hooks/useLabelSettings';
+import type { TextLabelSpec } from '@/lib/tsplText';
 
 export interface DefrostInfo {
   staff: string;
@@ -32,8 +33,17 @@ const DefrostLabel = ({ info, printedAt, settings }: DefrostLabelProps) => {
     ? fmt(new Date(printedAt.getTime() + info.hours * 3600000))
     : null;
 
+  const tspl: TextLabelSpec = {
+    kind: 'defrost',
+    placed: stamp,
+    expiry: bestBefore ?? undefined,
+    staff: info.staff || '—',
+    temp: info.temp,
+  };
+
   return (
     <div
+      data-tspl={JSON.stringify(tspl)}
       className={`print-area animate-print-out mx-auto border-y-2 border-primary bg-white font-body text-primary ${micro ? 'p-1' : tiny ? 'p-2' : 'p-4'}`}
       style={{ maxWidth: `${paper.widthMm * 3.5}px`, minHeight: micro ? `${paper.heightMm! * 3.5}px` : undefined }}
     >

@@ -3,9 +3,9 @@ import Icon from '@/components/ui/icon';
 import { toast } from '@/hooks/use-toast';
 import { LabelSettings } from '@/hooks/useLabelSettings';
 import { NetPrinter, PrintConfig, apiRegenPrintKey, apiSavePrinters, printEndpoint } from '@/lib/printApi';
-import { loadPrintConfig, networkOptions, pickPrinter, sendRaw, setPrintConfig, subscribePrintConfig } from '@/lib/netPrint';
+import { loadPrintConfig, pickPrinter, sendRaw, setPrintConfig, subscribePrintConfig, testLabelBytes } from '@/lib/netPrint';
+import TextModeSettings from '@/components/TextModeSettings';
 import { downloadHelper } from '@/lib/printHelper';
-import { testLabelTspl } from '@/lib/tspl';
 
 interface NetworkPrinterSettingsProps {
   settings: LabelSettings;
@@ -81,7 +81,7 @@ const NetworkPrinterSettings = ({ settings, onChange }: NetworkPrinterSettingsPr
 
   const test = async (p: NetPrinter) => {
     setTesting(p.id);
-    const ok = await sendRaw(p, testLabelTspl(networkOptions(settings), `${p.name} · ${p.ip}`));
+    const ok = await sendRaw(p, testLabelBytes(settings, `${p.name} ${p.ip}`));
     setTesting('');
     if (ok) toast({ title: 'Тестовая этикетка напечатана' });
   };
@@ -228,6 +228,7 @@ const NetworkPrinterSettings = ({ settings, onChange }: NetworkPrinterSettingsPr
         </p>
       )}
 
+      <TextModeSettings settings={settings} onChange={onChange} />
       <div className="grid grid-cols-2 gap-2">
         <label className="grid gap-1">
           <span className={labelClass}>Зазор, мм</span>

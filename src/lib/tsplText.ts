@@ -1,234 +1,244 @@
-import { TsplOptions } from '@/lib/tspl';
+import QRCode from 'qrcode';
+import type { TsplOptions } from '@/lib/tspl';
 
 export type TsplCodepage = '1251' | '866' | 'UTF-8';
 
-export interface TextLabelRow {
-  label: string;
-  value: string;
-  bold?: boolean;
-}
-
-export interface TextLabel {
-  title: string;
-  rows: TextLabelRow[];
-  footer?: string;
-  center?: boolean;
-}
+export type TextLabelSpec =
+  | { kind: 'product'; name: string; made?: string; staff?: string; expiry?: string; storage?: string }
+  | { kind: 'defrost'; placed: string; expiry?: string; staff: string; temp: string }
+  | { kind: 'qr'; name: string; code: string }
+  | { kind: 'test'; title: string };
 
 export interface TextTsplOptions extends TsplOptions {
   codepage?: TsplCodepage;
-  sizeShift?: number;
 }
 
-const DOTS_PER_MM = 8;
-const MARGIN = 10;
+type Font = '1' | '2' | '3' | '4' | '5';
 
-const FONTS: Record<string, { w: number; h: number }> = {
+const DOTS_PER_MM = 8;
+const MARGIN = 8;
+const GAP = 3;
+const FONT: Record<Font, { w: number; h: number }> = {
   '1': { w: 8, h: 12 },
   '2': { w: 12, h: 20 },
   '3': { w: 16, h: 24 },
   '4': { w: 24, h: 32 },
   '5': { w: 32, h: 48 },
 };
+const ORDER: Font[] = ['5', '4', '3', '2', '1'];
+const smaller = (f: Font, level: number) => ORDER[Math.min(ORDER.length - 1, ORDER.indexOf(f) + level)];
 
-const FONT_SETS = [
-  { big: '4', small: '3' },
-  { big: '3', small: '3' },
-  { big: '3', small: '2' },
-  { big: '2', small: '2' },
-  { big: '2', small: '1' },
-  { big: '1', small: '1' },
-];
+const CP1251: Record<string, number> = { Ё: 0xa8, ё: 0xb8, '№': 0xb9, '°': 0xb0, '±': 0xb1 };
+const CP866: Record<string, number> = { Ё: 0xf0, ё: 0xf1, '№': 0xfc, '°': 0xf8 };
 
-const CP1251_EXTRA: Record<string, number> = {
-  Ё: 0xa8, ё: 0xb8, '№': 0xb9, '°': 0xb0, '«': 0xab, '»': 0xbb, '—': 0x97, '–': 0x96, '…': 0x85,
-};
-const CP866_EXTRA: Record<string, number> = { Ё: 0xf0, ё: 0xf1, '№': 0xfc, '°': 0xf8 };
-const FALLBACK: Record<string, string> = { '«': '"', '»': '"', '—': '-', '–': '-', '…': '...' };
-
-const encodeText = (text: string, codepage: TsplCodepage): number[] => {
-  if (codepage === 'UTF-8') return Array.from(new TextEncoder().encode(text));
-  const out: number[] = [];
-  for (const ch of text) {
-    const code = ch.codePointAt(0)!;
-    if (code < 0x80) {
-      out.push(code);
-      continue;
-    }
-    if (codepage === '1251') {
-      if (code >= 0x410 && code <= 0x44f) out.push(code - 0x410 + 0xc0);
-      else if (CP1251_EXTRA[ch] !== undefined) out.push(CP1251_EXTRA[ch]);
-      else out.push(0x3f);
-      continue;
-    }
-    if (code >= 0x410 && code <= 0x42f) out.push(code - 0x410 + 0x80);
-    else if (code >= 0x430 && code <= 0x43f) out.push(code - 0x430 + 0xa0);
-    else if (code >= 0x440 && code <= 0x44f) out.push(code - 0x440 + 0xe0);
-    else if (CP866_EXTRA[ch] !== undefined) out.push(CP866_EXTRA[ch]);
-    else if (FALLBACK[ch]) out.push(...Array.from(FALLBACK[ch]).map((c) => c.charCodeAt(0)));
-    else out.push(0x3f);
-  }
-  return out;
-};
-
-const clean = (text: string) =>
-  String(text ?? '')
-    .replace(/["\\]/g, "'")
-    .replace(/[\r\n\t]+/g, ' ')
+const normalize = (s: string) =>
+  String(s ?? '')
+    .replace(/[\u00a0\u202f\u2009]/g, ' ')
+    .replace(/…/g, '...')
+    .replace(/[—–]/g, '-')
+    .replace(/[«»“”„"]/g, "'")
+    .replace(/[‘’]/g, "'")
+    .replace(/\\/g, '/')
     .replace(/\s+/g, ' ')
     .trim();
 
-const fit = (text: string, maxChars: number) =>
-  maxChars <= 0 ? '' : text.length <= maxChars ? text : `${text.slice(0, Math.max(1, maxChars - 1))}.`;
-
-const wrap = (text: string, maxChars: number, maxLines: number) => {
-  const words = text.split(' ');
-  const lines: string[] = [];
-  let line = '';
-  for (const word of words) {
-    const next = line ? `${line} ${word}` : word;
-    if (next.length <= maxChars) {
-      line = next;
-      continue;
-    }
-    if (line) lines.push(line);
-    line = word.length > maxChars ? word.slice(0, maxChars) : word;
-    if (lines.length >= maxLines) break;
+const encode = (text: string, codepage: TsplCodepage) => {
+  if (codepage === 'UTF-8') return new TextEncoder().encode(text);
+  const out: number[] = [];
+  for (const ch of text) {
+    const code = ch.codePointAt(0)!;
+    if (code < 0x80) out.push(code);
+    else if (codepage === '1251') {
+      if (code >= 0x410 && code <= 0x44f) out.push(code - 0x350);
+      else out.push(CP1251[ch] ?? 0x3f);
+    } else if (code >= 0x410 && code <= 0x43f) out.push(code - 0x390);
+    else if (code >= 0x440 && code <= 0x44f) out.push(code - 0x360);
+    else out.push(CP866[ch] ?? 0x3f);
   }
-  if (line && lines.length < maxLines) lines.push(line);
-  if (lines.length === maxLines && lines.join(' ').length < text.length) {
-    lines[maxLines - 1] = fit(`${lines[maxLines - 1]} `, maxChars);
-    if (lines[maxLines - 1].endsWith(' .')) lines[maxLines - 1] = `${lines[maxLines - 1].slice(0, -2)}.`;
-  }
-  return lines;
+  return Uint8Array.from(out);
 };
 
-interface Item {
-  x: number;
-  y: number;
-  font: string;
-  text: string;
-  bold?: boolean;
-}
+const width = (s: string, f: Font) => s.length * FONT[f].w;
+const cut = (s: string, f: Font, maxW: number) => {
+  const max = Math.max(0, Math.floor(maxW / FONT[f].w));
+  return s.length <= max ? s : `${s.slice(0, Math.max(1, max - 1))}.`;
+};
 
-interface Bar {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
+const wrap = (s: string, f: Font, maxW: number, maxLines: number) => {
+  const perLine = Math.max(1, Math.floor(maxW / FONT[f].w));
+  const words = s.split(' ').flatMap((w) => {
+    const parts: string[] = [];
+    for (let i = 0; i < w.length; i += perLine) parts.push(w.slice(i, i + perLine));
+    return parts;
+  });
+  const lines: string[] = [];
+  let current = '';
+  words.forEach((w) => {
+    const next = current ? `${current} ${w}` : w;
+    if (next.length <= perLine) current = next;
+    else {
+      lines.push(current);
+      current = w;
+    }
+  });
+  if (current) lines.push(current);
+  const overflow = lines.length > maxLines;
+  const result = lines.slice(0, maxLines);
+  if (overflow) result[maxLines - 1] = cut(`${result[maxLines - 1]}..`, f, maxW);
+  return { lines: result, overflow };
+};
 
-const layout = (label: TextLabel, W: number, H: number, setIndex: number) => {
-  const set = FONT_SETS[Math.min(FONT_SETS.length - 1, Math.max(0, setIndex))];
-  const big = FONTS[set.big];
-  const small = FONTS[set.small];
+type Item =
+  | { t: 'text'; x: number; y: number; f: Font; s: string; bold?: boolean }
+  | { t: 'bar'; x: number; y: number; w: number; h: number }
+  | { t: 'qr'; x: number; y: number; cell: number; size: number; data: string };
+
+const createLayout = (W: number, level: number) => {
   const inner = W - MARGIN * 2;
   const items: Item[] = [];
-  const bars: Bar[] = [];
   let y = MARGIN;
+  const fs = (f: Font) => smaller(f, level);
 
-  const titleChars = Math.floor(inner / big.w);
-  const titleLines = wrap(clean(label.title).toUpperCase(), titleChars, 2);
-  titleLines.forEach((t) => {
-    const x = label.center ? MARGIN + Math.floor((inner - t.length * big.w) / 2) : MARGIN;
-    items.push({ x, y, font: set.big, text: t, bold: true });
-    y += big.h + 2;
-  });
-  y += 1;
-  bars.push({ x: MARGIN, y, w: inner, h: 2 });
-  y += 5;
-
-  label.rows.forEach((row) => {
-    const f = row.bold ? big : small;
-    const font = row.bold ? set.big : set.small;
-    const total = Math.floor(inner / f.w);
-    const value = fit(clean(row.value), total);
-    const labelChars = total - value.length - 1;
-    const name = labelChars >= 3 ? fit(clean(row.label), labelChars) : '';
-    if (name) items.push({ x: MARGIN, y, font, text: name, bold: row.bold });
-    items.push({ x: MARGIN + inner - value.length * f.w, y, font, text: value, bold: row.bold });
-    y += f.h + 3;
-  });
-
-  if (label.footer) {
-    const t = fit(clean(label.footer).toUpperCase(), Math.floor(inner / small.w));
-    y += 2;
-    items.push({ x: MARGIN + Math.floor((inner - t.length * small.w) / 2), y, font: set.small, text: t, bold: true });
-    y += small.h;
-  }
-
-  return { items, bars, height: y + MARGIN, fits: y + MARGIN <= H };
-};
-
-const concat = (parts: number[][]) => Uint8Array.from(parts.flat());
-
-export const textLabelToTspl = (label: TextLabel, opts: TextTsplOptions) => {
-  const codepage = opts.codepage ?? '1251';
-  const pageW = Math.round(opts.widthMm * DOTS_PER_MM);
-  const pageH = Math.round((opts.heightMm ?? 30) * DOTS_PER_MM);
-  const rotate = Boolean(opts.rotate90);
-  const W = rotate ? pageH : pageW;
-  const H = rotate ? pageW : pageH;
-
-  const start = Math.max(0, 1 - (opts.sizeShift ?? 0));
-  let result = layout(label, W, H, start);
-  for (let i = start + 1; !result.fits && i < FONT_SETS.length; i += 1) {
-    result = layout(label, W, H, i);
-  }
-  const shiftY = result.fits ? Math.floor((H - result.height) / 2) : 0;
-  const dx = Math.round((opts.offsetXmm ?? 0) * DOTS_PER_MM);
-  const dy = Math.round((opts.offsetYmm ?? 0) * DOTS_PER_MM);
-
-  const place = (x: number, y: number) =>
-    rotate ? { x: pageW - (y + shiftY) + dx, y: x + dy, r: 90 } : { x: x + dx, y: y + shiftY + dy, r: 0 };
-
-  const enc = (s: string) => encodeText(s, codepage);
-  const parts: number[][] = [
-    enc(
-      `SIZE ${opts.widthMm} mm,${opts.heightMm ?? 30} mm\r\n` +
-        `GAP ${opts.gapMm ?? 2} mm,0 mm\r\n` +
-        `DIRECTION ${opts.flip ? 0 : 1},0\r\n` +
-        'REFERENCE 0,0\r\n' +
-        `DENSITY ${Math.min(15, Math.max(0, opts.density ?? 8))}\r\n` +
-        'SPEED 4\r\n' +
-        `CODEPAGE ${codepage}\r\n` +
-        'CLS\r\n',
-    ),
-  ];
-
-  result.bars.forEach((b) => {
-    const p = place(b.x, b.y);
-    parts.push(enc(rotate ? `BAR ${p.x - b.h},${p.y},${b.h},${b.w}\r\n` : `BAR ${p.x},${p.y},${b.w},${b.h}\r\n`));
-  });
-
-  result.items.forEach((it) => {
-    const passes = it.bold ? [0, 1] : [0];
-    passes.forEach((shift) => {
-      const p = place(it.x + shift, it.y);
-      parts.push(enc(`TEXT ${Math.max(0, p.x)},${Math.max(0, p.y)},"${it.font}",${p.r},1,1,"`), enc(it.text), enc('"\r\n'));
+  const title = (raw: string, f0: Font, align: 'left' | 'center', maxLines = 2) => {
+    const s = normalize(raw).toUpperCase();
+    if (!s) return;
+    const f = fs(f0);
+    wrap(s, f, inner, maxLines).lines.forEach((line) => {
+      const x = align === 'center' ? Math.round((W - width(line, f)) / 2) : MARGIN;
+      items.push({ t: 'text', x, y, f, s: line, bold: true });
+      y += FONT[f].h + 2;
     });
-  });
+    y += GAP - 1;
+  };
 
-  parts.push(enc(`PRINT 1,${Math.max(1, opts.copies ?? 1)}\r\n`));
-  return concat(parts);
+  const row = (labelRaw: string, valueRaw: string, lf0: Font, vf0: Font, bold = false) => {
+    const label = normalize(labelRaw);
+    const value = normalize(valueRaw) || '-';
+    let lf = fs(lf0);
+    let vf = fs(vf0);
+    while (width(label, lf) + FONT[lf].w + width(value, vf) > inner && (vf !== '1' || lf !== '1')) {
+      if (ORDER.indexOf(vf) <= ORDER.indexOf(lf) && vf !== '1') vf = smaller(vf, 1);
+      else lf = smaller(lf, 1);
+    }
+    const h = Math.max(FONT[lf].h, FONT[vf].h);
+    const v = cut(value, vf, inner - width(label, lf) - FONT[lf].w);
+    items.push({ t: 'text', x: MARGIN, y: y + h - FONT[lf].h, f: lf, s: label });
+    items.push({ t: 'text', x: W - MARGIN - width(v, vf), y: y + h - FONT[vf].h, f: vf, s: v, bold });
+    y += h + GAP;
+  };
+
+  const centered = (raw: string, f0: Font, bold = true) => {
+    const s = normalize(raw);
+    if (!s) return;
+    let f = fs(f0);
+    while (width(s, f) > inner && f !== '1') f = smaller(f, 1);
+    const v = cut(s, f, inner);
+    items.push({ t: 'text', x: Math.round((W - width(v, f)) / 2), y, f, s: v, bold });
+    y += FONT[f].h + GAP;
+  };
+
+  const line = () => {
+    items.push({ t: 'bar', x: MARGIN, y, w: inner, h: 2 });
+    y += 2 + GAP;
+  };
+
+  const qr = (data: string, maxH: number) => {
+    const size = QRCode.create(data, { errorCorrectionLevel: 'M' }).modules.size;
+    const cell = Math.max(2, Math.min(10, Math.floor(Math.min(inner, maxH - y) / size)));
+    items.push({ t: 'qr', x: Math.round((W - size * cell) / 2), y, cell, size, data });
+    y += size * cell + GAP;
+  };
+
+  return { title, row, centered, line, qr, items, used: () => y - GAP + MARGIN };
 };
 
-export const readTextLabel = (node: HTMLElement): TextLabel | null => {
-  const raw = node.getAttribute('data-text-label') ?? node.querySelector('[data-text-label]')?.getAttribute('data-text-label');
+type Layout = ReturnType<typeof createLayout>;
+
+const draw = (spec: TextLabelSpec, l: Layout, H: number) => {
+  if (spec.kind === 'product') {
+    l.title(spec.name, '3', 'left');
+    l.line();
+    if (spec.made) l.row('Изгот.', spec.made, '2', '2');
+    if (spec.staff) l.row('Изг./пров.', spec.staff, '2', '2');
+    if (spec.expiry) l.row('Годен до', spec.expiry, '2', '3', true);
+    if (spec.storage) l.centered(normalize(spec.storage).toUpperCase(), '2');
+  } else if (spec.kind === 'defrost') {
+    l.centered('ДЕФРОСТ', '4');
+    l.row('Выложено', spec.placed, '2', '2');
+    if (spec.expiry) l.row('Годен до', spec.expiry, '2', '3', true);
+    l.row('Выложил', spec.staff || '-', '2', '2');
+    if (spec.temp) l.centered(normalize(spec.temp).toUpperCase(), '3');
+  } else if (spec.kind === 'qr') {
+    l.title(spec.name, '3', 'center');
+    l.qr(spec.code, H - MARGIN);
+  } else {
+    l.centered('ТЕСТ', '4');
+    l.centered(spec.title, '2', false);
+    l.centered('Абв Ёё Эюя 0123', '2', false);
+  }
+};
+
+export const buildTextTspl = (spec: TextLabelSpec, opts: TextTsplOptions) => {
+  const codepage = opts.codepage ?? '1251';
+  const pw = Math.round(opts.widthMm * DOTS_PER_MM);
+  const ph = Math.round((opts.heightMm ?? 30) * DOTS_PER_MM);
+  const rotate = Boolean(opts.rotate90 && opts.heightMm);
+  const W = rotate ? ph : pw;
+  const H = rotate ? pw : ph;
+
+  let layout = createLayout(W, 0);
+  draw(spec, layout, H);
+  for (let level = 1; layout.used() > H && level < 4; level += 1) {
+    layout = createLayout(W, level);
+    draw(spec, layout, H);
+  }
+  const shiftY = Math.max(0, Math.floor((H - layout.used()) / 2));
+  const ox = Math.round((opts.offsetXmm ?? 0) * DOTS_PER_MM);
+  const oy = Math.round((opts.offsetYmm ?? 0) * DOTS_PER_MM);
+  const at = (x: number, y: number) =>
+    rotate ? { x: pw - (y + shiftY) + ox, y: x + oy } : { x: x + ox, y: y + shiftY + oy };
+
+  const cmds: string[] = [];
+  layout.items.forEach((it) => {
+    if (it.t === 'bar') {
+      const p = at(it.x, it.y);
+      cmds.push(rotate ? `BAR ${Math.max(0, p.x - it.h)},${p.y},${it.h},${it.w}` : `BAR ${p.x},${p.y},${it.w},${it.h}`);
+    } else if (it.t === 'qr') {
+      const side = it.size * it.cell;
+      const p = at(it.x, it.y);
+      cmds.push(`QRCODE ${Math.max(0, rotate ? p.x - side : p.x)},${p.y},M,${it.cell},A,0,"${it.data.replace(/"/g, "'")}"`);
+    } else {
+      (it.bold ? [0, 1] : [0]).forEach((dx) => {
+        const p = at(it.x + dx, it.y);
+        cmds.push(`TEXT ${Math.max(0, p.x)},${Math.max(0, p.y)},"${it.f}",${rotate ? 90 : 0},1,1,"${it.s}"`);
+      });
+    }
+  });
+
+  const gap = opts.heightMm ? (opts.gapMm ?? 2) : 0;
+  const program = [
+    `SIZE ${opts.widthMm} mm,${opts.heightMm ?? 30} mm`,
+    `GAP ${gap} mm,0 mm`,
+    `DIRECTION ${opts.flip ? 0 : 1},0`,
+    'REFERENCE 0,0',
+    `DENSITY ${Math.min(15, Math.max(0, opts.density ?? 8))}`,
+    'SPEED 4',
+    `CODEPAGE ${codepage}`,
+    'CLS',
+    ...cmds,
+    `PRINT 1,${Math.max(1, opts.copies ?? 1)}`,
+    '',
+  ].join('\r\n');
+  return encode(program, codepage);
+};
+
+export const readTextSpec = (node: HTMLElement): TextLabelSpec | null => {
+  const raw = node.getAttribute('data-tspl') ?? node.querySelector('[data-tspl]')?.getAttribute('data-tspl');
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as TextLabel;
-    return parsed && typeof parsed.title === 'string' && Array.isArray(parsed.rows) ? parsed : null;
+    const spec = JSON.parse(raw) as TextLabelSpec;
+    return spec && typeof spec.kind === 'string' ? spec : null;
   } catch {
     return null;
   }
 };
-
-export const testTextLabel = (title: string): TextLabel => ({
-  title: 'Тест: Абвгдеёжз ЭЮЯ',
-  rows: [
-    { label: 'Принтер', value: title },
-    { label: 'Годен до', value: '31.12 23:59', bold: true },
-  ],
-  footer: 'Хранить при +2…+4 °C',
-});

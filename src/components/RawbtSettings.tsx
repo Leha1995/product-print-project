@@ -1,7 +1,7 @@
 import Icon from '@/components/ui/icon';
 import { LabelSettings } from '@/hooks/useLabelSettings';
-import { networkOptions, sendToRawbt } from '@/lib/netPrint';
-import { testLabelTspl } from '@/lib/tspl';
+import { sendToRawbt, testLabelBytes } from '@/lib/netPrint';
+import TextModeSettings from '@/components/TextModeSettings';
 
 interface RawbtSettingsProps {
   settings: LabelSettings;
@@ -54,6 +54,7 @@ const RawbtSettings = ({ settings, onChange }: RawbtSettingsProps) => (
         />
       </label>
     </div>
+    <TextModeSettings settings={settings} onChange={onChange} />
     <label className="flex items-center gap-2 text-[12px] text-primary">
       <input
         type="checkbox"
@@ -65,7 +66,7 @@ const RawbtSettings = ({ settings, onChange }: RawbtSettingsProps) => (
     </label>
 
     <button
-      onClick={() => sendToRawbt([testLabelTspl(networkOptions(settings), 'RawBT')])}
+      onClick={() => sendToRawbt([testLabelBytes(settings, 'RawBT')])}
       className="flex items-center justify-center gap-2 border-2 border-primary bg-accent px-3 py-2 font-head text-[0.75rem] font-bold uppercase text-accent-foreground transition-transform hover:-translate-y-0.5"
     >
       <Icon name="Printer" size={16} strokeWidth={2.5} />

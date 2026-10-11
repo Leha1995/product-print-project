@@ -42,6 +42,8 @@ export interface LabelSettings {
   netGapMm: number;
   netDensity: number;
   netFlip: boolean;
+  netTextMode: boolean;
+  netCodepage: '1251' | '866' | 'UTF-8';
   bartenderTemplate: string;
   bartenderPrinter: string;
   offsetXmm: number;
@@ -72,6 +74,8 @@ export const defaultLabelSettings: LabelSettings = {
   netGapMm: 2,
   netDensity: 8,
   netFlip: false,
+  netTextMode: true,
+  netCodepage: '1251',
   bartenderTemplate: 'cennik.btw',
   bartenderPrinter: '',
   offsetXmm: 0,

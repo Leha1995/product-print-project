@@ -9,7 +9,8 @@ import {
   apiPrintJob,
   apiPrintStatus,
 } from '@/lib/printApi';
-import { TsplOptions, nodeToLabelCanvas, nodeToTspl, toBase64 } from '@/lib/tspl';
+import { TsplOptions, nodeToLabelCanvas, nodeToTspl, testLabelTspl, toBase64 } from '@/lib/tspl';
+import { buildTextTspl, readTextSpec } from '@/lib/tsplText';
 
 type Listener = (config: PrintConfig | null) => void;
 
@@ -101,6 +102,17 @@ export const networkOptions = (settings: LabelSettings, copies = 1): TsplOptions
     copies,
   };
 };
+
+export const labelBytes = (node: HTMLElement, settings: LabelSettings, opts: TsplOptions) => {
+  const spec = settings.netTextMode ? readTextSpec(node) : null;
+  if (spec) return Promise.resolve(buildTextTspl(spec, { ...opts, codepage: settings.netCodepage }));
+  return nodeToTspl(node, opts);
+};
+
+export const testLabelBytes = (settings: LabelSettings, title: string) =>
+  settings.netTextMode
+    ? buildTextTspl({ kind: 'test', title }, { ...networkOptions(settings), codepage: settings.netCodepage })
+    : testLabelTspl(networkOptions(settings), title);
 
 export const isRawMode = (settings: LabelSettings) =>
   settings.printMode === 'network' || settings.printMode === 'rawbt' || settings.printMode === 'share';
@@ -206,7 +218,7 @@ const printNodesRawbt = async (
   try {
     const labels: Uint8Array[] = [];
     for (const node of nodes) {
-      labels.push(await nodeToTspl(node, { ...networkOptions(settings, copies), ...override }));
+      labels.push(await labelBytes(node, settings, { ...networkOptions(settings, copies), ...override }));
     }
     return await sendToRawbt(labels);
   } catch {
@@ -351,7 +363,7 @@ export const printNodesNetwork = async (
   const total = nodes.length;
   if (!total) return false;
   const opts = { ...networkOptions(settings, copies), ...override };
-  const render = (i: number) => nodeToTspl(nodes[i], opts);
+  const render = (i: number) => labelBytes(nodes[i], settings, opts);
   const prepareRest = async (from: number) => {
     const out: Uint8Array[] = [];
     for (let i = from; i < total; i += 1) out.push(await render(i));
