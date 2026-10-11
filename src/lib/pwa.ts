@@ -20,7 +20,7 @@ export const isAndroid = () => /android/i.test(navigator.userAgent);
 export const initPwa = () => {
   if ('serviceWorker' in navigator && window.isSecureContext) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').catch(() => undefined);
+      navigator.serviceWorker.register('sw.js', { scope: './' }).catch(() => undefined);
     });
   }
   window.addEventListener('beforeinstallprompt', (e) => {

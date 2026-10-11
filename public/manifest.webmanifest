@@ -4,7 +4,7 @@
   "short_name": "САМ Кафе",
   "description": "Маркировка продуктов, учёт оборудования и задачи техникам.",
   "lang": "ru",
-  "start_url": "./",
+  "start_url": "./#/",
   "scope": "./",
   "display": "fullscreen",
   "display_override": ["fullscreen", "standalone"],
