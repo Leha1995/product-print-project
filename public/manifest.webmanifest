@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "Терминал САМ Кафе",
+  "short_name": "САМ Кафе",
+  "description": "Маркировка продуктов, учёт оборудования и задачи техникам.",
+  "lang": "ru",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "any",
+  "background_color": "#e9e3fd",
+  "theme_color": "#1400f0",
+  "icons": [
+    { "src": "app-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "app-icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

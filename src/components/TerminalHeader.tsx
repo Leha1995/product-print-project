@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Icon from '@/components/ui/icon';
+import InstallAppButton from '@/components/InstallAppButton';
 
 interface TerminalHeaderProps {
   printedCount: number;
@@ -111,6 +112,7 @@ const TerminalHeader = ({
       </div>
 
       <div className="flex items-center justify-end gap-3">
+        <InstallAppButton />
         <button
           onClick={() => window.location.reload()}
           aria-label="Обновить страницу"

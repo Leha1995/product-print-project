@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Icon from '@/components/ui/icon';
 import VirtualKeyboard from '@/components/VirtualKeyboard';
 import LicenseContacts from '@/components/LicenseContacts';
+import InstallAppButton from '@/components/InstallAppButton';
 import { forgetLogin, getKnownLogins, getRemembered, removeKnownLogin } from '@/lib/authApi';
 
 interface LoginScreenProps {
@@ -198,6 +199,7 @@ const LoginScreen = ({ onLogin, kicked }: LoginScreenProps) => {
             Забыть это устройство
           </button>
         )}
+        <InstallAppButton variant="block" className="mt-3" />
       </form>
 
       {!field && (
