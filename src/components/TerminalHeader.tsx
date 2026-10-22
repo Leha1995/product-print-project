@@ -12,10 +12,12 @@ interface TerminalHeaderProps {
   alertCount?: number;
   onAdminClick: () => void;
   accessUntil?: string | null;
-  section?: 'labels' | 'equipment';
-  onSectionChange?: (section: 'labels' | 'equipment') => void;
+  section?: 'labels' | 'equipment' | 'tasks';
+  onSectionChange?: (section: 'labels' | 'equipment' | 'tasks') => void;
   showSections?: boolean;
   inventoryOnly?: boolean;
+  showTasks?: boolean;
+  tasksDue?: number;
 }
 
 const accessLeft = (until?: string | null) => {
@@ -49,6 +51,8 @@ const TerminalHeader = ({
   onSectionChange,
   showSections = false,
   inventoryOnly = false,
+  showTasks = false,
+  tasksDue = 0,
 }: TerminalHeaderProps) => {
   const [, tick] = useState(0);
   useEffect(() => {
@@ -62,15 +66,25 @@ const TerminalHeader = ({
     <header className="print-hide sticky top-0 z-40 grid h-[70px] grid-cols-[1fr_auto_1fr] items-center border-b-2 border-primary bg-background px-4 md:px-8">
       <div className="flex items-center gap-1.5">
         {inventoryOnly && (
-          <span className="flex h-[34px] items-center gap-1.5 border-2 border-primary bg-accent px-2 font-head text-[0.7rem] font-bold uppercase tracking-[0.04em] text-accent-foreground">
+          <button
+            onClick={() => onSectionChange?.('equipment')}
+            className={`flex h-[34px] items-center gap-1.5 border-2 border-primary px-2 font-head text-[0.7rem] font-bold uppercase tracking-[0.04em] transition-colors ${
+              section !== 'tasks' ? 'bg-accent text-accent-foreground' : 'bg-card text-primary hover:bg-muted'
+            }`}
+          >
             <Icon name="Wrench" size={16} strokeWidth={2.5} />
             <span className="hidden sm:inline">Оборудование</span>
-          </span>
+          </button>
         )}
         {!showSections && !inventoryOnly && (
           <button
-            onClick={() => onNavigate(links[0].target)}
-            className="font-head text-[0.8rem] font-medium uppercase tracking-[0.04em] text-primary transition-colors hover:text-secondary md:text-[0.95rem]"
+            onClick={() => {
+              onSectionChange?.('labels');
+              window.setTimeout(() => onNavigate(links[0].target), 50);
+            }}
+            className={`font-head text-[0.8rem] font-medium uppercase tracking-[0.04em] transition-colors hover:text-secondary md:text-[0.95rem] ${
+              showTasks && section !== 'tasks' ? 'text-primary underline decoration-2 underline-offset-4' : 'text-primary'
+            }`}
           >
             {links[0].label}
           </button>
@@ -103,6 +117,26 @@ const TerminalHeader = ({
           <Icon name="Wrench" size={16} strokeWidth={2.5} />
           <span className="hidden sm:inline">Оборудование</span>
         </button>
+        )}
+        {showTasks && (
+          <button
+            onClick={() => onSectionChange?.('tasks')}
+            className={`relative flex h-[34px] items-center gap-1.5 border-2 border-primary px-2 font-head text-[0.7rem] font-bold uppercase tracking-[0.04em] transition-colors ${
+              section === 'tasks'
+                ? 'bg-accent text-accent-foreground'
+                : tasksDue
+                  ? 'animate-pulse bg-destructive text-destructive-foreground'
+                  : 'bg-card text-primary hover:bg-muted'
+            }`}
+          >
+            <Icon name={tasksDue ? 'BellRing' : 'ListChecks'} size={16} strokeWidth={2.5} />
+            <span className="hidden sm:inline">Задания</span>
+            {tasksDue > 0 && (
+              <span className="flex h-[18px] min-w-[18px] items-center justify-center border-2 border-primary bg-accent px-1 font-head text-[0.65rem] font-bold text-accent-foreground">
+                {tasksDue}
+              </span>
+            )}
+          </button>
         )}
       </div>
 

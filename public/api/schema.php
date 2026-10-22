@@ -201,6 +201,27 @@ function schema_sql(string $driver): array
             last_seen DATETIME NULL,
             created_at DATETIME NULL
         )$tail",
+        "CREATE TABLE IF NOT EXISTS staff_tasks (
+            id $auto,
+            created_by INT NOT NULL,
+            assignee_id INT NOT NULL,
+            title $short NOT NULL,
+            note $text NULL,
+            kind VARCHAR(16) NOT NULL DEFAULT 'daily',
+            start_time VARCHAR(5) NOT NULL DEFAULT '09:00',
+            task_date VARCHAR(10) NULL,
+            interval_min INT NOT NULL DEFAULT 5,
+            tune VARCHAR(20) NOT NULL DEFAULT 'beep',
+            active TINYINT NOT NULL DEFAULT 1,
+            created_at DATETIME NULL
+        )$tail",
+        "CREATE TABLE IF NOT EXISTS staff_task_done (
+            task_id INT NOT NULL,
+            day VARCHAR(10) NOT NULL,
+            done_at DATETIME NULL,
+            done_by INT NOT NULL,
+            PRIMARY KEY (task_id, day)
+        )$tail",
         "CREATE TABLE IF NOT EXISTS print_jobs (
             id $auto,
             owner_id INT NOT NULL,
@@ -216,7 +237,7 @@ function schema_sql(string $driver): array
     ];
 }
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 const SCHEMA_COLUMNS = [
     'app_sessions' => [
@@ -309,6 +330,8 @@ const IMPORT_COLUMNS = [
     'telegram_links' => ['user_id', 'chat_id', 'tg_name', 'linked_at'],
     'print_keys' => ['owner_id', 'print_key', 'printers', 'last_seen', 'created_at'],
     'inventory_sessions' => ['id', 'user_id', 'started_by', 'started_at', 'finished_at', 'scanned', 'missing', 'total', 'total_price', 'missing_price'],
+    'staff_tasks' => ['id', 'created_by', 'assignee_id', 'title', 'note', 'kind', 'start_time', 'task_date', 'interval_min', 'tune', 'active', 'created_at'],
+    'staff_task_done' => ['task_id', 'day', 'done_at', 'done_by'],
 ];
 
 const IMPORT_DEFAULTS = [

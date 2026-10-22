@@ -35,10 +35,12 @@ import TechnicianScreen from '@/components/technician/TechnicianScreen';
 import AccountantExportButton from '@/components/AccountantExportButton';
 import AccountantTechsPanel from '@/components/accountant/AccountantTechsPanel';
 import AccountantTransfersPanel from '@/components/accountant/AccountantTransfersPanel';
+import StaffTasksSection from '@/components/staff-tasks/StaffTasksSection';
+import useStaffTasks from '@/hooks/useStaffTasks';
 
 const Index = () => {
   const [selected, setSelected] = useState<Product | null>(null);
-  const [section, setSection] = useState<'labels' | 'equipment'>('labels');
+  const [section, setSection] = useState<'labels' | 'equipment' | 'tasks'>('labels');
   const [open, setOpen] = useState(false);
   const [jobs, setJobs] = useState<PrintJob[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
@@ -61,6 +63,9 @@ const Index = () => {
     useAuth();
   const { managed, refreshManaged } = useManagedUsers(isAdmin || isAccountant);
   const isTechnician = user?.role === 'technician';
+  const tasksEnabled = isAuthed && !isTechnician && !isAccountant;
+  const staffTasks = useStaffTasks(tasksEnabled);
+  const showTasks = tasksEnabled && (staffTasks.data.canManage || staffTasks.data.mine.length > 0);
   const [targetId, setTargetId] = useState<number | null>(null);
   const activeTarget = targetId ?? (inventoryOnly ? null : (user?.id ?? null));
   const pickedTech = isSuperAdmin
@@ -294,9 +299,11 @@ const Index = () => {
         onAdminClick={() => setAdminOpen(true)}
         accessUntil={user?.accessUntil ?? null}
         section={section}
-        onSectionChange={canInventory && (!inventoryOnly || managerPicked) ? setSection : undefined}
+        onSectionChange={setSection}
         showSections={canInventory && (!inventoryOnly || managerPicked)}
         inventoryOnly={inventoryOnly && !managerPicked}
+        showTasks={showTasks}
+        tasksDue={staffTasks.due.length}
       />
       <StructureSwitcher
         structures={user?.structures ?? []}
@@ -328,7 +335,15 @@ const Index = () => {
           viewingName={viewingName}
         />
       )}
-      {pickedTech ? (
+      {section === 'tasks' && showTasks ? (
+        <StaffTasksSection
+          data={staffTasks.data}
+          setData={staffTasks.setData}
+          loading={staffTasks.loading}
+          now={staffTasks.now}
+          onConfirm={staffTasks.confirm}
+        />
+      ) : pickedTech ? (
         <TechnicianScreen
           key={pickedTech.id}
           inline
@@ -343,7 +358,7 @@ const Index = () => {
         canTransfer={user?.role === 'manager'}
         managerPicked={managerPicked}
         activeTarget={activeTarget}
-        section={section}
+        section={section === 'tasks' ? 'labels' : section}
         canInventory={canInventory}
         userId={user?.id}
         isAdmin={isAdmin}
