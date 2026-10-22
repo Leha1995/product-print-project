@@ -95,12 +95,7 @@ function poll_updates(PDO $db): void
     if (!is_array($info)) {
         return;
     }
-    $hook = (string)($info['url'] ?? '');
-    if ($hook !== '') {
-        $broken = !empty($info['last_error_date']) && (time() - (int)$info['last_error_date']) < 600;
-        if (!$broken || (int)($info['pending_update_count'] ?? 0) === 0) {
-            return;
-        }
+    if ((string)($info['url'] ?? '') !== '') {
         tg_call('deleteWebhook', ['drop_pending_updates' => false], 4);
     }
     $res = tg_call('getUpdates', ['timeout' => 0, 'limit' => 50, 'allowed_updates' => ['message']], 6);
@@ -120,20 +115,6 @@ function poll_updates(PDO $db): void
     if ($last) {
         tg_call('getUpdates', ['offset' => $last + 1, 'limit' => 1, 'timeout' => 0], 4);
     }
-}
-
-function hook_url(): string
-{
-    $given = (string)(body()['hookUrl'] ?? '');
-    $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
-    if ($given !== '' && preg_match('#^https://([^/]+)/.*telegram\.php$#i', $given, $m) && strtolower($m[1]) === $host) {
-        return $given;
-    }
-    $url = site_url() . '/api/telegram.php';
-    $https = (($_SERVER['REQUEST_SCHEME'] ?? '') === 'https')
-        || (($_SERVER['HTTP_X_FORWARDED_SSL'] ?? '') === 'on')
-        || (strpos((string)($_SERVER['HTTP_CF_VISITOR'] ?? ''), 'https') !== false);
-    return $https ? preg_replace('#^http://#', 'https://', $url) : $url;
 }
 
 $me = session_user($db, header_value('X-Auth-Token'));
@@ -179,16 +160,8 @@ if ($action === 'link') {
     if (empty($bot['username'])) {
         out(['error' => 'bad_token'], 400);
     }
-    $hookUrl = hook_url();
     $info = tg_call('getWebhookInfo', [], 4)['result'] ?? [];
-    if (strpos($hookUrl, 'https://') === 0) {
-        if (($info['url'] ?? '') !== $hookUrl || !empty($info['last_error_message'])) {
-            $set = tg_call('setWebhook', ['url' => $hookUrl, 'secret_token' => webhook_secret(), 'allowed_updates' => ['message']], 4);
-            if (empty($set['ok'])) {
-                tg_call('deleteWebhook', ['drop_pending_updates' => false], 4);
-            }
-        }
-    } elseif (($info['url'] ?? '') !== '') {
+    if (($info['url'] ?? '') !== '') {
         tg_call('deleteWebhook', ['drop_pending_updates' => false], 4);
     }
     $code = rtrim(strtr(base64_encode(random_bytes(18)), '+/', '-_'), '=');

@@ -123,13 +123,11 @@ if ($cfg && $authorized) {
                 $hook = tg_call('getWebhookInfo', [], 6)['result'] ?? [];
                 $hookUrl = (string)($hook['url'] ?? '');
                 $hookErr = (string)($hook['last_error_message'] ?? '');
-                if ($hookUrl === '') {
-                    $add(true, 'Приём сообщений от бота', 'Режим опроса: привязка сработает, пока открыто окно подключения в приложении');
-                } elseif ($hookErr !== '') {
-                    $add(false, 'Приём сообщений от бота', 'Telegram не может достучаться до ' . $hookUrl . ': ' . $hookErr . '. Нажмите «Подключить Telegram» ещё раз — включится запасной режим');
-                } else {
-                    $add(true, 'Приём сообщений от бота', 'Адрес ' . $hookUrl);
+                if ($hookUrl !== '') {
+                    tg_call('deleteWebhook', ['drop_pending_updates' => false], 6);
                 }
+                $add(true, 'Приём сообщений от бота', 'Сервер сам забирает сообщения у бота, пока в приложении открыто подключение Telegram'
+                    . ($hookErr !== '' ? ' (старый адрес приёма с ошибкой «' . $hookErr . '» отключён)' : ''));
             }
             try {
                 $add(true, 'Подключённые к Telegram', 'аккаунтов: ' . (int)one_value($db, 'SELECT COUNT(*) FROM telegram_links'));
