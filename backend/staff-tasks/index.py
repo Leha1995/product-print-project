@@ -233,15 +233,32 @@ def handler(event: dict, context) -> dict:
         task = clean_task(body)
         if not task:
             return finish({'error': 'invalid_input'}, 400)
-        assignee = int(body.get('assigneeId') or 0)
-        if assignee not in allowed:
+        raw_ids = body.get('assigneeIds')
+        if not isinstance(raw_ids, list):
+            raw_ids = [body.get('assigneeId')]
+        assignees = []
+        for value in raw_ids:
+            try:
+                uid = int(value or 0)
+            except (TypeError, ValueError):
+                continue
+            if uid and uid not in assignees:
+                assignees.append(uid)
+        if not assignees:
+            return finish({'error': 'invalid_input'}, 400)
+        if any(uid not in allowed for uid in assignees):
             return finish({'error': 'forbidden'}, 403)
+        assignee = assignees[0]
         date_sql = q(task['task_date']) if task['task_date'] else 'NULL'
         if action == 'create':
+            values = ', '.join(
+                f"({int(me['id'])}, {uid}, {q(task['title'])}, {q(task['note'])}, {q(task['kind'])}, "
+                f"{q(task['start_time'])}, {date_sql}, {task['interval_min']}, {q(task['tune'])})"
+                for uid in assignees[:100]
+            )
             cur.execute(
                 'INSERT INTO staff_tasks (created_by, assignee_id, title, note, kind, start_time, task_date, interval_min, tune) '
-                f"VALUES ({int(me['id'])}, {assignee}, {q(task['title'])}, {q(task['note'])}, {q(task['kind'])}, "
-                f"{q(task['start_time'])}, {date_sql}, {task['interval_min']}, {q(task['tune'])})"
+                f'VALUES {values}'
             )
         else:
             tid = int(body.get('taskId') or 0)

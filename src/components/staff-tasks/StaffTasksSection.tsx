@@ -83,7 +83,11 @@ const StaffTasksSection = ({ data, setData, loading, now, onConfirm, viewedId = 
   const save = async (input: StaffTaskInput) => {
     const next = editing ? await updateStaffTask(editing.id, input) : await createStaffTask(input);
     setData(next);
-    toast({ title: editing ? 'Задание обновлено' : 'Задание создано', description: input.title });
+    const count = input.assigneeIds.length;
+    toast({
+      title: editing ? 'Задание обновлено' : count > 1 ? `Задание поставлено ${count} сотрудникам` : 'Задание создано',
+      description: input.title,
+    });
   };
 
   const remove = async (t: StaffTask) => {

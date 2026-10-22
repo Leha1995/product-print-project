@@ -190,17 +190,32 @@ if ($action === 'create' || $action === 'update') {
     if (!$task) {
         out(['error' => 'invalid_input'], 400);
     }
-    $assignee = (int)($b['assigneeId'] ?? 0);
-    if (!in_array($assignee, $allowed, true)) {
-        out(['error' => 'forbidden'], 403);
+    $rawIds = is_array($b['assigneeIds'] ?? null) ? $b['assigneeIds'] : [$b['assigneeId'] ?? 0];
+    $assignees = [];
+    foreach ($rawIds as $value) {
+        $uid = (int)$value;
+        if ($uid > 0 && !in_array($uid, $assignees, true)) {
+            $assignees[] = $uid;
+        }
     }
+    if (!$assignees) {
+        out(['error' => 'invalid_input'], 400);
+    }
+    foreach ($assignees as $uid) {
+        if (!in_array($uid, $allowed, true)) {
+            out(['error' => 'forbidden'], 403);
+        }
+    }
+    $assignee = $assignees[0];
     if ($action === 'create') {
-        run(
-            $db,
-            'INSERT INTO staff_tasks (created_by, assignee_id, title, note, kind, start_time, task_date, interval_min, tune, active, created_at) '
-            . 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)',
-            [(int)$me['id'], $assignee, $task['title'], $task['note'], $task['kind'], $task['start_time'], $task['task_date'], $task['interval_min'], $task['tune'], now_utc()]
-        );
+        foreach (array_slice($assignees, 0, 100) as $uid) {
+            run(
+                $db,
+                'INSERT INTO staff_tasks (created_by, assignee_id, title, note, kind, start_time, task_date, interval_min, tune, active, created_at) '
+                . 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)',
+                [(int)$me['id'], $uid, $task['title'], $task['note'], $task['kind'], $task['start_time'], $task['task_date'], $task['interval_min'], $task['tune'], now_utc()]
+            );
+        }
     } else {
         $tid = (int)($b['taskId'] ?? 0);
         if (!$canTouch($tid)) {

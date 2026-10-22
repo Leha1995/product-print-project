@@ -35,7 +35,7 @@ const StaffTaskFormDialog = ({
   const [date, setDate] = useState(todayKey());
   const [intervalMin, setIntervalMin] = useState(5);
   const [tune, setTune] = useState('beep');
-  const [assigneeId, setAssigneeId] = useState<number | ''>('');
+  const [assigneeIds, setAssigneeIds] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -49,13 +49,19 @@ const StaffTaskFormDialog = ({
     setIntervalMin(task?.intervalMin ?? 5);
     setTune(task?.tune ?? 'beep');
     const preset = defaultAssigneeId && assignees.some((a) => a.id === defaultAssigneeId) ? defaultAssigneeId : null;
-    setAssigneeId(task?.assigneeId ?? preset ?? (assignees.length === 1 ? assignees[0].id : ''));
+    const initial = task?.assigneeId ?? preset ?? (assignees.length === 1 ? assignees[0].id : null);
+    setAssigneeIds(initial ? [initial] : []);
     setError('');
   }, [open, task, assignees, defaultAssigneeId]);
 
+  const allPicked = assignees.length > 0 && assignees.every((a) => assigneeIds.includes(a.id));
+
+  const toggle = (id: number) =>
+    setAssigneeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
   const submit = async () => {
     if (!title.trim()) return setError('Напишите, что нужно сделать');
-    if (!assigneeId) return setError('Выберите сотрудника');
+    if (!assigneeIds.length) return setError('Выберите хотя бы одного сотрудника');
     if (!startTime) return setError('Укажите время');
     if (kind === 'once' && !date) return setError('Укажите дату');
     setBusy(true);
@@ -69,7 +75,7 @@ const StaffTaskFormDialog = ({
         date: kind === 'once' ? date : null,
         intervalMin,
         tune,
-        assigneeId: Number(assigneeId),
+        assigneeIds,
       });
       onOpenChange(false);
     } catch {
@@ -107,22 +113,56 @@ const StaffTaskFormDialog = ({
               maxLength={1000}
             />
           </label>
-          <label>
-            <span className={labelClass}>Кому</span>
-            <select
-              value={assigneeId}
-              onChange={(e) => setAssigneeId(e.target.value ? Number(e.target.value) : '')}
-              className={inputClass}
-            >
-              <option value="">Выберите сотрудника</option>
-              {assignees.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                  {a.role !== 'user' ? ` (${roleLabel[a.role] ?? a.role})` : ''}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div>
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <span className={`${labelClass} mb-0`}>
+                Кому{assigneeIds.length > 1 ? ` · выбрано ${assigneeIds.length}` : ''}
+              </span>
+              {assignees.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setAssigneeIds(allPicked ? (task ? [task.assigneeId] : []) : assignees.map((a) => a.id))
+                  }
+                  className="font-head text-[0.65rem] font-bold uppercase tracking-[0.04em] text-primary underline underline-offset-2 hover:text-secondary"
+                >
+                  {allPicked ? 'Снять всех' : 'Выбрать всех'}
+                </button>
+              )}
+            </div>
+            <div className="max-h-[220px] overflow-y-auto border-2 border-primary bg-background">
+              {assignees.map((a) => {
+                const checked = assigneeIds.includes(a.id);
+                return (
+                  <label
+                    key={a.id}
+                    className={`flex cursor-pointer items-center gap-3 border-b border-primary/20 px-3 py-2.5 last:border-b-0 ${
+                      checked ? 'bg-accent text-accent-foreground' : 'text-primary hover:bg-muted'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggle(a.id)}
+                      className="h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                    />
+                    <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{a.name}</span>
+                    {a.role !== 'user' && (
+                      <span className="shrink-0 text-[12px] opacity-75">{roleLabel[a.role] ?? a.role}</span>
+                    )}
+                  </label>
+                );
+              })}
+              {!assignees.length && (
+                <p className="px-3 py-3 text-[13px] text-muted-foreground">Нет сотрудников, которым можно поставить задание</p>
+              )}
+            </div>
+            {task && assigneeIds.length > 1 && (
+              <span className="mt-1 block text-[12px] text-muted-foreground">
+                Остальным выбранным создадутся такие же задания.
+              </span>
+            )}
+          </div>
 
           <div>
             <span className={labelClass}>Как часто</span>

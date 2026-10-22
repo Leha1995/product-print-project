@@ -42,7 +42,7 @@ export interface StaffTaskInput {
   date: string | null;
   intervalMin: number;
   tune: string;
-  assigneeId: number;
+  assigneeIds: number[];
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -78,8 +78,11 @@ export const markStaffTaskDone = (taskId: number) => send({ action: 'done', task
 
 export const createStaffTask = (task: StaffTaskInput) => send({ action: 'create', ...task });
 
-export const updateStaffTask = (taskId: number, task: StaffTaskInput) =>
-  send({ action: 'update', taskId, ...task });
+export const updateStaffTask = async (taskId: number, task: StaffTaskInput) => {
+  const [first, ...rest] = task.assigneeIds;
+  const updated = await send({ action: 'update', taskId, ...task, assigneeIds: [first] });
+  return rest.length ? createStaffTask({ ...task, assigneeIds: rest }) : updated;
+};
 
 export const deleteStaffTask = (taskId: number) => send({ action: 'delete', taskId });
 
