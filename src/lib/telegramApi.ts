@@ -1,5 +1,5 @@
 import func2url from '../../backend/func2url.json';
-import { apiUrl } from '@/lib/apiBase';
+import { apiUrl, isOwnServer } from '@/lib/apiBase';
 import { getToken } from '@/lib/authApi';
 
 export interface TelegramStatus {
@@ -26,6 +26,7 @@ export const requestTelegramLink = async (): Promise<{ url: string; botName: str
     body: JSON.stringify({
       action: 'link',
       webhookUrl: (func2url as Record<string, string>).telegram,
+      ...(isOwnServer() ? { hookUrl: new URL(API(), window.location.href).href } : {}),
     }),
   });
   const data = await res.json().catch(() => ({}));

@@ -8,6 +8,7 @@ header('X-Robots-Tag: noindex');
 
 require __DIR__ . '/lib.php';
 require __DIR__ . '/schema.php';
+require __DIR__ . '/notify.php';
 
 function e($v): string
 {
@@ -107,6 +108,33 @@ if ($cfg && $authorized) {
                 $db->rollBack();
             }
             $add(false, 'Запись входов в базу', $ex->getMessage());
+        }
+        if (bot_token() === '') {
+            $add(false, 'Telegram-бот', 'Токен бота не указан в настройках сервера — уведомления отключены');
+        } else {
+            $me = tg_call('getMe', [], 6);
+            if (!$me) {
+                $add(false, 'Telegram-бот', 'Хостинг не может связаться с api.telegram.org: ' . ($GLOBALS['tg_last_error'] ?? '') . ' — обратитесь в поддержку REG.RU, чтобы открыли исходящие запросы к api.telegram.org');
+            } elseif (empty($me['ok'])) {
+                $add(false, 'Telegram-бот', 'Telegram отклонил токен: ' . ($me['description'] ?? 'неизвестная ошибка') . ' — проверьте токен в настройках');
+            } else {
+                $add(true, 'Telegram-бот', '@' . ($me['result']['username'] ?? '') . ' на связи');
+                $hook = tg_call('getWebhookInfo', [], 6)['result'] ?? [];
+                $hookUrl = (string)($hook['url'] ?? '');
+                $hookErr = (string)($hook['last_error_message'] ?? '');
+                if ($hookUrl === '') {
+                    $add(true, 'Приём сообщений от бота', 'Режим опроса: привязка сработает, пока открыто окно подключения в приложении');
+                } elseif ($hookErr !== '') {
+                    $add(false, 'Приём сообщений от бота', 'Telegram не может достучаться до ' . $hookUrl . ': ' . $hookErr . '. Нажмите «Подключить Telegram» ещё раз — включится запасной режим');
+                } else {
+                    $add(true, 'Приём сообщений от бота', 'Адрес ' . $hookUrl);
+                }
+            }
+            try {
+                $add(true, 'Подключённые к Telegram', 'аккаунтов: ' . (int)one_value($db, 'SELECT COUNT(*) FROM telegram_links'));
+            } catch (Throwable $ex) {
+                $add(false, 'Подключённые к Telegram', $ex->getMessage());
+            }
         }
         try {
             $users = all_rows($db, 'SELECT id, username, role, active, manager_id, access_until, password_hash FROM app_users ORDER BY id');

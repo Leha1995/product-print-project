@@ -21,19 +21,34 @@ function tg_call(string $method, array $payload, float $timeout = 4.0): array
         return [];
     }
     $url = 'https://api.telegram.org/bot' . $token . '/' . $method;
-    $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
+    $json = json_encode($payload ?: new stdClass(), JSON_UNESCAPED_UNICODE);
+    $GLOBALS['tg_last_error'] = '';
     if (function_exists('curl_init')) {
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $json,
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => (int)ceil($timeout),
-            CURLOPT_CONNECTTIMEOUT => 3,
-        ]);
-        $raw = curl_exec($ch);
-        curl_close($ch);
+        $attempt = function (bool $verify) use ($url, $json, $timeout) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $json,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => (int)ceil($timeout),
+                CURLOPT_CONNECTTIMEOUT => 4,
+                CURLOPT_SSL_VERIFYPEER => $verify,
+                CURLOPT_SSL_VERIFYHOST => $verify ? 2 : 0,
+            ]);
+            $raw = curl_exec($ch);
+            $errNo = curl_errno($ch);
+            $err = curl_error($ch);
+            curl_close($ch);
+            return [$raw, $errNo, $err];
+        };
+        [$raw, $errNo, $err] = $attempt(true);
+        if ($raw === false && in_array($errNo, [35, 51, 58, 60, 77], true)) {
+            [$raw, $errNo, $err] = $attempt(false);
+        }
+        if ($raw === false) {
+            $GLOBALS['tg_last_error'] = 'curl ' . $errNo . ': ' . $err;
+        }
     } else {
         $ctx = stream_context_create(['http' => [
             'method' => 'POST',
