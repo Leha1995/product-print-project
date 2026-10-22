@@ -10,6 +10,7 @@ interface StaffTaskFormDialogProps {
   task: StaffTask | null;
   assignees: StaffAssignee[];
   onSave: (input: StaffTaskInput) => Promise<void>;
+  defaultAssigneeId?: number | null;
 }
 
 const roleLabel: Record<string, string> = { user: 'сотрудник', admin: 'админ', manager: 'управляющий' };
@@ -19,7 +20,14 @@ const inputClass =
   'w-full border-2 border-primary bg-background px-3 py-2.5 font-body text-[15px] text-primary outline-none focus:bg-muted';
 const labelClass = 'mb-1 block font-head text-[0.7rem] font-bold uppercase tracking-[0.06em] text-primary';
 
-const StaffTaskFormDialog = ({ open, onOpenChange, task, assignees, onSave }: StaffTaskFormDialogProps) => {
+const StaffTaskFormDialog = ({
+  open,
+  onOpenChange,
+  task,
+  assignees,
+  onSave,
+  defaultAssigneeId = null,
+}: StaffTaskFormDialogProps) => {
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
   const [kind, setKind] = useState<StaffTaskKind>('daily');
@@ -40,9 +48,10 @@ const StaffTaskFormDialog = ({ open, onOpenChange, task, assignees, onSave }: St
     setDate(task?.date ?? todayKey());
     setIntervalMin(task?.intervalMin ?? 5);
     setTune(task?.tune ?? 'beep');
-    setAssigneeId(task?.assigneeId ?? (assignees.length === 1 ? assignees[0].id : ''));
+    const preset = defaultAssigneeId && assignees.some((a) => a.id === defaultAssigneeId) ? defaultAssigneeId : null;
+    setAssigneeId(task?.assigneeId ?? preset ?? (assignees.length === 1 ? assignees[0].id : ''));
     setError('');
-  }, [open, task, assignees]);
+  }, [open, task, assignees, defaultAssigneeId]);
 
   const submit = async () => {
     if (!title.trim()) return setError('Напишите, что нужно сделать');

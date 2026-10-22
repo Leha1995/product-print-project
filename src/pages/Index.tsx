@@ -326,7 +326,7 @@ const Index = () => {
           targetId={activeTarget ?? user.id}
           onChange={(id) => {
             setTargetId(id);
-            if (inventoryOnly) setSection('equipment');
+            if (inventoryOnly && section !== 'tasks') setSection('equipment');
           }}
           label={inventoryOnly ? 'Точка' : 'Каталог сотрудника'}
           minCount={inventoryOnly ? 1 : 2}
@@ -342,6 +342,7 @@ const Index = () => {
           loading={staffTasks.loading}
           now={staffTasks.now}
           onConfirm={staffTasks.confirm}
+          viewedId={targetId && targetId !== user?.id ? targetId : null}
         />
       ) : pickedTech ? (
         <TechnicianScreen

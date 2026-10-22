@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Icon from '@/components/ui/icon';
 import { toast } from '@/hooks/use-toast';
 import { getTune } from '@/lib/chiptune';
@@ -20,6 +20,7 @@ interface StaffTasksSectionProps {
   loading: boolean;
   now: Date;
   onConfirm: (taskId: number) => Promise<void>;
+  viewedId?: number | null;
 }
 
 const timeOf = (iso: string | null) =>
@@ -34,12 +35,25 @@ const dateLabel = (key: string | null) => {
 const scheduleText = (t: StaffTask) =>
   t.kind === 'daily' ? `Каждый день с ${t.startTime}` : `${dateLabel(t.date)} с ${t.startTime}`;
 
-const StaffTasksSection = ({ data, setData, loading, now, onConfirm }: StaffTasksSectionProps) => {
-  const [tab, setTab] = useState<'mine' | 'manage'>(data.canManage && !data.mine.length ? 'manage' : 'mine');
+const StaffTasksSection = ({ data, setData, loading, now, onConfirm, viewedId = null }: StaffTasksSectionProps) => {
+  const viewed = viewedId ? data.assignees.find((a) => a.id === viewedId) ?? null : null;
+  const [tab, setTab] = useState<'mine' | 'manage'>(
+    data.canManage && (viewedId || !data.mine.length) ? 'manage' : 'mine',
+  );
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<StaffTask | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
-  const [filter, setFilter] = useState<number | 'all'>('all');
+  const [filter, setFilter] = useState<number | 'all'>(viewedId ?? 'all');
+
+  useEffect(() => {
+    if (!data.canManage) return;
+    if (viewedId && data.assignees.some((a) => a.id === viewedId)) {
+      setFilter(viewedId);
+      setTab('manage');
+    } else {
+      setFilter('all');
+    }
+  }, [viewedId, data.canManage, data.assignees]);
 
   const mine = useMemo(() => {
     const rank = (t: StaffTask) => (isTaskDue(t, now) ? 0 : t.doneAt ? 2 : 1);
@@ -111,7 +125,9 @@ const StaffTasksSection = ({ data, setData, loading, now, onConfirm }: StaffTask
     <section className="px-4 py-6 md:px-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-head text-2xl font-black uppercase text-primary md:text-3xl">Задания</h1>
+          <h1 className="font-head text-2xl font-black uppercase text-primary md:text-3xl">
+            {viewed && tab === 'manage' ? `Задания · ${viewed.name}` : 'Задания'}
+          </h1>
           <p className="mt-1 text-[13px] text-muted-foreground">
             {loading ? 'Загружаю…' : dueCount ? `Ждут выполнения: ${dueCount}` : 'Сигнал звучит, пока задание не отмечено выполненным'}
           </p>
@@ -125,7 +141,7 @@ const StaffTasksSection = ({ data, setData, loading, now, onConfirm }: StaffTask
             className="flex items-center gap-2 border-2 border-primary bg-accent px-4 py-2.5 font-head text-[0.75rem] font-bold uppercase text-accent-foreground transition-transform hover:-translate-y-0.5"
           >
             <Icon name="Plus" size={17} strokeWidth={2.5} />
-            Новое задание
+            {viewed ? `Задание для ${viewed.name}` : 'Новое задание'}
           </button>
         )}
       </div>
@@ -275,6 +291,7 @@ const StaffTasksSection = ({ data, setData, loading, now, onConfirm }: StaffTask
         task={editing}
         assignees={data.assignees}
         onSave={save}
+        defaultAssigneeId={filter === 'all' ? viewedId : filter}
       />
     </section>
   );
