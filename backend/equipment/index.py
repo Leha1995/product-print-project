@@ -988,6 +988,7 @@ def handler(event: dict, context) -> dict:
             eid if eq_sql != 'NULL' else None,
             int(tech_id) if tech_sql != 'NULL' else None,
             techs,
+            int(me['id']),
         )
         return finish({'ok': True, 'tasks': owner_tasks(cur, uid)})
 
@@ -1139,7 +1140,7 @@ def handler(event: dict, context) -> dict:
                 f"VALUES ({uid}, {q(eid)}, NULL, {int(me['id'])}, {q(task_text[:2000])}, {q(json.dumps(photos))}::jsonb, "
                 f"{q(body.get('priority') if body.get('priority') in PRIORITIES else 'soon')}, 'repair')"
             )
-            safe_notify(notify_repair, cur, uid, eid, description, owner_technicians(cur, uid))
+            safe_notify(notify_repair, cur, uid, eid, description, owner_technicians(cur, uid), int(me['id']))
         return finish({'ok': True, 'items': read_items(cur, uid), 'tasks': owner_tasks(cur, uid)})
 
     if action == 'return_repair':

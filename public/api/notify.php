@@ -174,22 +174,67 @@ function equipment_line(PDO $db, int $uid, $eid): string
     return implode(' · ', array_filter([(string)$row['name'], (string)$row['location']]));
 }
 
-function notify_new_task(PDO $db, int $uid, int $taskId, string $description, string $priority, $eid, $techId, array $techs): void
+const ROLE_LABEL = [
+    'admin' => 'админ',
+    'manager' => 'управляющий',
+    'superadmin' => 'супер-админ',
+    'user' => 'сотрудник',
+    'accountant' => 'бухгалтер',
+    'technician' => 'техник',
+];
+
+function notify_person(PDO $db, $uid): ?array
+{
+    if (!$uid) {
+        return null;
+    }
+    return one_row($db, 'SELECT full_name, username, role, manager_id FROM app_users WHERE id = ?', [(int)$uid]);
+}
+
+function author_lines(PDO $db, int $uid, $authorId): string
+{
+    $out = '';
+    $author = notify_person($db, $authorId);
+    $authorName = $author ? (string)($author['full_name'] ?: $author['username']) : '';
+    if ($author) {
+        $out .= '👤 От: ' . tg_esc($authorName) . ' (' . (ROLE_LABEL[$author['role']] ?? $author['role']) . ")\n";
+    }
+    $owner = notify_person($db, $uid);
+    $adminName = '';
+    if ($owner) {
+        if ($owner['role'] === 'admin') {
+            $adminName = (string)($owner['full_name'] ?: $owner['username']);
+        } elseif ($owner['manager_id']) {
+            $head = notify_person($db, $owner['manager_id']);
+            if ($head && $head['role'] === 'admin') {
+                $adminName = (string)($head['full_name'] ?: $head['username']);
+            }
+        }
+    }
+    if ($adminName !== '' && $adminName !== $authorName) {
+        $out .= '🏢 Админ точки: ' . tg_esc($adminName) . "\n";
+    }
+    return $out;
+}
+
+function notify_new_task(PDO $db, int $uid, int $taskId, string $description, string $priority, $eid, $techId, array $techs, $authorId = null): void
 {
     $targets = $techId ? [(int)$techId] : array_column($techs, 'id');
     $eq = equipment_line($db, $uid, $eid);
-    $text = '🛠 <b>Новая задача №' . $taskId . "</b>\n"
+    $text = '🛠 <b>Поступила заявка №' . $taskId . "</b>\n"
         . (PRIORITY_LABEL[$priority] ?? PRIORITY_LABEL['normal']) . "\n"
+        . author_lines($db, $uid, $authorId)
         . '📍 Точка: ' . tg_esc(point_name($db, $uid)) . "\n"
         . ($eq !== '' ? '⚙️ Оборудование: ' . tg_esc($eq) . "\n" : '')
         . "\n" . tg_esc(mb_substr($description, 0, 1500));
     send_to_users($db, $targets, $text);
 }
 
-function notify_repair(PDO $db, int $uid, $eid, string $description, array $techs): void
+function notify_repair(PDO $db, int $uid, $eid, string $description, array $techs, $authorId = null): void
 {
     $eq = equipment_line($db, $uid, $eid) ?: (string)$eid;
     $text = "🔧 <b>Оборудование отправлено в ремонт</b>\n"
+        . author_lines($db, $uid, $authorId)
         . '📍 Точка: ' . tg_esc(point_name($db, $uid)) . "\n"
         . '⚙️ ' . tg_esc($eq) . "\n"
         . ($description !== '' ? "\nПоломка: " . tg_esc(mb_substr($description, 0, 1500)) : "\nОписание поломки не указано");

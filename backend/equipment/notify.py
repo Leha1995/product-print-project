@@ -55,6 +55,45 @@ def point_name(cur, uid: int) -> str:
     return row[0] if row else ''
 
 
+ROLE_LABEL = {
+    'admin': 'админ',
+    'manager': 'управляющий',
+    'superadmin': 'супер-админ',
+    'user': 'сотрудник',
+    'accountant': 'бухгалтер',
+    'technician': 'техник',
+}
+
+
+def person(cur, uid):
+    if not uid:
+        return None
+    cur.execute(
+        f"SELECT COALESCE(NULLIF(full_name, ''), username), role, manager_id FROM app_users WHERE id = {int(uid)}"
+    )
+    return cur.fetchone()
+
+
+def author_lines(cur, uid: int, author_id) -> str:
+    """Строки «От кого» и, если нужно, «Админ точки» для уведомления технику."""
+    lines = []
+    author = person(cur, author_id)
+    if author:
+        lines.append(f'👤 От: {esc(author[0])} ({ROLE_LABEL.get(author[1], author[1])})')
+    owner = person(cur, uid)
+    admin_name = ''
+    if owner:
+        if owner[1] == 'admin':
+            admin_name = owner[0]
+        elif owner[2]:
+            head = person(cur, owner[2])
+            if head and head[1] == 'admin':
+                admin_name = head[0]
+    if admin_name and (not author or author[0] != admin_name):
+        lines.append(f'🏢 Админ точки: {esc(admin_name)}')
+    return ''.join(f'{line}\n' for line in lines)
+
+
 def equipment_line(cur, uid: int, eid) -> str:
     if not eid:
         return ''
@@ -68,24 +107,26 @@ def equipment_line(cur, uid: int, eid) -> str:
     return ' · '.join(filter(None, [row[0], row[1]]))
 
 
-def notify_new_task(cur, uid: int, task_id: int, description: str, priority: str, eid, tech_id, techs) -> None:
+def notify_new_task(cur, uid: int, task_id: int, description: str, priority: str, eid, tech_id, techs, author_id=None) -> None:
     targets = [int(tech_id)] if tech_id else [t['id'] for t in techs]
     eq = equipment_line(cur, uid, eid)
     text = (
-        f'🛠 <b>Новая задача №{int(task_id)}</b>\n'
+        f'🛠 <b>Поступила заявка №{int(task_id)}</b>\n'
         f'{PRIORITY_LABEL.get(priority, PRIORITY_LABEL["normal"])}\n'
-        f'📍 Точка: {esc(point_name(cur, uid))}\n'
+        + author_lines(cur, uid, author_id)
+        + f'📍 Точка: {esc(point_name(cur, uid))}\n'
         + (f'⚙️ Оборудование: {esc(eq)}\n' if eq else '')
         + f'\n{esc(description[:1500])}'
     )
     send_to_users(cur, targets, text)
 
 
-def notify_repair(cur, uid: int, eid, description: str, techs) -> None:
+def notify_repair(cur, uid: int, eid, description: str, techs, author_id=None) -> None:
     eq = equipment_line(cur, uid, eid) or str(eid)
     text = (
         '🔧 <b>Оборудование отправлено в ремонт</b>\n'
-        f'📍 Точка: {esc(point_name(cur, uid))}\n'
+        + author_lines(cur, uid, author_id)
+        + f'📍 Точка: {esc(point_name(cur, uid))}\n'
         f'⚙️ {esc(eq)}\n'
         + (f'\nПоломка: {esc(description[:1500])}' if description else '\nОписание поломки не указано')
     )

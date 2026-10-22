@@ -857,7 +857,7 @@ if ($action === 'create_task') {
         . "VALUES (?, ?, ?, ?, ?, ?, 'open', ?, '', ?, 0, 'task')",
         [$uid, $eqId, $techId, $me['id'], $description, json_text($photos), now_utc(), $priority]
     );
-    notify_new_task($db, $uid, (int)$db->lastInsertId(), $description, $priority, $eqId, $techId, $techs);
+    notify_new_task($db, $uid, (int)$db->lastInsertId(), $description, $priority, $eqId, $techId, $techs, (int)$me['id']);
     out(['ok' => true, 'tasks' => owner_tasks($db, $uid)]);
 }
 
@@ -1011,7 +1011,7 @@ if ($action === 'send_repair') {
             . "VALUES (?, ?, NULL, ?, ?, ?, 'open', ?, '', ?, 0, 'repair')",
             [$uid, $eid, $me['id'], $taskText, json_text($photos), now_utc(), $priority]
         );
-        notify_repair($db, $uid, $eid, $description, owner_technicians($db, $uid));
+        notify_repair($db, $uid, $eid, $description, owner_technicians($db, $uid), (int)$me['id']);
     }
     out(['ok' => true, 'items' => read_items($db, $uid), 'tasks' => owner_tasks($db, $uid)]);
 }
