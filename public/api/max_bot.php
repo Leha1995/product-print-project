@@ -115,9 +115,14 @@ function max_summary(PDO $db, int $maxUid, string $kind = 'points'): void
         max_send($maxUid, 'Сводка по точкам доступна админам, управляющим и супер-админу.');
         return;
     }
-    max_send_button($maxUid, $kind === 'staff'
-        ? build_staff_report($db, (int)$row['id'], (string)$row['role'])
-        : build_report($db, (int)$row['id'], (string)$row['role'], false));
+    if ($kind === 'staff') {
+        $text = build_staff_report($db, (int)$row['id'], (string)$row['role']);
+    } elseif ($kind === 'month') {
+        $text = build_month_report($db, (int)$row['id'], (string)$row['role']);
+    } else {
+        $text = build_report($db, (int)$row['id'], (string)$row['role'], false);
+    }
+    max_send_button($maxUid, $text);
 }
 
 function max_handle(PDO $db, array $u): void
@@ -130,13 +135,13 @@ function max_handle(PDO $db, array $u): void
         $payload = (string)($cb['payload'] ?? '');
         $cbUid = (int)($cb['user']['user_id'] ?? 0);
         if (!empty($cb['callback_id'])) {
-            max_call('POST', '/answers', ['callback_id' => (string)$cb['callback_id']], ['notification' => in_array($payload, ['summary', 'staff'], true) ? 'Готовлю сводку…' : 'Принято'], 3);
+            max_call('POST', '/answers', ['callback_id' => (string)$cb['callback_id']], ['notification' => in_array($payload, ['summary', 'staff', 'month'], true) ? 'Готовлю сводку…' : 'Принято'], 3);
         }
         if (!$cbUid) {
             return;
         }
-        if ($payload === 'summary' || $payload === 'staff') {
-            max_summary($db, $cbUid, $payload === 'staff' ? 'staff' : 'points');
+        if (in_array($payload, ['summary', 'staff', 'month'], true)) {
+            max_summary($db, $cbUid, $payload === 'summary' ? 'points' : $payload);
         } else {
             mt_callback($db, $cbUid, $payload);
         }
@@ -155,12 +160,14 @@ function max_handle(PDO $db, array $u): void
             max_send($sid, 'Уведомления отключены.');
         } elseif (mt_dialog_text($db, $sid, $text)) {
             return;
+        } elseif (preg_match('#^(/month|расход|траты|затраты)#u', $low)) {
+            max_summary($db, $sid, 'month');
         } elseif (preg_match('#^(/staff|сотрудники|сводка по сотрудникам|персонал)#u', $low)) {
             max_summary($db, $sid, 'staff');
         } elseif (preg_match('#^(/summary|/svodka|сводка|отч[её]т)#u', $low)) {
             max_summary($db, $sid);
         } else {
-            max_send_button($sid, "Я присылаю уведомления о заявках, ремонтах и передачах оборудования, а в 23:00 — итоги дня.\nСводку по точкам или по сотрудникам можно получить кнопками ниже или словами «сводка» и «сотрудники».");
+            max_send_button($sid, "Я присылаю уведомления о заявках, ремонтах и передачах оборудования, а в 23:00 — итоги дня.\nСводку по точкам, по сотрудникам и расходы за месяц можно получить кнопками ниже или словами «сводка», «сотрудники», «расходы».");
         }
     }
 }

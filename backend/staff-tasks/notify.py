@@ -33,6 +33,7 @@ def _send(chat_id: int, text: str) -> None:
 BOSS_BUTTONS = [{'type': 'inline_keyboard', 'payload': {'buttons': [
     [{'type': 'callback', 'text': '👥 Сводка по сотрудникам', 'payload': 'staff'}],
     [{'type': 'callback', 'text': '📊 Сводка по точкам', 'payload': 'summary'}],
+    [{'type': 'callback', 'text': '💰 Расходы за месяц', 'payload': 'month'}],
 ]}}]
 
 

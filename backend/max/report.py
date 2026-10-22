@@ -13,8 +13,11 @@ SUMMARY_BUTTON = [{
     'payload': {'buttons': [
         [{'type': 'callback', 'text': '📊 Сводка по точкам', 'payload': 'summary'}],
         [{'type': 'callback', 'text': '👥 Сводка по сотрудникам', 'payload': 'staff'}],
+        [{'type': 'callback', 'text': '💰 Расходы за месяц', 'payload': 'month'}],
     ]},
 }]
+
+MONTHS_RU = ['', 'январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь']
 
 
 def esc(value) -> str:
@@ -152,6 +155,45 @@ def flush_overdue_queue(cur, limit: int = 10) -> int:
             send_tg(row[1], text)
         sent += 1
     return sent
+
+
+def build_month_report(cur, uid: int, role: str) -> str:
+    """Сколько потрачено на ремонты и заявки по каждой точке с начала месяца."""
+    tz = boss_tz(cur, uid)
+    now = local_now(tz)
+    start_utc = datetime.datetime(now.year, now.month, 1) + datetime.timedelta(minutes=tz)
+    title = f'💰 Расходы на ремонты · {MONTHS_RU[now.month]} {now.year}'
+    period = f"с 01.{now.strftime('%m')} по {now.strftime('%d.%m')}"
+    points = boss_points(cur, uid, role)
+    if not points:
+        return f'<b>{title}</b>\n\nЗа вами пока не закреплено ни одной точки.'
+    point_names = names(cur, points)
+    st = {int(p): {'sum': 0.0, 'cnt': 0, 'repair': 0.0, 'task': 0.0} for p in points}
+    cur.execute(
+        "SELECT user_id, kind, COUNT(*), COALESCE(SUM(cost), 0) FROM equipment_tasks WHERE status = 'done' "
+        f"AND user_id IN ({ids_sql(points)}) AND done_at >= {q(start_utc.strftime('%Y-%m-%d %H:%M:%S'))} GROUP BY user_id, kind"
+    )
+    for p, kind, cnt, spent in cur.fetchall():
+        s = st.setdefault(int(p), {'sum': 0.0, 'cnt': 0, 'repair': 0.0, 'task': 0.0})
+        s['sum'] += float(spent or 0)
+        s['cnt'] += int(cnt)
+        s['repair' if kind == 'repair' else 'task'] += float(spent or 0)
+    total = sum(s['sum'] for s in st.values())
+    count = sum(s['cnt'] for s in st.values())
+    lines = [f'<b>{title}</b>', period, '', f'<b>Итого: {money(total)}</b> · закрыто заявок: {count}']
+    for p, s in sorted(st.items(), key=lambda kv: -kv[1]['sum']):
+        line = f"\n📍 <b>{esc(point_names.get(p, f'Точка {p}'))}</b> — {money(s['sum'])}"
+        if s['cnt']:
+            line += f"\n   заявок: {s['cnt']}"
+            if s['repair'] > 0 and s['task'] > 0:
+                line += f" · ремонты {money(s['repair'])} · заявки {money(s['task'])}"
+            if total > 0 and len(st) > 1:
+                line += f" · {round(s['sum'] / total * 100)}%"
+        else:
+            line += '\n   расходов не было'
+        lines.append(line)
+    text = '\n'.join(lines)
+    return text if len(text) <= 3900 else text[:3850] + '\n\n…список сокращён'
 
 
 def build_staff_report(cur, uid: int, role: str) -> str:

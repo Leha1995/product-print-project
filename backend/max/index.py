@@ -11,7 +11,7 @@ import psycopg2
 
 from tasks import handle_callback, handle_dialog_text
 from report import (
-    SUMMARY_BUTTON, build_report, build_staff_report, flush_overdue_queue, report_settings, reports_due,
+    SUMMARY_BUTTON, build_month_report, build_report, build_staff_report, flush_overdue_queue, report_settings, reports_due,
     save_overdue_settings, save_report_settings, send_daily_reports,
 )
 
@@ -28,6 +28,7 @@ BOSS_ROLES = ('admin', 'manager', 'superadmin')
 WEBHOOK_PREFIX = 'https://functions.poehali.dev/'
 SUMMARY_WORDS = ('/summary', '/svodka', 'сводка', 'отчет', 'отчёт')
 STAFF_WORDS = ('/staff', 'сотрудники', 'сводка по сотрудникам', 'персонал')
+MONTH_WORDS = ('/month', 'расход', 'траты', 'затраты')
 TIME_RE = re.compile(r'^([01]\d|2[0-3]):[0-5]\d$')
 
 
@@ -101,7 +102,12 @@ def send_summary(cur, max_uid, kind: str = 'points') -> None:
     if row[1] not in BOSS_ROLES:
         send_text(max_uid, 'Сводка по точкам доступна админам, управляющим и супер-админу.')
         return
-    text = build_staff_report(cur, int(row[0]), row[1]) if kind == 'staff' else build_report(cur, int(row[0]), row[1], False)
+    if kind == 'staff':
+        text = build_staff_report(cur, int(row[0]), row[1])
+    elif kind == 'month':
+        text = build_month_report(cur, int(row[0]), row[1])
+    else:
+        text = build_report(cur, int(row[0]), row[1], False)
     send_text(max_uid, text, True)
 
 
@@ -114,13 +120,13 @@ def handle_update(cur, upd: dict) -> None:
         user = cb.get('user') or {}
         payload = str(cb.get('payload') or '')
         uid = user.get('user_id')
-        notice = 'Готовлю сводку…' if payload in ('summary', 'staff') else 'Принято'
+        notice = 'Готовлю сводку…' if payload in ('summary', 'staff', 'month') else 'Принято'
         if cb.get('callback_id'):
             max_api('POST', '/answers', {'callback_id': cb['callback_id']}, {'notification': notice}, 3)
         if not uid:
             return
-        if payload in ('summary', 'staff'):
-            send_summary(cur, uid, 'staff' if payload == 'staff' else 'points')
+        if payload in ('summary', 'staff', 'month'):
+            send_summary(cur, uid, 'points' if payload == 'summary' else payload)
         else:
             handle_callback(cur, uid, payload, lambda t: send_text(uid, t))
     elif kind == 'message_created':
@@ -137,6 +143,8 @@ def handle_update(cur, upd: dict) -> None:
             send_text(sender['user_id'], 'Уведомления отключены.')
         elif handle_dialog_text(cur, sender['user_id'], text):
             return
+        elif any(low.startswith(w) for w in MONTH_WORDS):
+            send_summary(cur, sender['user_id'], 'month')
         elif any(low.startswith(w) for w in STAFF_WORDS):
             send_summary(cur, sender['user_id'], 'staff')
         elif any(low.startswith(w) for w in SUMMARY_WORDS):
@@ -145,7 +153,7 @@ def handle_update(cur, upd: dict) -> None:
             send_text(
                 sender['user_id'],
                 'Я присылаю уведомления о заявках, ремонтах и передачах оборудования, а в 23:00 — итоги дня.\n'
-                'Сводку по точкам или по сотрудникам можно получить кнопками ниже или словами «сводка» и «сотрудники».',
+                'Сводку по точкам, по сотрудникам и расходы за месяц можно получить кнопками ниже или словами «сводка», «сотрудники», «расходы».',
                 True,
             )
 

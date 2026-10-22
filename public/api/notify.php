@@ -312,6 +312,7 @@ function send_max_to_users(PDO $db, array $ids, array $roles, string $text, ?int
                 'attachments' => [['type' => 'inline_keyboard', 'payload' => ['buttons' => [
                     [['type' => 'callback', 'text' => '👥 Сводка по сотрудникам', 'payload' => 'staff']],
                     [['type' => 'callback', 'text' => '📊 Сводка по точкам', 'payload' => 'summary']],
+                    [['type' => 'callback', 'text' => '💰 Расходы за месяц', 'payload' => 'month']],
                 ]]]],
             ], 4);
         } else {

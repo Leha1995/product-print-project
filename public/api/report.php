@@ -12,8 +12,67 @@ function summary_button(): array
         'payload' => ['buttons' => [
             [['type' => 'callback', 'text' => '📊 Сводка по точкам', 'payload' => 'summary']],
             [['type' => 'callback', 'text' => '👥 Сводка по сотрудникам', 'payload' => 'staff']],
+            [['type' => 'callback', 'text' => '💰 Расходы за месяц', 'payload' => 'month']],
         ]],
     ]];
+}
+
+const MONTHS_RU = ['', 'январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+
+function build_month_report(PDO $db, int $uid, string $role): string
+{
+    $tz = boss_tz($db, $uid);
+    $local = local_time($tz);
+    $monthStart = gmdate('Y-m-01', $local);
+    $startUtc = gmdate('Y-m-d H:i:s', strtotime($monthStart . ' 00:00:00 UTC') + $tz * 60);
+    $title = '💰 Расходы на ремонты · ' . MONTHS_RU[(int)gmdate('n', $local)] . ' ' . gmdate('Y', $local);
+    $period = 'с 01.' . gmdate('m', $local) . ' по ' . gmdate('d.m', $local);
+    $points = boss_points($db, $uid, $role);
+    if (!$points) {
+        return "<b>{$title}</b>\n\nЗа вами пока не закреплено ни одной точки.";
+    }
+    $names = [];
+    foreach (all_rows($db, 'SELECT id, full_name, username FROM app_users WHERE id IN (' . in_list($points) . ')') as $r) {
+        $names[(int)$r['id']] = (string)($r['full_name'] ?: $r['username']);
+    }
+    $st = [];
+    foreach ($points as $p) {
+        $st[$p] = ['sum' => 0.0, 'cnt' => 0, 'repair' => 0.0, 'task' => 0.0];
+    }
+    $rows = all_rows(
+        $db,
+        "SELECT user_id, kind, COUNT(*) AS c, COALESCE(SUM(cost), 0) AS s FROM equipment_tasks WHERE status = 'done' "
+        . 'AND user_id IN (' . in_list($points) . ') AND done_at >= ? GROUP BY user_id, kind',
+        [$startUtc]
+    );
+    foreach ($rows as $r) {
+        $p = (int)$r['user_id'];
+        $s = (float)$r['s'];
+        $st[$p]['sum'] += $s;
+        $st[$p]['cnt'] += (int)$r['c'];
+        $st[$p][$r['kind'] === 'repair' ? 'repair' : 'task'] += $s;
+    }
+    $total = array_sum(array_column($st, 'sum'));
+    $count = array_sum(array_column($st, 'cnt'));
+    uasort($st, fn($a, $b) => $b['sum'] <=> $a['sum']);
+    $lines = ["<b>{$title}</b>", $period, '', '<b>Итого: ' . rub($total) . "</b> · закрыто заявок: {$count}"];
+    foreach ($st as $p => $s) {
+        $line = "\n📍 <b>" . tg_esc($names[$p] ?? ('Точка ' . $p)) . '</b> — ' . rub($s['sum']);
+        if ($s['cnt'] > 0) {
+            $line .= "\n   заявок: {$s['cnt']}";
+            if ($s['repair'] > 0 && $s['task'] > 0) {
+                $line .= ' · ремонты ' . rub($s['repair']) . ' · заявки ' . rub($s['task']);
+            }
+            if ($total > 0 && count($st) > 1) {
+                $line .= ' · ' . round($s['sum'] / $total * 100) . '%';
+            }
+        } else {
+            $line .= "\n   расходов не было";
+        }
+        $lines[] = $line;
+    }
+    $text = implode("\n", $lines);
+    return mb_strlen($text) <= 3900 ? $text : mb_substr($text, 0, 3850) . "\n\n…список сокращён";
 }
 
 function max_send_button(int $maxUserId, string $text): void
