@@ -200,6 +200,13 @@ function schema_sql(string $driver): array
             user_id INT NOT NULL,
             expires_at DATETIME NOT NULL
         )$tail",
+        "CREATE TABLE IF NOT EXISTS max_dialogs (
+            max_user_id BIGINT NOT NULL PRIMARY KEY,
+            task_id INT NOT NULL,
+            step VARCHAR(16) NOT NULL,
+            cost DECIMAL(12,2) NOT NULL DEFAULT 0,
+            updated_at DATETIME NULL
+        )$tail",
         "CREATE TABLE IF NOT EXISTS staff_tune_prefs (
             user_id INT NOT NULL PRIMARY KEY,
             tune VARCHAR(32) NOT NULL DEFAULT '',
@@ -276,11 +283,14 @@ function schema_sql(string $driver): array
     ];
 }
 
-const SCHEMA_VERSION = 10;
+const SCHEMA_VERSION = 11;
 
 const SCHEMA_COLUMNS = [
     'app_sessions' => [
         'structure_id' => 'INT NULL',
+    ],
+    'equipment_tasks' => [
+        'taken_at' => 'DATETIME NULL',
     ],
     'shared_products' => [
         'structure_id' => 'INT NULL',

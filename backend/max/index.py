@@ -9,6 +9,7 @@ import urllib.request
 
 import psycopg2
 
+from tasks import handle_callback, handle_dialog_text
 from report import (
     SUMMARY_BUTTON, build_report, report_settings, reports_due, save_report_settings, send_daily_reports,
 )
@@ -107,10 +108,17 @@ def handle_update(cur, upd: dict) -> None:
     elif kind == 'message_callback':
         cb = upd.get('callback') or {}
         user = cb.get('user') or {}
+        payload = str(cb.get('payload') or '')
+        uid = user.get('user_id')
+        notice = 'Готовлю сводку…' if payload == 'summary' else 'Принято'
         if cb.get('callback_id'):
-            max_api('POST', '/answers', {'callback_id': cb['callback_id']}, {'notification': 'Готовлю сводку…'}, 3)
-        if cb.get('payload') == 'summary' and user.get('user_id'):
-            send_summary(cur, user['user_id'])
+            max_api('POST', '/answers', {'callback_id': cb['callback_id']}, {'notification': notice}, 3)
+        if not uid:
+            return
+        if payload == 'summary':
+            send_summary(cur, uid)
+        else:
+            handle_callback(cur, uid, payload, lambda t: send_text(uid, t))
     elif kind == 'message_created':
         msg = upd.get('message') or {}
         text = str((msg.get('body') or {}).get('text') or '').strip()
@@ -123,6 +131,8 @@ def handle_update(cur, upd: dict) -> None:
         elif low == '/stop':
             cur.execute(f"DELETE FROM max_links WHERE max_user_id = {int(sender['user_id'])}")
             send_text(sender['user_id'], 'Уведомления отключены.')
+        elif handle_dialog_text(cur, sender['user_id'], text):
+            return
         elif any(low.startswith(w) for w in SUMMARY_WORDS):
             send_summary(cur, sender['user_id'])
         else:

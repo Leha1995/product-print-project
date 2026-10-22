@@ -195,7 +195,15 @@ function max_send(int $maxUserId, string $text): void
     max_call('POST', '/messages', ['user_id' => $maxUserId], ['text' => mb_substr($text, 0, 3900), 'format' => 'html'], 4);
 }
 
-function send_max_to_users(PDO $db, array $ids, array $roles, string $text): void
+function max_task_keyboard(int $taskId): array
+{
+    return [['type' => 'inline_keyboard', 'payload' => ['buttons' => [[
+        ['type' => 'callback', 'text' => '🛠 Взял в работу', 'payload' => 'take:' . $taskId],
+        ['type' => 'callback', 'text' => '✅ Выполнено', 'payload' => 'done:' . $taskId, 'intent' => 'positive'],
+    ]]]]];
+}
+
+function send_max_to_users(PDO $db, array $ids, array $roles, string $text, ?int $techTaskId = null): void
 {
     if (!$ids || max_token() === '') {
         return;
@@ -204,20 +212,28 @@ function send_max_to_users(PDO $db, array $ids, array $roles, string $text): voi
         $roleSql = implode(', ', array_map(fn($r) => "'" . $r . "'", $roles));
         $rows = all_rows(
             $db,
-            "SELECT DISTINCT l.max_user_id FROM max_links l JOIN app_users u ON u.id = l.user_id WHERE u.active = 1 AND u.role IN ($roleSql) AND l.user_id IN (" . in_list($ids) . ')'
+            "SELECT DISTINCT l.max_user_id, u.role FROM max_links l JOIN app_users u ON u.id = l.user_id WHERE u.active = 1 AND u.role IN ($roleSql) AND l.user_id IN (" . in_list($ids) . ')'
         );
     } catch (Throwable $e) {
         return;
     }
     foreach ($rows as $r) {
-        max_send((int)$r['max_user_id'], $text);
+        if ($techTaskId && $r['role'] === 'technician') {
+            max_call('POST', '/messages', ['user_id' => (int)$r['max_user_id']], [
+                'text' => mb_substr($text, 0, 3900),
+                'format' => 'html',
+                'attachments' => max_task_keyboard($techTaskId),
+            ], 4);
+        } else {
+            max_send((int)$r['max_user_id'], $text);
+        }
     }
 }
 
-function send_to_users(PDO $db, array $userIds, string $text): void
+function send_to_users(PDO $db, array $userIds, string $text, ?int $techTaskId = null): void
 {
     $ids = array_values(array_unique(array_filter(array_map('intval', $userIds))));
-    send_max_to_users($db, $ids, NOTIFY_ROLES, $text);
+    send_max_to_users($db, $ids, NOTIFY_ROLES, $text, $techTaskId);
     if (!$ids || bot_token() === '') {
         return;
     }
@@ -310,10 +326,10 @@ function notify_new_task(PDO $db, int $uid, int $taskId, string $description, st
         . '📍 Точка: ' . tg_esc(point_name($db, $uid)) . "\n"
         . ($eq !== '' ? '⚙️ Оборудование: ' . tg_esc($eq) . "\n" : '')
         . "\n" . tg_esc(mb_substr($description, 0, 1500));
-    send_to_users($db, $targets, $text);
+    send_to_users($db, $targets, $text, $taskId);
 }
 
-function notify_repair(PDO $db, int $uid, $eid, string $description, array $techs, $authorId = null): void
+function notify_repair(PDO $db, int $uid, $eid, string $description, array $techs, $authorId = null, ?int $taskId = null): void
 {
     $eq = equipment_line($db, $uid, $eid) ?: (string)$eid;
     $text = "🔧 <b>Оборудование отправлено в ремонт</b>\n"
@@ -321,7 +337,7 @@ function notify_repair(PDO $db, int $uid, $eid, string $description, array $tech
         . '📍 Точка: ' . tg_esc(point_name($db, $uid)) . "\n"
         . '⚙️ ' . tg_esc($eq) . "\n"
         . ($description !== '' ? "\nПоломка: " . tg_esc(mb_substr($description, 0, 1500)) : "\nОписание поломки не указано");
-    send_to_users($db, array_column($techs, 'id'), $text);
+    send_to_users($db, array_column($techs, 'id'), $text, $taskId);
 }
 
 function notify_transfer(PDO $db, int $fromUid, int $toUid, string $eid, int $senderId): void

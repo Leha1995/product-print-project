@@ -33,11 +33,21 @@ def _send(chat_id: int, text: str) -> None:
         print(f'telegram send failed {chat_id}: {err}')
 
 
-def _send_max(max_user_id: int, text: str) -> None:
+def task_keyboard(task_id: int) -> list:
+    return [{'type': 'inline_keyboard', 'payload': {'buttons': [[
+        {'type': 'callback', 'text': '🛠 Взял в работу', 'payload': f'take:{int(task_id)}'},
+        {'type': 'callback', 'text': '✅ Выполнено', 'payload': f'done:{int(task_id)}', 'intent': 'positive'},
+    ]]}}]
+
+
+def _send_max(max_user_id: int, text: str, attachments=None) -> None:
     token = os.environ.get('MAX_BOT_TOKEN', '').strip()
+    body = {'text': text[:3900], 'format': 'html'}
+    if attachments:
+        body['attachments'] = attachments
     req = urllib.request.Request(
         f'https://platform-api.max.ru/messages?user_id={int(max_user_id)}',
-        data=json.dumps({'text': text[:3900], 'format': 'html'}).encode(),
+        data=json.dumps(body).encode(),
         headers={'Authorization': token, 'Content-Type': 'application/json'},
         method='POST',
     )
@@ -47,28 +57,29 @@ def _send_max(max_user_id: int, text: str) -> None:
         print(f'max send failed {max_user_id}: {err}')
 
 
-def send_max_to_users(cur, ids, roles_sql: str, text: str) -> None:
+def send_max_to_users(cur, ids, roles_sql: str, text: str, tech_task_id=None) -> None:
     if not ids or not os.environ.get('MAX_BOT_TOKEN', '').strip():
         return
     try:
         cur.execute(
-            'SELECT DISTINCT l.max_user_id FROM max_links l JOIN app_users u ON u.id = l.user_id '
+            'SELECT DISTINCT l.max_user_id, u.role FROM max_links l JOIN app_users u ON u.id = l.user_id '
             f"WHERE u.active AND u.role IN ({roles_sql}) "
             f"AND l.user_id IN ({', '.join(str(int(i)) for i in ids)})"
         )
     except Exception as err:
         print(f'max links read failed: {err}')
         return
-    targets = [r[0] for r in cur.fetchall()]
+    targets = cur.fetchall()
     if not targets:
         return
+    kb = task_keyboard(tech_task_id) if tech_task_id else None
     with ThreadPoolExecutor(max_workers=min(8, len(targets))) as pool:
-        list(pool.map(lambda t: _send_max(t, text), targets))
+        list(pool.map(lambda t: _send_max(t[0], text, kb if t[1] == 'technician' else None), targets))
 
 
-def send_to_users(cur, user_ids, text: str) -> None:
+def send_to_users(cur, user_ids, text: str, tech_task_id=None) -> None:
     ids = sorted({int(i) for i in user_ids if i})
-    send_max_to_users(cur, ids, "'admin', 'manager', 'technician', 'superadmin'", text)
+    send_max_to_users(cur, ids, "'admin', 'manager', 'technician', 'superadmin'", text, tech_task_id)
     if not ids or not os.environ.get('TELEGRAM_BOT_TOKEN', '').strip():
         return
     cur.execute(
@@ -152,10 +163,10 @@ def notify_new_task(cur, uid: int, task_id: int, description: str, priority: str
         + (f'⚙️ Оборудование: {esc(eq)}\n' if eq else '')
         + f'\n{esc(description[:1500])}'
     )
-    send_to_users(cur, targets, text)
+    send_to_users(cur, targets, text, task_id)
 
 
-def notify_repair(cur, uid: int, eid, description: str, techs, author_id=None) -> None:
+def notify_repair(cur, uid: int, eid, description: str, techs, author_id=None, task_id=None) -> None:
     eq = equipment_line(cur, uid, eid) or str(eid)
     text = (
         '🔧 <b>Оборудование отправлено в ремонт</b>\n'
@@ -164,7 +175,7 @@ def notify_repair(cur, uid: int, eid, description: str, techs, author_id=None) -
         f'⚙️ {esc(eq)}\n'
         + (f'\nПоломка: {esc(description[:1500])}' if description else '\nОписание поломки не указано')
     )
-    send_to_users(cur, [t['id'] for t in techs], text)
+    send_to_users(cur, [t['id'] for t in techs], text, task_id)
 
 
 def money_text(value) -> str:

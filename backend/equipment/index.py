@@ -1144,9 +1144,10 @@ def handler(event: dict, context) -> dict:
             cur.execute(
                 'INSERT INTO equipment_tasks (user_id, equipment_id, technician_id, created_by, description, photos, priority, kind) '
                 f"VALUES ({uid}, {q(eid)}, NULL, {int(me['id'])}, {q(task_text[:2000])}, {q(json.dumps(photos))}::jsonb, "
-                f"{q(body.get('priority') if body.get('priority') in PRIORITIES else 'soon')}, 'repair')"
+                f"{q(body.get('priority') if body.get('priority') in PRIORITIES else 'soon')}, 'repair') RETURNING id"
             )
-            safe_notify(notify_repair, cur, uid, eid, description, owner_technicians(cur, uid), int(me['id']))
+            repair_task_id = cur.fetchone()[0]
+            safe_notify(notify_repair, cur, uid, eid, description, owner_technicians(cur, uid), int(me['id']), repair_task_id)
         return finish({'ok': True, 'items': read_items(cur, uid), 'tasks': owner_tasks(cur, uid)})
 
     if action == 'return_repair':

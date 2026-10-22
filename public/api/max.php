@@ -5,6 +5,7 @@ require __DIR__ . '/lib.php';
 require __DIR__ . '/schema.php';
 require __DIR__ . '/notify.php';
 require __DIR__ . '/report.php';
+require __DIR__ . '/max_tasks.php';
 
 $db = boot();
 upgrade_schema($db);
@@ -54,11 +55,18 @@ function max_handle(PDO $db, array $u): void
         max_apply_code($db, (string)($u['payload'] ?? ''), (array)($u['user'] ?? []));
     } elseif ($type === 'message_callback') {
         $cb = (array)($u['callback'] ?? []);
+        $payload = (string)($cb['payload'] ?? '');
+        $cbUid = (int)($cb['user']['user_id'] ?? 0);
         if (!empty($cb['callback_id'])) {
-            max_call('POST', '/answers', ['callback_id' => (string)$cb['callback_id']], ['notification' => 'Готовлю сводку…'], 3);
+            max_call('POST', '/answers', ['callback_id' => (string)$cb['callback_id']], ['notification' => $payload === 'summary' ? 'Готовлю сводку…' : 'Принято'], 3);
         }
-        if (($cb['payload'] ?? '') === 'summary' && !empty($cb['user']['user_id'])) {
-            max_summary($db, (int)$cb['user']['user_id']);
+        if (!$cbUid) {
+            return;
+        }
+        if ($payload === 'summary') {
+            max_summary($db, $cbUid);
+        } else {
+            mt_callback($db, $cbUid, $payload);
         }
     } elseif ($type === 'message_created') {
         $msg = (array)($u['message'] ?? []);
@@ -73,6 +81,8 @@ function max_handle(PDO $db, array $u): void
         } elseif ($low === '/stop') {
             run($db, 'DELETE FROM max_links WHERE max_user_id = ?', [$sid]);
             max_send($sid, 'Уведомления отключены.');
+        } elseif (mt_dialog_text($db, $sid, $text)) {
+            return;
         } elseif (preg_match('#^(/summary|/svodka|сводка|отч[её]т)#u', $low)) {
             max_summary($db, $sid);
         } else {
