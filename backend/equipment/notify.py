@@ -167,6 +167,69 @@ def notify_repair(cur, uid: int, eid, description: str, techs, author_id=None) -
     send_to_users(cur, [t['id'] for t in techs], text)
 
 
+def money_text(value) -> str:
+    return f'{round(float(value or 0)):,}'.replace(',', ' ') + ' ₽'
+
+
+def point_bosses(cur, uid: int) -> list:
+    """Админ точки и управляющий над ним."""
+    ids = [int(uid)]
+    cur.execute(f"SELECT manager_id FROM app_users WHERE id = {int(uid)} AND role = 'admin'")
+    row = cur.fetchone()
+    if row and row[0]:
+        ids.append(int(row[0]))
+    return ids
+
+
+def month_spent(cur, uid: int) -> float:
+    cur.execute(
+        'SELECT COALESCE(SUM(cost), 0) FROM equipment_tasks '
+        f"WHERE user_id = {int(uid)} AND status = 'done' AND done_at >= date_trunc('month', NOW())"
+    )
+    return float(cur.fetchone()[0] or 0)
+
+
+def notify_repair_returned(cur, uid: int, eid, cost, comment: str, by_user: int) -> None:
+    eq = equipment_line(cur, uid, eid) or str(eid)
+    by = point_name(cur, by_user) if by_user else ''
+    text = (
+        '🔧✅ <b>Оборудование вернулось из ремонта</b>\n'
+        f'📍 Точка: {esc(point_name(cur, uid))}\n'
+        f'⚙️ {esc(eq)}\n'
+        + (f'👷 Принял: {esc(by)}\n' if by else '')
+        + f'💰 Сумма ремонта: {money_text(cost)}\n'
+        f'📊 Расходы точки за месяц: {money_text(month_spent(cur, uid))}'
+        + (f'\n\nЧто сделано: {esc(comment[:1500])}' if comment else '')
+    )
+    send_to_users(cur, [i for i in point_bosses(cur, uid) if i != int(by_user or 0)], text)
+
+
+def notify_transfer_decided(cur, transfer_id: int, accepted: bool, decider_id: int) -> None:
+    cur.execute(
+        'SELECT from_user, to_user, created_by, equipment_name, equipment_price FROM equipment_transfers '
+        f'WHERE id = {int(transfer_id)}'
+    )
+    row = cur.fetchone()
+    if not row:
+        return
+    from_uid, to_uid, sender, name, price = row
+    head = '✅ <b>Оборудование принято</b>' if accepted else '❌ <b>Передача оборудования отклонена</b>'
+    text = (
+        f'{head}\n'
+        f'⚙️ {esc(name or "")}\n'
+        + (f'💰 Стоимость: {money_text(price)}\n' if float(price or 0) > 0 else '')
+        + f'📤 Откуда: {esc(point_name(cur, from_uid))}\n'
+        f'📥 Куда: {esc(point_name(cur, to_uid))}\n'
+        f'👤 {"Подтвердил" if accepted else "Отклонил"}: {esc(point_name(cur, decider_id))}'
+        + ('\n\nОборудование уже числится на новой точке.' if accepted else '\n\nОборудование осталось на прежней точке.')
+    )
+    targets = {int(from_uid), int(to_uid)}
+    if sender:
+        targets.add(int(sender))
+    targets.discard(int(decider_id))
+    send_to_users(cur, sorted(targets), text)
+
+
 def notify_task_done(cur, task_id: int) -> None:
     cur.execute(
         'SELECT t.user_id, t.created_by, t.description, t.done_comment, t.cost, t.equipment_id, '
@@ -180,17 +243,17 @@ def notify_task_done(cur, task_id: int) -> None:
     uid, created_by, description, comment, cost, eid, done_by = row
     title = (description or '').split('\n')[0][:200]
     eq = equipment_line(cur, uid, eid)
-    cost_text = f'{round(float(cost or 0)):,}'.replace(',', ' ')
     text = (
-        f'✅ <b>Задача №{int(task_id)} выполнена</b>\n'
+        f'✅ <b>Техник выполнил задачу №{int(task_id)}</b>\n'
         f'📍 Точка: {esc(point_name(cur, uid))}\n'
         + (f'⚙️ Оборудование: {esc(eq)}\n' if eq else '')
         + f'📝 {esc(title)}\n'
         f'👷 Выполнил: {esc(done_by)}\n'
-        f'💰 Потрачено: {cost_text} ₽'
+        f'💰 Потрачено на ремонт: {money_text(cost)}\n'
+        f'📊 Расходы точки за месяц: {money_text(month_spent(cur, uid))}'
         + (f'\n\nЧто сделано: {esc(comment[:1500])}' if comment else '')
     )
-    send_to_users(cur, [uid, created_by], text)
+    send_to_users(cur, point_bosses(cur, uid) + [created_by], text)
 
 
 def notify_transfer(cur, from_uid: int, to_uid: int, eid, sender_id: int) -> None:
@@ -218,3 +281,10 @@ def notify_transfer(cur, from_uid: int, to_uid: int, eid, sender_id: int) -> Non
         '\nОткройте сайт, чтобы подтвердить или отклонить.'
     )
     send_to_users(cur, [int(row[0])], text)
+    send_to_users(cur, [int(to_uid)], (
+        '📦 <b>К вам направлено оборудование</b>\n'
+        f'⚙️ {esc(name)}\n'
+        f'📤 Откуда: {esc(point_name(cur, from_uid))}\n'
+        f'👤 Отправил: {esc(point_name(cur, sender_id))}\n'
+        '\n⏳ Ждёт подтверждения управляющего.'
+    ))

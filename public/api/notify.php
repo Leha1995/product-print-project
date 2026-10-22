@@ -346,6 +346,67 @@ function notify_transfer(PDO $db, int $fromUid, int $toUid, string $eid, int $se
         . '👤 Отправил: ' . tg_esc(point_name($db, $senderId)) . "\n"
         . "\nОткройте сайт, чтобы подтвердить или отклонить.";
     send_to_users($db, [$head], $text);
+    send_to_users($db, [$toUid], "📦 <b>К вам направлено оборудование</b>\n"
+        . '⚙️ ' . tg_esc($eq['name']) . "\n"
+        . '📤 Откуда: ' . tg_esc(point_name($db, $fromUid)) . "\n"
+        . '👤 Отправил: ' . tg_esc(point_name($db, $senderId)) . "\n"
+        . "\n⏳ Ждёт подтверждения управляющего.");
+}
+
+function point_bosses(PDO $db, int $uid): array
+{
+    $ids = [$uid];
+    $head = (int)one_value($db, "SELECT manager_id FROM app_users WHERE id = ? AND role = 'admin'", [$uid]);
+    if ($head) {
+        $ids[] = $head;
+    }
+    return $ids;
+}
+
+function month_spent(PDO $db, int $uid): float
+{
+    return (float)one_value(
+        $db,
+        "SELECT COALESCE(SUM(cost), 0) FROM equipment_tasks WHERE user_id = ? AND status = 'done' AND done_at >= ?",
+        [$uid, gmdate('Y-m-01 00:00:00')]
+    );
+}
+
+function money_line($v): string
+{
+    return number_format(round((float)$v), 0, '', ' ') . ' ₽';
+}
+
+function notify_repair_returned(PDO $db, int $uid, string $eid, float $cost, string $comment, int $byUser): void
+{
+    $eq = equipment_line($db, $uid, $eid) ?: $eid;
+    $by = $byUser ? point_name($db, $byUser) : '';
+    $text = "🔧✅ <b>Оборудование вернулось из ремонта</b>\n"
+        . '📍 Точка: ' . tg_esc(point_name($db, $uid)) . "\n"
+        . '⚙️ ' . tg_esc($eq) . "\n"
+        . ($by !== '' ? '👷 Принял: ' . tg_esc($by) . "\n" : '')
+        . '💰 Сумма ремонта: ' . money_line($cost) . "\n"
+        . '📊 Расходы точки за месяц: ' . money_line(month_spent($db, $uid))
+        . ($comment !== '' ? "\n\nЧто сделано: " . tg_esc(mb_substr($comment, 0, 1500)) : '');
+    send_to_users($db, array_values(array_filter(point_bosses($db, $uid), fn($i) => $i !== $byUser)), $text);
+}
+
+function notify_transfer_decided(PDO $db, int $transferId, bool $accepted, int $deciderId): void
+{
+    $t = one_row($db, 'SELECT from_user, to_user, created_by, equipment_name, equipment_price FROM equipment_transfers WHERE id = ?', [$transferId]);
+    if (!$t) {
+        return;
+    }
+    $price = (float)$t['equipment_price'];
+    $text = ($accepted ? '✅ <b>Оборудование принято</b>' : '❌ <b>Передача оборудования отклонена</b>') . "\n"
+        . '⚙️ ' . tg_esc((string)$t['equipment_name']) . "\n"
+        . ($price > 0 ? '💰 Стоимость: ' . money_line($price) . "\n" : '')
+        . '📤 Откуда: ' . tg_esc(point_name($db, (int)$t['from_user'])) . "\n"
+        . '📥 Куда: ' . tg_esc(point_name($db, (int)$t['to_user'])) . "\n"
+        . '👤 ' . ($accepted ? 'Подтвердил' : 'Отклонил') . ': ' . tg_esc(point_name($db, $deciderId))
+        . ($accepted ? "\n\nОборудование уже числится на новой точке." : "\n\nОборудование осталось на прежней точке.");
+    $targets = array_unique(array_filter([(int)$t['from_user'], (int)$t['to_user'], (int)$t['created_by']]));
+    send_to_users($db, array_values(array_filter($targets, fn($i) => $i !== $deciderId)), $text);
 }
 
 function notify_task_done(PDO $db, int $taskId): void
@@ -363,12 +424,13 @@ function notify_task_done(PDO $db, int $taskId): void
     $title = mb_substr(explode("\n", (string)$row['description'])[0], 0, 200);
     $eq = equipment_line($db, $uid, $row['equipment_id']);
     $comment = (string)$row['done_comment'];
-    $text = '✅ <b>Задача №' . $taskId . " выполнена</b>\n"
+    $text = '✅ <b>Техник выполнил задачу №' . $taskId . "</b>\n"
         . '📍 Точка: ' . tg_esc(point_name($db, $uid)) . "\n"
         . ($eq !== '' ? '⚙️ Оборудование: ' . tg_esc($eq) . "\n" : '')
         . '📝 ' . tg_esc($title) . "\n"
         . '👷 Выполнил: ' . tg_esc($row['done_name']) . "\n"
-        . '💰 Потрачено: ' . number_format(round((float)$row['cost']), 0, '', ' ') . ' ₽'
+        . '💰 Потрачено на ремонт: ' . money_line($row['cost']) . "\n"
+        . '📊 Расходы точки за месяц: ' . money_line(month_spent($db, $uid))
         . ($comment !== '' ? "\n\nЧто сделано: " . tg_esc(mb_substr($comment, 0, 1500)) : '');
-    send_to_users($db, [$uid, (int)$row['created_by']], $text);
+    send_to_users($db, array_merge(point_bosses($db, $uid), [(int)$row['created_by']]), $text);
 }

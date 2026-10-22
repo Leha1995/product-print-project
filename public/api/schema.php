@@ -200,6 +200,12 @@ function schema_sql(string $driver): array
             user_id INT NOT NULL,
             expires_at DATETIME NOT NULL
         )$tail",
+        "CREATE TABLE IF NOT EXISTS daily_reports (
+            user_id INT NOT NULL,
+            day VARCHAR(10) NOT NULL,
+            sent_at DATETIME NULL,
+            PRIMARY KEY (user_id, day)
+        )$tail",
         "CREATE TABLE IF NOT EXISTS max_state (
             id INT NOT NULL PRIMARY KEY,
             marker BIGINT NULL
@@ -258,7 +264,7 @@ function schema_sql(string $driver): array
     ];
 }
 
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 9;
 
 const SCHEMA_COLUMNS = [
     'app_sessions' => [

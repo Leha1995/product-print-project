@@ -4,9 +4,99 @@ declare(strict_types=1);
 require __DIR__ . '/lib.php';
 require __DIR__ . '/schema.php';
 require __DIR__ . '/notify.php';
+require __DIR__ . '/report.php';
 
 $db = boot();
 upgrade_schema($db);
+
+function max_hook_key(): string
+{
+    return substr(hash('sha256', 'max-hook:' . max_token()), 0, 40);
+}
+
+function max_ensure_webhook(string $hookUrl): void
+{
+    if (!preg_match('#^https://#', $hookUrl)) {
+        return;
+    }
+    $target = strtok($hookUrl, '?') . '?hook=' . max_hook_key();
+    [$code, $data] = max_call('GET', '/subscriptions', [], null, 4);
+    $subs = $code === 200 ? (array)($data['subscriptions'] ?? []) : [];
+    foreach ($subs as $s) {
+        if (($s['url'] ?? '') === $target) {
+            return;
+        }
+    }
+    foreach ($subs as $s) {
+        max_call('DELETE', '/subscriptions', ['url' => (string)$s['url']], null, 4);
+    }
+    max_call('POST', '/subscriptions', [], ['url' => $target, 'update_types' => ['bot_started', 'message_created', 'message_callback']], 4);
+}
+
+function max_summary(PDO $db, int $maxUid): void
+{
+    $row = one_row($db, 'SELECT u.id, u.role FROM max_links l JOIN app_users u ON u.id = l.user_id WHERE l.max_user_id = ? AND u.active = 1', [$maxUid]);
+    if (!$row) {
+        max_send($maxUid, 'Аккаунт не подключён. Нажмите «Подключить MAX» в приложении.');
+        return;
+    }
+    if (!in_array($row['role'], BOSS_ROLES_R, true)) {
+        max_send($maxUid, 'Сводка по точкам доступна админам, управляющим и супер-админу.');
+        return;
+    }
+    max_send_button($maxUid, build_report($db, (int)$row['id'], (string)$row['role'], false));
+}
+
+function max_handle(PDO $db, array $u): void
+{
+    $type = $u['update_type'] ?? '';
+    if ($type === 'bot_started') {
+        max_apply_code($db, (string)($u['payload'] ?? ''), (array)($u['user'] ?? []));
+    } elseif ($type === 'message_callback') {
+        $cb = (array)($u['callback'] ?? []);
+        if (!empty($cb['callback_id'])) {
+            max_call('POST', '/answers', ['callback_id' => (string)$cb['callback_id']], ['notification' => 'Готовлю сводку…'], 3);
+        }
+        if (($cb['payload'] ?? '') === 'summary' && !empty($cb['user']['user_id'])) {
+            max_summary($db, (int)$cb['user']['user_id']);
+        }
+    } elseif ($type === 'message_created') {
+        $msg = (array)($u['message'] ?? []);
+        $text = trim((string)($msg['body']['text'] ?? ''));
+        $low = mb_strtolower($text);
+        $sid = (int)($msg['sender']['user_id'] ?? 0);
+        if (!$sid) {
+            return;
+        }
+        if (strpos($low, '/start') === 0) {
+            max_apply_code($db, trim(substr($text, 6)), (array)$msg['sender']);
+        } elseif ($low === '/stop') {
+            run($db, 'DELETE FROM max_links WHERE max_user_id = ?', [$sid]);
+            max_send($sid, 'Уведомления отключены.');
+        } elseif (preg_match('#^(/summary|/svodka|сводка|отч[её]т)#u', $low)) {
+            max_summary($db, $sid);
+        } else {
+            max_send_button($sid, "Я присылаю уведомления о заявках, ремонтах и передачах оборудования, а в 23:00 — итоги дня.\nЧтобы получить сводку по своим точкам прямо сейчас, нажмите кнопку или напишите «сводка».");
+        }
+    }
+}
+
+$hook = (string)($_GET['hook'] ?? '');
+if ($hook !== '') {
+    if (max_token() === '' || !hash_equals(max_hook_key(), $hook)) {
+        out(['error' => 'forbidden'], 403);
+    }
+    try {
+        max_handle($db, body());
+    } catch (Throwable $e) {
+        error_log('[asap] max hook failed: ' . $e->getMessage());
+    }
+    out(['ok' => true]);
+}
+
+if (($_GET['task'] ?? '') === 'daily') {
+    out(['ok' => true, 'sent' => send_daily_reports($db)]);
+}
 
 function max_status(PDO $db, int $uid, string $role): array
 {
@@ -60,13 +150,18 @@ function max_apply_code(PDO $db, string $code, array $user): void
         'linked_at' => now_utc(),
     ]);
     $name = (string)($acc['full_name'] ?: $acc['username']);
-    max_send($maxUid, "Готово! Аккаунт «{$name}» подключён — уведомления будут приходить сюда.");
+    $hello = "Готово! Аккаунт «{$name}» подключён — уведомления будут приходить сюда.";
+    if (in_array($acc['role'], BOSS_ROLES_R, true)) {
+        max_send_button($maxUid, $hello . "\nКаждый день в 23:00 пришлю итоги дня, а сводку по точкам можно запросить кнопкой ниже или словом «сводка».");
+    } else {
+        max_send($maxUid, $hello);
+    }
 }
 
 function max_poll(PDO $db): void
 {
     $marker = one_value($db, 'SELECT marker FROM max_state WHERE id = 1');
-    $query = ['timeout' => 0, 'limit' => 100, 'types' => 'bot_started,message_created'];
+    $query = ['timeout' => 0, 'limit' => 100, 'types' => 'bot_started,message_created,message_callback'];
     if ($marker) {
         $query['marker'] = $marker;
     }
@@ -76,20 +171,7 @@ function max_poll(PDO $db): void
     }
     foreach ($data['updates'] ?? [] as $u) {
         try {
-            $type = $u['update_type'] ?? '';
-            if ($type === 'bot_started') {
-                max_apply_code($db, (string)($u['payload'] ?? ''), (array)($u['user'] ?? []));
-            } elseif ($type === 'message_created') {
-                $msg = (array)($u['message'] ?? []);
-                $text = trim((string)($msg['body']['text'] ?? ''));
-                $sender = (array)($msg['sender'] ?? []);
-                if (strpos($text, '/start') === 0) {
-                    max_apply_code($db, trim(substr($text, 6)), $sender);
-                } elseif ($text === '/stop' && !empty($sender['user_id'])) {
-                    run($db, 'DELETE FROM max_links WHERE max_user_id = ?', [(int)$sender['user_id']]);
-                    max_send((int)$sender['user_id'], 'Уведомления отключены.');
-                }
-            }
+            max_handle($db, (array)$u);
         } catch (Throwable $e) {
             error_log('[asap] max update failed: ' . $e->getMessage());
         }
@@ -109,6 +191,7 @@ if (!$me) {
 }
 
 if (method() === 'GET') {
+    maybe_daily_reports($db);
     $pending = one_value($db, 'SELECT 1 FROM max_link_codes WHERE user_id = ? AND expires_at > ?', [$me['id'], now_utc()]);
     if ($pending && max_token() !== '') {
         try {
@@ -150,6 +233,11 @@ if ($action === 'link') {
         max_poll($db);
     } catch (Throwable $e) {
         error_log('[asap] max poll failed: ' . $e->getMessage());
+    }
+    try {
+        max_ensure_webhook((string)($body['hookUrl'] ?? ''));
+    } catch (Throwable $e) {
+        error_log('[asap] max webhook failed: ' . $e->getMessage());
     }
     $linkCode = rtrim(strtr(base64_encode(random_bytes(12)), '+/', '-_'), '=');
     run($db, 'DELETE FROM max_link_codes WHERE user_id = ? OR expires_at < ?', [$me['id'], now_utc()]);

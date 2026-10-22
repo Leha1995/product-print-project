@@ -4,6 +4,7 @@ declare(strict_types=1);
 require __DIR__ . '/lib.php';
 require __DIR__ . '/schema.php';
 require __DIR__ . '/notify.php';
+require __DIR__ . '/report.php';
 
 $db = boot();
 upgrade_schema($db);
@@ -245,6 +246,7 @@ $payload = function () use ($db, $me, $day, $isBoss, $token): array {
 if (method() === 'GET') {
     try {
         check_overdue($db);
+        maybe_daily_reports($db);
     } catch (Throwable $e) {
         error_log('[asap] check_overdue: ' . $e->getMessage());
     }

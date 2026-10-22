@@ -1,4 +1,5 @@
-import { apiUrl } from '@/lib/apiBase';
+import func2url from '../../backend/func2url.json';
+import { apiUrl, isOwnServer } from '@/lib/apiBase';
 import { getToken } from '@/lib/authApi';
 
 export interface MaxStatus {
@@ -22,7 +23,11 @@ export const requestMaxLink = async (): Promise<{ url: string; botName: string }
   const res = await fetch(API(), {
     method: 'POST',
     headers: headers(),
-    body: JSON.stringify({ action: 'link' }),
+    body: JSON.stringify({
+      action: 'link',
+      webhookUrl: (func2url as Record<string, string>).max,
+      ...(isOwnServer() ? { hookUrl: new URL(API(), window.location.href).href } : {}),
+    }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || String(res.status));

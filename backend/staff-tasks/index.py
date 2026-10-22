@@ -2,6 +2,7 @@ import datetime
 import json
 import os
 import re
+import urllib.request
 
 import psycopg2
 
@@ -241,6 +242,23 @@ def check_overdue(cur, limit: int = 15) -> None:
             print(f'overdue notify failed {c["id"]}: {err}')
 
 
+MAX_FN = 'https://functions.poehali.dev/af92396f-6f3f-4ceb-a528-6ffaf66a1e61'
+
+
+def kick_daily_reports(cur) -> None:
+    """После 23:00 по Москве будит рассылку итогов дня, если сегодня она ещё не прошла."""
+    local = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
+    if local.hour < 23:
+        return
+    cur.execute(f"SELECT COUNT(*) FROM daily_reports WHERE day = {q(local.strftime('%Y-%m-%d'))}")
+    if int(cur.fetchone()[0] or 0) > 0 and local.minute % 10:
+        return
+    try:
+        urllib.request.urlopen(f'{MAX_FN}?task=daily', timeout=1.5).read()
+    except Exception:
+        pass
+
+
 def handler(event: dict, context) -> dict:
     """Задания сотрудникам: ежедневные и разовые, со звуковым сигналом до подтверждения выполнения."""
     method = event.get('httpMethod', 'GET')
@@ -275,6 +293,10 @@ def handler(event: dict, context) -> dict:
             check_overdue(cur)
         except Exception as err:
             print(f'check_overdue failed: {err}')
+        try:
+            kick_daily_reports(cur)
+        except Exception as err:
+            print(f'daily kick failed: {err}')
 
     def payload():
         data = {'mine': mine(cur, me, day), 'canManage': is_boss}

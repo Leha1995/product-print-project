@@ -484,6 +484,11 @@ function return_repair(PDO $db, int $uid, array $body, int $byUser, bool $closeT
             . "WHERE user_id = ? AND equipment_id = ? AND kind = 'repair' AND status = 'open'",
             [now_utc(), $cost, $byUser ?: null, $desc !== '' ? $desc : 'Возвращено из ремонта', $uid, $eid]
         );
+        try {
+            notify_repair_returned($db, $uid, $eid, (float)$cost, $desc, $byUser);
+        } catch (Throwable $e) {
+            error_log('[asap] repair notify failed: ' . $e->getMessage());
+        }
     }
 }
 
@@ -546,6 +551,7 @@ function decide_transfer(PDO $db, array $me, array $body): array
     $eid = (string)$row['equipment_id'];
     if (($body['action'] ?? '') === 'transfer_decline') {
         run($db, "UPDATE equipment_transfers SET status = 'declined', decided_at = ?, decided_by = ? WHERE id = ?", [now_utc(), $me['id'], $tid]);
+        notify_transfer_decided($db, $tid, false, $mid);
         return ['ok' => true, 'transfers' => incoming_transfers($db, $mid)];
     }
     $newId = $eid;
@@ -563,6 +569,7 @@ function decide_transfer(PDO $db, array $me, array $body): array
     }
     run($db, 'UPDATE equipment_repairs SET user_id = ?, equipment_id = ? WHERE user_id = ? AND equipment_id = ?', [$uid, $newId, $from, $eid]);
     run($db, "UPDATE equipment_transfers SET status = 'accepted', decided_at = ?, decided_by = ? WHERE id = ?", [now_utc(), $me['id'], $tid]);
+    notify_transfer_decided($db, $tid, true, $mid);
     run(
         $db,
         "UPDATE equipment_transfers SET status = 'cancelled', decided_at = ? WHERE from_user = ? AND equipment_id = ? AND status = 'pending'",

@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import secrets
@@ -6,6 +7,8 @@ import urllib.parse
 import urllib.request
 
 import psycopg2
+
+from report import SUMMARY_BUTTON, build_report, reports_due, send_daily_reports
 
 CORS = {
     'Access-Control-Allow-Origin': '*',
@@ -16,6 +19,9 @@ CORS = {
 }
 API = 'https://platform-api.max.ru'
 ALLOWED_ROLES = ('admin', 'manager', 'technician', 'superadmin')
+BOSS_ROLES = ('admin', 'manager', 'superadmin')
+WEBHOOK_PREFIX = 'https://functions.poehali.dev/'
+SUMMARY_WORDS = ('/summary', '/svodka', 'сводка', 'отчет', 'отчёт')
 
 
 def q(value) -> str:
@@ -46,8 +52,83 @@ def max_api(method: str, path: str, params: dict | None = None, payload: dict | 
             return err.code, {}
 
 
-def send_text(user_id, text: str) -> None:
-    max_api('POST', '/messages', {'user_id': int(user_id)}, {'text': text[:3900], 'format': 'html'}, 3)
+def webhook_key() -> str:
+    return hashlib.sha256(('max-hook:' + bot_token()).encode()).hexdigest()[:40]
+
+
+def send_text(user_id, text: str, button: bool = False) -> None:
+    body = {'text': text[:3900], 'format': 'html'}
+    if button:
+        body['attachments'] = SUMMARY_BUTTON
+    max_api('POST', '/messages', {'user_id': int(user_id)}, body, 3)
+
+
+def ensure_webhook(hook_url: str) -> None:
+    if not hook_url.startswith(WEBHOOK_PREFIX):
+        return
+    target = f'{hook_url}?hook={webhook_key()}'
+    status, data = max_api('GET', '/subscriptions', None, None, 3)
+    if status == 200 and any(s.get('url') == target for s in data.get('subscriptions') or []):
+        return
+    subs = (data.get('subscriptions') or []) if status == 200 else []
+    if any(not s.get('url', '').startswith(WEBHOOK_PREFIX) for s in subs):
+        return
+    for sub in subs:
+        max_api('DELETE', '/subscriptions', {'url': sub['url']}, None, 3)
+    status, data = max_api('POST', '/subscriptions', None, {
+        'url': target,
+        'update_types': ['bot_started', 'message_created', 'message_callback'],
+    }, 3)
+    print(f'max subscribe {status}: {data}')
+
+
+def send_summary(cur, max_uid) -> None:
+    cur.execute(
+        'SELECT u.id, u.role FROM max_links l JOIN app_users u ON u.id = l.user_id '
+        f'WHERE l.max_user_id = {int(max_uid)} AND u.active'
+    )
+    row = cur.fetchone()
+    if not row:
+        send_text(max_uid, 'Аккаунт не подключён. Нажмите «Подключить MAX» в приложении.')
+        return
+    if row[1] not in BOSS_ROLES:
+        send_text(max_uid, 'Сводка по точкам доступна админам, управляющим и супер-админу.')
+        return
+    send_text(max_uid, build_report(cur, int(row[0]), row[1], False), True)
+
+
+def handle_update(cur, upd: dict) -> None:
+    kind = upd.get('update_type')
+    if kind == 'bot_started':
+        apply_code(cur, str(upd.get('payload') or ''), upd.get('user') or {})
+    elif kind == 'message_callback':
+        cb = upd.get('callback') or {}
+        user = cb.get('user') or {}
+        if cb.get('callback_id'):
+            max_api('POST', '/answers', {'callback_id': cb['callback_id']}, {'notification': 'Готовлю сводку…'}, 3)
+        if cb.get('payload') == 'summary' and user.get('user_id'):
+            send_summary(cur, user['user_id'])
+    elif kind == 'message_created':
+        msg = upd.get('message') or {}
+        text = str((msg.get('body') or {}).get('text') or '').strip()
+        sender = msg.get('sender') or {}
+        low = text.lower()
+        if not sender.get('user_id'):
+            return
+        if low.startswith('/start'):
+            apply_code(cur, text[6:].strip(), sender)
+        elif low == '/stop':
+            cur.execute(f"DELETE FROM max_links WHERE max_user_id = {int(sender['user_id'])}")
+            send_text(sender['user_id'], 'Уведомления отключены.')
+        elif any(low.startswith(w) for w in SUMMARY_WORDS):
+            send_summary(cur, sender['user_id'])
+        else:
+            send_text(
+                sender['user_id'],
+                'Я присылаю уведомления о заявках, ремонтах и передачах оборудования, а в 23:00 — итоги дня.\n'
+                'Чтобы получить сводку по своим точкам прямо сейчас, нажмите кнопку или напишите «сводка».',
+                True,
+            )
 
 
 def session_user(cur, token: str):
@@ -105,14 +186,20 @@ def apply_code(cur, code: str, max_user: dict) -> None:
         'ON CONFLICT (user_id) DO UPDATE SET max_user_id = EXCLUDED.max_user_id, '
         'max_name = EXCLUDED.max_name, linked_at = NOW()'
     )
-    send_text(max_uid, f'Готово! Аккаунт «{user[1]}» подключён — уведомления будут приходить сюда.')
+    boss = user[0] in BOSS_ROLES
+    send_text(
+        max_uid,
+        f'Готово! Аккаунт «{user[1]}» подключён — уведомления будут приходить сюда.'
+        + ('\nКаждый день в 23:00 пришлю итоги дня, а сводку по точкам можно запросить кнопкой ниже или словом «сводка».' if boss else ''),
+        boss,
+    )
 
 
 def poll_updates(cur) -> None:
     """Забирает новые события у бота MAX (нажатие «Начать», команды) и привязывает аккаунты."""
     cur.execute('SELECT marker FROM max_state WHERE id = 1')
     row = cur.fetchone()
-    params = {'timeout': 0, 'limit': 100, 'types': 'bot_started,message_created'}
+    params = {'timeout': 0, 'limit': 100, 'types': 'bot_started,message_created,message_callback'}
     if row and row[0]:
         params['marker'] = row[0]
     status, data = max_api('GET', '/updates', params, None, 4)
@@ -120,19 +207,8 @@ def poll_updates(cur) -> None:
         print(f'max updates failed {status}: {data}')
         return
     for upd in data.get('updates') or []:
-        kind = upd.get('update_type')
         try:
-            if kind == 'bot_started':
-                apply_code(cur, str(upd.get('payload') or ''), upd.get('user') or {})
-            elif kind == 'message_created':
-                msg = upd.get('message') or {}
-                text = str((msg.get('body') or {}).get('text') or '').strip()
-                sender = msg.get('sender') or {}
-                if text.startswith('/start'):
-                    apply_code(cur, text[6:].strip(), sender)
-                elif text == '/stop' and sender.get('user_id'):
-                    cur.execute(f"DELETE FROM max_links WHERE max_user_id = {int(sender['user_id'])}")
-                    send_text(sender['user_id'], 'Уведомления отключены.')
+            handle_update(cur, upd)
         except Exception as err:
             print(f'max update failed: {err}')
     marker = data.get('marker')
@@ -144,13 +220,14 @@ def poll_updates(cur) -> None:
 
 
 def handler(event: dict, context) -> dict:
-    """Подключение уведомлений в мессенджере MAX: привязка аккаунта через бота и отключение."""
+    """Бот MAX: привязка аккаунта, приём сообщений (сводка по точкам) и итоги дня в 23:00."""
     method = event.get('httpMethod', 'GET')
     if method == 'OPTIONS':
         return {'statusCode': 200, 'headers': CORS, 'body': ''}
 
     headers = event.get('headers') or {}
     token = headers.get('X-Auth-Token') or headers.get('x-auth-token') or ''
+    qs = event.get('queryStringParameters') or {}
 
     conn = psycopg2.connect(os.environ['DATABASE_URL'])
     conn.autocommit = True
@@ -161,11 +238,33 @@ def handler(event: dict, context) -> dict:
         conn.close()
         return {'statusCode': status, 'headers': CORS, 'body': json.dumps(payload, ensure_ascii=False)}
 
+    if qs.get('hook'):
+        if not bot_token() or qs.get('hook') != webhook_key():
+            return finish({'error': 'forbidden'}, 403)
+        try:
+            handle_update(cur, json.loads(event.get('body') or '{}'))
+        except Exception as err:
+            print(f'max webhook failed: {err}')
+        return finish({'ok': True})
+
+    if qs.get('task') == 'daily':
+        sent = 0
+        try:
+            sent = send_daily_reports(cur)
+        except Exception as err:
+            print(f'daily reports failed: {err}')
+        return finish({'ok': True, 'sent': sent})
+
     me = session_user(cur, token)
     if not me:
         return finish({'error': 'unauthorized'}, 401)
 
     if method == 'GET':
+        try:
+            if reports_due(cur):
+                send_daily_reports(cur, 4)
+        except Exception as err:
+            print(f'daily reports failed: {err}')
         if bot_token():
             cur.execute(f"SELECT 1 FROM max_link_codes WHERE user_id = {int(me['id'])} AND expires_at > NOW()")
             if cur.fetchone():
@@ -203,6 +302,10 @@ def handler(event: dict, context) -> dict:
             return finish({'error': 'bad_token'}, 400)
         if status != 200 or not bot.get('username'):
             return finish({'error': 'max_unavailable'}, 502)
+        try:
+            ensure_webhook(str(body.get('webhookUrl') or ''))
+        except Exception as err:
+            print(f'max webhook setup failed: {err}')
         try:
             poll_updates(cur)
         except Exception as err:

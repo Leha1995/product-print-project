@@ -7,7 +7,10 @@ import uuid
 import boto3
 import psycopg2
 
-from notify import notify_new_task, notify_repair, notify_task_done, notify_transfer
+from notify import (
+    notify_new_task, notify_repair, notify_repair_returned, notify_task_done, notify_transfer,
+    notify_transfer_decided,
+)
 
 
 def safe_notify(fn, *args) -> None:
@@ -406,6 +409,7 @@ def return_repair(cur, uid: int, body: dict, by_user: int = 0, close_task: bool 
     )
     if close_task:
         comment = str(body.get('description') or '').strip()[:1000]
+        safe_notify(notify_repair_returned, cur, uid, eid, cost, comment, int(by_user or 0))
         cur.execute(
             "UPDATE equipment_tasks SET status = 'done', done_at = NOW(), "
             f"cost = {num(cost)}, done_by = {int(by_user) or 'NULL'}, "
@@ -640,6 +644,7 @@ def decide_transfer(cur, me, body: dict) -> dict:
             "UPDATE equipment_transfers SET status = 'declined', decided_at = NOW(), "
             f"decided_by = {int(me['id'])} WHERE id = {tid}"
         )
+        safe_notify(notify_transfer_decided, cur, tid, False, mid)
         return {'ok': True, 'transfers': incoming_transfers(cur, mid)}
     new_id = eid
     cur.execute(f'SELECT 1 FROM equipment WHERE user_id = {int(uid)} AND id = {q(eid)}')
@@ -660,6 +665,7 @@ def decide_transfer(cur, me, body: dict) -> dict:
         f"UPDATE equipment_transfers SET status = 'accepted', decided_at = NOW(), decided_by = {int(me['id'])} "
         f'WHERE id = {tid}'
     )
+    safe_notify(notify_transfer_decided, cur, tid, True, mid)
     cur.execute(
         "UPDATE equipment_transfers SET status = 'cancelled', decided_at = NOW() "
         f"WHERE from_user = {from_user} AND equipment_id = {q(eid)} AND status = 'pending'"

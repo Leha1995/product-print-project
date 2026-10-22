@@ -1,6 +1,8 @@
 {
   "tests": [
     {"name": "CORS preflight", "method": "OPTIONS", "path": "/", "expectedStatus": 200},
-    {"name": "Статус без токена — 401", "method": "GET", "path": "/", "expectedStatus": 401, "expectedBody": {"error": "unauthorized"}, "bodyMatcher": "partial"}
+    {"name": "Статус без токена — 401", "method": "GET", "path": "/", "expectedStatus": 401, "expectedBody": {"error": "unauthorized"}, "bodyMatcher": "partial"},
+    {"name": "Вебхук с чужим ключом — 403", "method": "POST", "path": "/?hook=wrong", "body": {}, "expectedStatus": 403},
+    {"name": "Вечерний запуск отчётов", "method": "GET", "path": "/?task=daily", "expectedStatus": 200, "expectedBody": {"ok": true}, "bodyMatcher": "partial"}
   ]
 }
