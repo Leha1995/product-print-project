@@ -76,6 +76,32 @@ function real_login_request(string $login, string $pass): array
     $text = preg_replace('/"token":"[0-9a-f]+"/', '"token":"…"', $text);
     return [$url, $code, mb_substr($text, 0, 800)];
 }
+if ($cfg && $authorized && isset($_POST['tg_save'])) {
+    $newToken = trim((string)($_POST['tg_token'] ?? ''));
+    $newApi = rtrim(trim((string)($_POST['tg_api'] ?? '')), '/');
+    if ($newToken !== '' && !preg_match('/^\d{5,15}:[A-Za-z0-9_-]{30,64}$/', $newToken)) {
+        $add(false, 'Новый токен бота', 'Не похож на токен от @BotFather (должен быть вида 123456789:AAH…). Не сохранён');
+    } elseif ($newApi !== '' && !preg_match('#^https://[^\s]+$#', $newApi)) {
+        $add(false, 'Свой адрес Telegram API', 'Должен начинаться с https://. Не сохранён');
+    } else {
+        $next = $cfg;
+        if ($newToken !== '') {
+            $next['telegram_token'] = $newToken;
+        }
+        if (!empty($_POST['tg_token_clear'])) {
+            $next['telegram_token'] = '';
+        }
+        $next['telegram_api'] = $newApi;
+        if (save_config($next)) {
+            $cfg = $next;
+            @unlink(tg_relay_marker());
+            $add(true, 'Настройки Telegram', $newToken !== '' ? 'Новый токен сохранён' : 'Сохранено');
+        } else {
+            $add(false, 'Настройки Telegram', 'Не удалось записать api/config.php — проверьте права на папку api (755)');
+        }
+    }
+}
+
 if ($cfg && $authorized) {
     $db = null;
     try {
@@ -114,12 +140,14 @@ if ($cfg && $authorized) {
         } else {
             $me = tg_call('getMe', [], 6);
             if (!$me) {
-                $add(false, 'Telegram-бот', 'Нет связи ни напрямую, ни через посредника: ' . ($GLOBALS['tg_last_error'] ?? '') . ' — обратитесь в поддержку REG.RU, чтобы разрешили исходящие запросы к api.telegram.org или functions.poehali.dev');
+                $add(false, 'Telegram-бот', 'Нет связи с Telegram ни одним способом: ' . ($GLOBALS['tg_last_error'] ?? '') . '. Это не ошибка токена — Telegram просто недоступен с хостинга');
             } elseif (empty($me['ok'])) {
-                $add(false, 'Telegram-бот', 'Telegram отклонил токен: ' . ($me['description'] ?? 'неизвестная ошибка') . ' — проверьте токен в настройках');
+                $code = (int)($me['error_code'] ?? 0);
+                $add(false, 'Telegram-бот', in_array($code, [401, 404], true)
+                    ? 'Telegram не принял токен (' . ($me['description'] ?? '') . '). Получите новый у @BotFather и вставьте ниже'
+                    : 'Ошибка Telegram: ' . ($me['description'] ?? 'неизвестная ошибка'));
             } else {
-                $add(true, 'Telegram-бот', '@' . ($me['result']['username'] ?? '') . ' на связи'
-                    . (!empty($GLOBALS['tg_via_relay']) ? ' — через посредника (хостинг не пускает напрямую к api.telegram.org, это нормально)' : ' — напрямую'));
+                $add(true, 'Telegram-бот', '@' . ($me['result']['username'] ?? '') . ' на связи — ' . ($GLOBALS['tg_route'] ?? ''));
                 $hook = tg_call('getWebhookInfo', [], 6)['result'] ?? [];
                 $hookUrl = (string)($hook['url'] ?? '');
                 $hookErr = (string)($hook['last_error_message'] ?? '');
@@ -366,6 +394,23 @@ $serverJs = @file_get_contents(__DIR__ . '/server.js');
             <div class="d">Тот же файл, что загружали при установке. Недостающие фото скачаются с poehali.dev — это может занять пару минут.</div>
             <button type="submit">Проверить</button>
         </form>
+
+        <?php if ($authorized): $tgToken = (string)($cfg['telegram_token'] ?? ''); ?>
+        <form method="post" style="margin-top:24px">
+            <h3>Настройки Telegram-бота</h3>
+            <input type="hidden" name="db_pass" value="<?= e((string)($_POST['db_pass'] ?? '')) ?>">
+            <input type="hidden" name="tg_save" value="1">
+            <div class="d">Сейчас: <?= $tgToken !== '' ? 'токен …' . e(substr($tgToken, -6)) : 'токен не задан' ?></div>
+            <label>Новый токен бота от @BotFather</label>
+            <input type="text" name="tg_token" placeholder="123456789:AAH..." autocomplete="off">
+            <div class="d">Оставьте пустым, чтобы не менять. Получить: в Telegram откройте @BotFather → /mybots → ваш бот → API Token (или /newbot для нового бота).</div>
+            <label>Свой адрес Telegram API (необязательно)</label>
+            <input type="text" name="tg_api" value="<?= e((string)($cfg['telegram_api'] ?? '')) ?>" placeholder="https://...">
+            <div class="d">Только если у вас есть свой прокси для api.telegram.org. Обычно оставьте пустым.</div>
+            <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="tg_token_clear" value="1" style="width:auto"> Удалить токен (отключить уведомления)</label>
+            <button type="submit">Сохранить настройки Telegram</button>
+        </form>
+        <?php endif; ?>
     <?php endif; ?>
 </div>
 </body>

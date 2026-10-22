@@ -47,7 +47,7 @@ def handler(event: dict, context) -> dict:
         headers={'Content-Type': 'application/json'},
     )
     try:
-        raw = urllib.request.urlopen(req, timeout=8).read()
+        raw = urllib.request.urlopen(req, timeout=4).read()
     except urllib.error.HTTPError as err:
         raw = err.read()
     except Exception as err:

@@ -158,7 +158,8 @@ if ($action === 'link') {
     }
     $bot = $probe['result'] ?? [];
     if (empty($bot['username'])) {
-        out(['error' => 'bad_token'], 400);
+        $code = (int)($probe['error_code'] ?? 0);
+        out(['error' => in_array($code, [401, 404], true) ? 'bad_token' : 'telegram_unavailable', 'detail' => (string)($probe['description'] ?? '')], $code === 401 || $code === 404 ? 400 : 502);
     }
     $info = tg_call('getWebhookInfo', [], 4)['result'] ?? [];
     if (($info['url'] ?? '') !== '') {

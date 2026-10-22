@@ -15,9 +15,9 @@ interface TelegramConnectProps {
 
 const errorText: Record<string, string> = {
   not_configured: 'Бот ещё не настроен — нужен токен бота в настройках проекта',
-  bad_token: 'Токен бота неверный — проверьте его в настройках проекта',
+  bad_token: 'Telegram не принял токен бота — задайте новый на странице проверки сервера (api/check.php)',
   forbidden_role: 'Уведомления доступны только админам, управляющим, техникам и супер-админу',
-  telegram_unavailable: 'Telegram не отвечает, попробуйте через минуту',
+  telegram_unavailable: 'Сервер не может связаться с Telegram — подробности на странице проверки сервера (api/check.php)',
 };
 
 const TelegramConnect = ({ hint, compact = false }: TelegramConnectProps) => {

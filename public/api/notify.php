@@ -14,6 +14,19 @@ function bot_token(): string
     return trim((string)($cfg['telegram_token'] ?? ''));
 }
 
+function tg_api_base(): string
+{
+    $cfg = load_config() ?? [];
+    $base = rtrim(trim((string)($cfg['telegram_api'] ?? '')), '/');
+    return preg_match('#^https://[^\s]+$#', $base) ? $base : '';
+}
+
+function tg_decode($raw): ?array
+{
+    $data = json_decode((string)$raw, true);
+    return is_array($data) && array_key_exists('ok', $data) ? $data : null;
+}
+
 const TG_RELAY_URL = 'https://functions.poehali.dev/cb4da38c-8f87-4ee3-9304-a91dc812dade';
 
 function tg_relay_marker(): string
@@ -73,33 +86,45 @@ function tg_call(string $method, array $payload, float $timeout = 4.0): array
     }
     $GLOBALS['tg_last_error'] = '';
     $GLOBALS['tg_via_relay'] = false;
+    $GLOBALS['tg_route'] = '';
     $body = $payload ?: new stdClass();
-    if (!tg_use_relay()) {
-        [$raw, $err] = tg_http(
-            'https://api.telegram.org/bot' . $token . '/' . $method,
-            json_encode($body, JSON_UNESCAPED_UNICODE),
-            min($timeout, 5.0)
-        );
-        if ($raw !== false) {
-            $data = json_decode((string)$raw, true);
-            return is_array($data) ? $data : [];
+    $json = json_encode($body, JSON_UNESCAPED_UNICODE);
+    $errors = [];
+    $custom = tg_api_base();
+    if ($custom !== '') {
+        [$raw, $err] = tg_http($custom . '/bot' . $token . '/' . $method, $json, max($timeout, 8.0));
+        $data = $raw === false ? null : tg_decode($raw);
+        if ($data !== null) {
+            $GLOBALS['tg_route'] = 'свой адрес ' . $custom;
+            return $data;
         }
-        $GLOBALS['tg_direct_error'] = $err;
+        $errors[] = 'свой адрес: ' . ($err ?: 'неожиданный ответ');
+    }
+    if (!tg_use_relay()) {
+        [$raw, $err] = tg_http('https://api.telegram.org/bot' . $token . '/' . $method, $json, min($timeout, 5.0));
+        $data = $raw === false ? null : tg_decode($raw);
+        if ($data !== null) {
+            $GLOBALS['tg_route'] = 'напрямую';
+            return $data;
+        }
+        $errors[] = 'напрямую: ' . ($err ?: 'неожиданный ответ');
         @touch(tg_relay_marker());
     }
     [$raw, $err] = tg_http(
         TG_RELAY_URL,
         json_encode(['token' => $token, 'method' => $method, 'payload' => $body], JSON_UNESCAPED_UNICODE),
-        max($timeout, 10.0)
+        max($timeout, 8.0)
     );
-    if ($raw === false) {
-        $GLOBALS['tg_last_error'] = trim(($GLOBALS['tg_direct_error'] ?? '') . ' / посредник: ' . $err, ' /');
-        @unlink(tg_relay_marker());
-        return [];
+    $data = $raw === false ? null : tg_decode($raw);
+    if ($data !== null && !(empty($data['ok']) && strpos((string)($data['description'] ?? ''), 'relay_failed') === 0)) {
+        $GLOBALS['tg_via_relay'] = true;
+        $GLOBALS['tg_route'] = 'через посредника';
+        return $data;
     }
-    $GLOBALS['tg_via_relay'] = true;
-    $data = json_decode((string)$raw, true);
-    return is_array($data) ? $data : [];
+    $errors[] = 'посредник: ' . ($err ?: (string)($data['description'] ?? 'не отвечает'));
+    @unlink(tg_relay_marker());
+    $GLOBALS['tg_last_error'] = implode(' / ', $errors);
+    return [];
 }
 
 function tg_esc($value): string
