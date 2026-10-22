@@ -273,6 +273,18 @@ def handler(event: dict, context) -> dict:
             print(f'max webhook failed: {err}')
         return finish({'ok': True})
 
+    if qs.get('task') == 'diag':
+        info = {'configured': bool(bot_token())}
+        if bot_token():
+            st, bot = max_api('GET', '/me', None, None, 4)
+            info['bot'] = bot.get('username') if st == 200 else f'error {st}'
+            st, subs = max_api('GET', '/subscriptions', None, None, 4)
+            info['subscriptions'] = [
+                {'url': re.sub(r'hook=[^&]+', 'hook=***', str(x.get('url') or '')), 'types': x.get('update_types')}
+                for x in (subs.get('subscriptions') or [])
+            ] if st == 200 else f'error {st}'
+        return finish(info)
+
     if qs.get('task') == 'daily':
         sent = 0
         try:
