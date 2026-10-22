@@ -132,9 +132,92 @@ function tg_esc($value): string
     return htmlspecialchars((string)$value, ENT_NOQUOTES, 'UTF-8');
 }
 
+function max_token(): string
+{
+    $cfg = load_config() ?? [];
+    return trim((string)($cfg['max_token'] ?? ''));
+}
+
+function max_call(string $method, string $path, array $query = [], $payload = null, float $timeout = 5.0): array
+{
+    $token = max_token();
+    $GLOBALS['max_last_error'] = '';
+    if ($token === '') {
+        return [0, []];
+    }
+    $url = 'https://platform-api.max.ru' . $path . ($query ? '?' . http_build_query($query) : '');
+    $headers = ['Authorization: ' . $token, 'Content-Type: application/json'];
+    $body = $payload === null ? null : json_encode($payload, JSON_UNESCAPED_UNICODE);
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        $opts = [
+            CURLOPT_CUSTOMREQUEST => $method,
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => (int)ceil($timeout),
+            CURLOPT_CONNECTTIMEOUT => 4,
+        ];
+        if ($body !== null) {
+            $opts[CURLOPT_POSTFIELDS] = $body;
+        }
+        curl_setopt_array($ch, $opts);
+        $raw = curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        if ($raw === false) {
+            $GLOBALS['max_last_error'] = 'curl ' . curl_errno($ch) . ': ' . curl_error($ch);
+        }
+        curl_close($ch);
+    } else {
+        $ctx = stream_context_create(['http' => [
+            'method' => $method,
+            'header' => implode("\r\n", $headers) . "\r\n",
+            'content' => $body ?? '',
+            'timeout' => $timeout,
+            'ignore_errors' => true,
+        ]]);
+        $raw = @file_get_contents($url, false, $ctx);
+        $code = 0;
+        foreach ($http_response_header ?? [] as $h) {
+            if (preg_match('#^HTTP/\S+\s+(\d{3})#', $h, $m)) {
+                $code = (int)$m[1];
+            }
+        }
+        if ($raw === false) {
+            $GLOBALS['max_last_error'] = 'нет соединения';
+        }
+    }
+    $data = json_decode((string)$raw, true);
+    return [$code, is_array($data) ? $data : []];
+}
+
+function max_send(int $maxUserId, string $text): void
+{
+    max_call('POST', '/messages', ['user_id' => $maxUserId], ['text' => mb_substr($text, 0, 3900), 'format' => 'html'], 4);
+}
+
+function send_max_to_users(PDO $db, array $ids, array $roles, string $text): void
+{
+    if (!$ids || max_token() === '') {
+        return;
+    }
+    try {
+        $roleSql = implode(', ', array_map(fn($r) => "'" . $r . "'", $roles));
+        $rows = all_rows(
+            $db,
+            "SELECT DISTINCT l.max_user_id FROM max_links l JOIN app_users u ON u.id = l.user_id WHERE u.active = 1 AND u.role IN ($roleSql) AND l.user_id IN (" . in_list($ids) . ')'
+        );
+    } catch (Throwable $e) {
+        return;
+    }
+    foreach ($rows as $r) {
+        max_send((int)$r['max_user_id'], $text);
+    }
+}
+
 function send_to_users(PDO $db, array $userIds, string $text): void
 {
     $ids = array_values(array_unique(array_filter(array_map('intval', $userIds))));
+    send_max_to_users($db, $ids, NOTIFY_ROLES, $text);
     if (!$ids || bot_token() === '') {
         return;
     }

@@ -121,7 +121,7 @@ function task_bosses(PDO $db, int $assignee, int $creator): array
 
 function check_overdue(PDO $db, int $limit = 15): void
 {
-    if (bot_token() === '') {
+    if (bot_token() === '' && max_token() === '') {
         return;
     }
     $rows = all_rows(

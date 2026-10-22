@@ -29,6 +29,39 @@ def _send(chat_id: int, text: str) -> None:
         print(f'telegram send failed {chat_id}: {err}')
 
 
+def _send_max(max_user_id: int, text: str) -> None:
+    token = os.environ.get('MAX_BOT_TOKEN', '').strip()
+    req = urllib.request.Request(
+        f'https://platform-api.max.ru/messages?user_id={int(max_user_id)}',
+        data=json.dumps({'text': text[:3900], 'format': 'html'}).encode(),
+        headers={'Authorization': token, 'Content-Type': 'application/json'},
+        method='POST',
+    )
+    try:
+        urllib.request.urlopen(req, timeout=2.5).read()
+    except Exception as err:
+        print(f'max send failed {max_user_id}: {err}')
+
+
+def send_max_to_users(cur, ids, roles_sql: str, text: str) -> None:
+    if not ids or not os.environ.get('MAX_BOT_TOKEN', '').strip():
+        return
+    try:
+        cur.execute(
+            'SELECT DISTINCT l.max_user_id FROM max_links l JOIN app_users u ON u.id = l.user_id '
+            f"WHERE u.active AND u.role IN ({roles_sql}) "
+            f"AND l.user_id IN ({', '.join(str(int(i)) for i in ids)})"
+        )
+    except Exception as err:
+        print(f'max links read failed: {err}')
+        return
+    targets = [r[0] for r in cur.fetchall()]
+    if not targets:
+        return
+    with ThreadPoolExecutor(max_workers=min(8, len(targets))) as pool:
+        list(pool.map(lambda t: _send_max(t, text), targets))
+
+
 def bosses_of(cur, assignee_id: int, creator_id: int) -> list:
     """Кому сообщать: кто поставил задание, админ сотрудника и управляющий над этим админом."""
     ids = {int(creator_id)}
@@ -47,6 +80,7 @@ def bosses_of(cur, assignee_id: int, creator_id: int) -> list:
 
 def send_to_bosses(cur, user_ids, text: str) -> None:
     ids = sorted({int(i) for i in user_ids if i})
+    send_max_to_users(cur, ids, ', '.join(repr(r) for r in BOSS_ROLES), text)
     if not ids or not os.environ.get('TELEGRAM_BOT_TOKEN', '').strip():
         return
     cur.execute(

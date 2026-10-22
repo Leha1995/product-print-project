@@ -76,6 +76,23 @@ function real_login_request(string $login, string $pass): array
     $text = preg_replace('/"token":"[0-9a-f]+"/', '"token":"…"', $text);
     return [$url, $code, mb_substr($text, 0, 800)];
 }
+if ($cfg && $authorized && isset($_POST['max_save'])) {
+    $newMax = trim((string)($_POST['max_token'] ?? ''));
+    $next = $cfg;
+    if ($newMax !== '') {
+        $next['max_token'] = $newMax;
+    }
+    if (!empty($_POST['max_token_clear'])) {
+        $next['max_token'] = '';
+    }
+    if (save_config($next)) {
+        $cfg = $next;
+        $add(true, 'Настройки MAX', $newMax !== '' ? 'Новый токен бота MAX сохранён' : 'Сохранено');
+    } else {
+        $add(false, 'Настройки MAX', 'Не удалось записать api/config.php — проверьте права на папку api (755)');
+    }
+}
+
 if ($cfg && $authorized && isset($_POST['tg_save'])) {
     $newToken = trim((string)($_POST['tg_token'] ?? ''));
     $newApi = rtrim(trim((string)($_POST['tg_api'] ?? '')), '/');
@@ -134,6 +151,23 @@ if ($cfg && $authorized) {
                 $db->rollBack();
             }
             $add(false, 'Запись входов в базу', $ex->getMessage());
+        }
+        if (max_token() === '') {
+            $add(false, 'Бот MAX', 'Токен бота MAX не указан — задайте его ниже, в блоке «Настройки бота MAX»');
+        } else {
+            [$mc, $mb] = max_call('GET', '/me', [], null, 6);
+            if ($mc === 200 && !empty($mb['username'])) {
+                $add(true, 'Бот MAX', '@' . $mb['username'] . ' на связи');
+            } elseif ($mc === 401) {
+                $add(false, 'Бот MAX', 'MAX не принял токен — проверьте его в business.max.ru → Чат-боты → Интеграция');
+            } else {
+                $add(false, 'Бот MAX', 'Нет связи с platform-api.max.ru: ' . (($GLOBALS['max_last_error'] ?? '') ?: 'код ' . $mc));
+            }
+            try {
+                $add(true, 'Подключённые к MAX', 'аккаунтов: ' . (int)one_value($db, 'SELECT COUNT(*) FROM max_links'));
+            } catch (Throwable $ex) {
+                $add(false, 'Подключённые к MAX', $ex->getMessage());
+            }
         }
         if (bot_token() === '') {
             $add(false, 'Telegram-бот', 'Токен бота не указан в настройках сервера — уведомления отключены');
@@ -394,6 +428,20 @@ $serverJs = @file_get_contents(__DIR__ . '/server.js');
             <div class="d">Тот же файл, что загружали при установке. Недостающие фото скачаются с poehali.dev — это может занять пару минут.</div>
             <button type="submit">Проверить</button>
         </form>
+
+        <?php if ($authorized): $maxTok = (string)($cfg['max_token'] ?? ''); ?>
+        <form method="post" style="margin-top:24px">
+            <h3>Настройки бота MAX</h3>
+            <input type="hidden" name="db_pass" value="<?= e((string)($_POST['db_pass'] ?? '')) ?>">
+            <input type="hidden" name="max_save" value="1">
+            <div class="d">Сейчас: <?= $maxTok !== '' ? 'токен …' . e(substr($maxTok, -6)) : 'токен не задан' ?></div>
+            <label>Токен бота MAX</label>
+            <input type="text" name="max_token" placeholder="вставьте токен" autocomplete="off">
+            <div class="d">business.max.ru → Чат-боты → ваш бот → Интеграция → Получить токен. Оставьте пустым, чтобы не менять.</div>
+            <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="max_token_clear" value="1" style="width:auto"> Удалить токен</label>
+            <button type="submit">Сохранить настройки MAX</button>
+        </form>
+        <?php endif; ?>
 
         <?php if ($authorized): $tgToken = (string)($cfg['telegram_token'] ?? ''); ?>
         <form method="post" style="margin-top:24px">

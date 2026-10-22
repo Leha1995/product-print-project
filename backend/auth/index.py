@@ -386,6 +386,7 @@ EXPORT_TABLES = {
                    'active, created_at, tz_offset',
     'staff_task_done': 'task_id, day, done_at, done_by',
     'staff_task_alerts': 'task_id, day, sent_at',
+    'max_links': 'user_id, max_user_id, max_name, linked_at',
 }
 
 

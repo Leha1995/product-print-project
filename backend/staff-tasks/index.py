@@ -178,7 +178,7 @@ def clean_task(body: dict):
 
 def check_overdue(cur, limit: int = 15) -> None:
     """Находит просроченные невыполненные задания и один раз сообщает руководителям в Telegram."""
-    if not os.environ.get('TELEGRAM_BOT_TOKEN', '').strip():
+    if not os.environ.get('TELEGRAM_BOT_TOKEN', '').strip() and not os.environ.get('MAX_BOT_TOKEN', '').strip():
         return
     utc_now = datetime.datetime.utcnow()
     cur.execute(

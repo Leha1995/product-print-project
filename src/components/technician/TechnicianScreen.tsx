@@ -17,6 +17,7 @@ import useHardwareScanner from '@/hooks/useHardwareScanner';
 import { playScanSound } from '@/lib/scanSound';
 import RepairPhotos from '@/components/equipment/RepairPhotos';
 import TelegramConnect from '@/components/TelegramConnect';
+import MaxConnect from '@/components/MaxConnect';
 import StructureFilter, { NO_STRUCTURE, StructureBadge, StructureTag } from '@/components/technician/StructureFilter';
 import TechMonthSummary from '@/components/technician/TechMonthSummary';
 
@@ -211,7 +212,8 @@ const TechnicianScreen = ({ userName, onLogout, viewTechId = null, inline = fals
 
       <main className="px-4 py-6 md:px-8">
         {!viewOnly && (
-          <div className="mb-4">
+          <div className="mb-4 grid gap-2">
+            <MaxConnect hint="Новые заявки и поломки будут приходить в MAX" />
             <TelegramConnect hint="Новые задачи и поломки будут приходить в Telegram" />
           </div>
         )}

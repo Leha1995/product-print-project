@@ -1,0 +1,15 @@
+CREATE TABLE IF NOT EXISTS max_links (
+  user_id INTEGER PRIMARY KEY,
+  max_user_id BIGINT NOT NULL,
+  max_name TEXT NOT NULL DEFAULT '',
+  linked_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS max_link_codes (
+  code TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  expires_at TIMESTAMP NOT NULL
+);
+CREATE TABLE IF NOT EXISTS max_state (
+  id INTEGER PRIMARY KEY,
+  marker BIGINT NULL
+);

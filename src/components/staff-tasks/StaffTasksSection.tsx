@@ -15,6 +15,7 @@ import {
 } from '@/lib/staffTasksApi';
 import StaffTaskFormDialog from '@/components/staff-tasks/StaffTaskFormDialog';
 import TelegramConnect from '@/components/TelegramConnect';
+import MaxConnect from '@/components/MaxConnect';
 
 interface StaffTasksSectionProps {
   data: StaffTasksData;
@@ -230,7 +231,8 @@ const StaffTasksSection = ({ data, setData, loading, now, onConfirm, viewedId = 
 
       {tab === 'manage' && data.canManage && (
         <>
-          <div className="mt-4">
+          <div className="mt-4 grid gap-2">
+            <MaxConnect compact hint="Сообщим в MAX, если сотрудник не выполнит задание к сроку" />
             <TelegramConnect compact hint="Сообщим в Telegram, если сотрудник не выполнит задание к сроку" />
           </div>
           {data.assignees.length > 1 && (

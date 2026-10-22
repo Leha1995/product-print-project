@@ -14,6 +14,7 @@ import TasksPanel from '@/components/equipment/TasksPanel';
 import TransferDialog from '@/components/equipment/TransferDialog';
 import ImportEquipmentDialog from '@/components/equipment/ImportEquipmentDialog';
 import TelegramConnect from '@/components/TelegramConnect';
+import MaxConnect from '@/components/MaxConnect';
 import useHardwareScanner from '@/hooks/useHardwareScanner';
 import { playScanSound } from '@/lib/scanSound';
 import useEquipment from '@/hooks/useEquipment';
@@ -373,7 +374,8 @@ const EquipmentSection = ({
       )}
 
       {isAdmin && !readOnly && (!targetId || targetId === userId) && (
-        <div className="mt-4">
+        <div className="mt-4 grid gap-2">
+          <MaxConnect compact hint="Сообщим в MAX, когда техник выполнит задачу" />
           <TelegramConnect compact hint="Сообщим в Telegram, когда техник выполнит задачу" />
         </div>
       )}

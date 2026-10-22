@@ -2,6 +2,7 @@ import TerminalHeader from '@/components/TerminalHeader';
 import WorkspaceSwitcher from '@/components/WorkspaceSwitcher';
 import IncomingTransfers from '@/components/equipment/IncomingTransfers';
 import TelegramConnect from '@/components/TelegramConnect';
+import MaxConnect from '@/components/MaxConnect';
 import StructureSwitcher from '@/components/StructureSwitcher';
 import AccountantExportButton from '@/components/AccountantExportButton';
 import AccountantTechsPanel from '@/components/accountant/AccountantTechsPanel';
@@ -66,7 +67,8 @@ const IndexTopBar = ({ ctl }: { ctl: IndexController }) => {
       {isAccountant && <AccountantTechsPanel />}
       {isAccountant && <AccountantTransfersPanel />}
       {user?.role === 'manager' && (
-        <div className="px-4 pt-4 md:px-8">
+        <div className="grid gap-2 px-4 pt-4 md:px-8">
+          <MaxConnect compact hint="Сообщим в MAX, когда придёт передача оборудования на подтверждение" />
           <TelegramConnect compact hint="Сообщим в Telegram, когда придёт передача оборудования на подтверждение" />
         </div>
       )}

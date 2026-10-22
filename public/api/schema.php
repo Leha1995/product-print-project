@@ -189,6 +189,21 @@ function schema_sql(string $driver): array
             tg_name $short NOT NULL DEFAULT '',
             linked_at DATETIME NULL
         )$tail",
+        "CREATE TABLE IF NOT EXISTS max_links (
+            user_id INT NOT NULL PRIMARY KEY,
+            max_user_id BIGINT NOT NULL,
+            max_name $short NOT NULL DEFAULT '',
+            linked_at DATETIME NULL
+        )$tail",
+        "CREATE TABLE IF NOT EXISTS max_link_codes (
+            code VARCHAR(64) NOT NULL PRIMARY KEY,
+            user_id INT NOT NULL,
+            expires_at DATETIME NOT NULL
+        )$tail",
+        "CREATE TABLE IF NOT EXISTS max_state (
+            id INT NOT NULL PRIMARY KEY,
+            marker BIGINT NULL
+        )$tail",
         "CREATE TABLE IF NOT EXISTS telegram_link_codes (
             code VARCHAR(64) NOT NULL PRIMARY KEY,
             user_id INT NOT NULL,
@@ -243,7 +258,7 @@ function schema_sql(string $driver): array
     ];
 }
 
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 
 const SCHEMA_COLUMNS = [
     'app_sessions' => [
@@ -343,6 +358,7 @@ const IMPORT_COLUMNS = [
     'staff_tasks' => ['id', 'created_by', 'assignee_id', 'title', 'note', 'kind', 'start_time', 'end_time', 'task_date', 'interval_min', 'tune', 'active', 'created_at', 'tz_offset'],
     'staff_task_done' => ['task_id', 'day', 'done_at', 'done_by'],
     'staff_task_alerts' => ['task_id', 'day', 'sent_at'],
+    'max_links' => ['user_id', 'max_user_id', 'max_name', 'linked_at'],
 ];
 
 const IMPORT_DEFAULTS = [
