@@ -203,6 +203,78 @@ function max_task_keyboard(int $taskId): array
     ]]]]];
 }
 
+function max_task_photos(PDO $db, int $taskId): array
+{
+    $raw = one_value($db, 'SELECT photos FROM equipment_tasks WHERE id = ?', [$taskId]);
+    return array_slice(array_values(array_filter(json_list(is_string($raw) ? $raw : null), 'is_string')), 0, 4);
+}
+
+function max_local_photo(string $url): ?string
+{
+    $path = (string)(parse_url($url, PHP_URL_PATH) ?: '');
+    $pos = strpos($path, '/uploads/');
+    if ($pos === false || !function_exists('find_upload')) {
+        return null;
+    }
+    return find_upload(substr($path, $pos + 9));
+}
+
+function max_upload_photo(string $url): ?array
+{
+    $file = max_local_photo($url);
+    if ($file && function_exists('curl_init') && class_exists('CURLFile')) {
+        [$code, $slot] = max_call('POST', '/uploads', ['type' => 'image'], null, 6);
+        if ($code === 200 && !empty($slot['url'])) {
+            $ch = curl_init((string)$slot['url']);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => ['data' => new CURLFile($file, (string)(mime_content_type($file) ?: 'image/jpeg'), basename($file))],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 20,
+                CURLOPT_CONNECTTIMEOUT => 5,
+            ]);
+            $res = json_decode((string)curl_exec($ch), true);
+            curl_close($ch);
+            if (is_array($res) && !empty($res['token'])) {
+                return ['type' => 'image', 'payload' => ['token' => (string)$res['token']]];
+            }
+            if (is_array($res) && !empty($res['photos'])) {
+                return ['type' => 'image', 'payload' => ['photos' => $res['photos']]];
+            }
+            if (!empty($slot['token'])) {
+                return ['type' => 'image', 'payload' => ['token' => (string)$slot['token']]];
+            }
+        }
+    }
+    return preg_match('#^https://#', $url) ? ['type' => 'image', 'payload' => ['url' => $url]] : null;
+}
+
+function max_send_task_photos(int $maxUid, int $taskId, array $photos): void
+{
+    $attachments = [];
+    foreach ($photos as $url) {
+        $a = max_upload_photo($url);
+        if ($a) {
+            $attachments[] = $a;
+        }
+    }
+    if (!$attachments) {
+        return;
+    }
+    $body = ['text' => '📷 Фото к заявке №' . $taskId . (count($attachments) > 1 ? ' (' . count($attachments) . ')' : ''), 'attachments' => $attachments];
+    for ($try = 0; $try < 3; $try++) {
+        [$code, $data] = max_call('POST', '/messages', ['user_id' => $maxUid], $body, 8);
+        if ($code === 200) {
+            return;
+        }
+        if (strpos((string)($data['code'] ?? ''), 'attachment.not.ready') === false) {
+            break;
+        }
+        sleep(1);
+    }
+    error_log('[asap] max photos failed: ' . ($data['message'] ?? $code));
+}
+
 function send_max_to_users(PDO $db, array $ids, array $roles, string $text, ?int $techTaskId = null): void
 {
     if (!$ids || max_token() === '') {
@@ -217,6 +289,7 @@ function send_max_to_users(PDO $db, array $ids, array $roles, string $text, ?int
     } catch (Throwable $e) {
         return;
     }
+    $photos = null;
     foreach ($rows as $r) {
         if ($techTaskId && $r['role'] === 'technician') {
             max_call('POST', '/messages', ['user_id' => (int)$r['max_user_id']], [
@@ -224,6 +297,14 @@ function send_max_to_users(PDO $db, array $ids, array $roles, string $text, ?int
                 'format' => 'html',
                 'attachments' => max_task_keyboard($techTaskId),
             ], 4);
+            try {
+                $photos = $photos ?? max_task_photos($db, $techTaskId);
+                if ($photos) {
+                    max_send_task_photos((int)$r['max_user_id'], $techTaskId, $photos);
+                }
+            } catch (Throwable $e) {
+                error_log('[asap] max photos failed: ' . $e->getMessage());
+            }
         } elseif (in_array($r['role'], ['admin', 'manager', 'superadmin'], true) && strpos($text, '⏰') === 0) {
             max_call('POST', '/messages', ['user_id' => (int)$r['max_user_id']], [
                 'text' => mb_substr($text, 0, 3900),

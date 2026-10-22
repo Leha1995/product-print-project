@@ -57,6 +57,14 @@ def _send_max(max_user_id: int, text: str, attachments=None) -> None:
         print(f'max send failed {max_user_id}: {err}')
 
 
+def _send_max_photos(max_user_id: int, task_id: int, photos: list) -> None:
+    attachments = [{'type': 'image', 'payload': {'url': u}} for u in photos if str(u).startswith('https://')][:4]
+    if not attachments:
+        return
+    label = f'📷 Фото к заявке №{int(task_id)}' + (f' ({len(attachments)})' if len(attachments) > 1 else '')
+    _send_max(max_user_id, label, attachments)
+
+
 def send_max_to_users(cur, ids, roles_sql: str, text: str, tech_task_id=None) -> None:
     if not ids or not os.environ.get('MAX_BOT_TOKEN', '').strip():
         return
@@ -73,8 +81,20 @@ def send_max_to_users(cur, ids, roles_sql: str, text: str, tech_task_id=None) ->
     if not targets:
         return
     kb = task_keyboard(tech_task_id) if tech_task_id else None
+    photos = []
+    if tech_task_id:
+        cur.execute(f'SELECT photos FROM equipment_tasks WHERE id = {int(tech_task_id)}')
+        row = cur.fetchone()
+        photos = [p for p in (row[0] if row and isinstance(row[0], list) else []) if isinstance(p, str)]
+
+    def deliver(t):
+        is_tech = t[1] == 'technician'
+        _send_max(t[0], text, kb if is_tech else None)
+        if is_tech and photos:
+            _send_max_photos(t[0], tech_task_id, photos)
+
     with ThreadPoolExecutor(max_workers=min(8, len(targets))) as pool:
-        list(pool.map(lambda t: _send_max(t[0], text, kb if t[1] == 'technician' else None), targets))
+        list(pool.map(deliver, targets))
 
 
 def send_to_users(cur, user_ids, text: str, tech_task_id=None) -> None:
