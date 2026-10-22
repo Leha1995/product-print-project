@@ -9,7 +9,10 @@ function summary_button(): array
 {
     return [[
         'type' => 'inline_keyboard',
-        'payload' => ['buttons' => [[['type' => 'callback', 'text' => '📊 Сводка по точкам', 'payload' => 'summary']]]],
+        'payload' => ['buttons' => [
+            [['type' => 'callback', 'text' => '📊 Сводка по точкам', 'payload' => 'summary']],
+            [['type' => 'callback', 'text' => '👥 Сводка по сотрудникам', 'payload' => 'staff']],
+        ]],
     ]];
 }
 
@@ -29,8 +32,165 @@ function rub($v): string
 
 function report_settings(PDO $db, int $uid): array
 {
-    $row = one_row($db, 'SELECT report_time, enabled FROM report_settings WHERE user_id = ?', [$uid]);
-    return ['time' => $row ? (string)$row['report_time'] : '23:00', 'enabled' => $row ? flag($row['enabled']) : true];
+    $row = one_row($db, 'SELECT report_time, enabled, overdue_enabled, overdue_from, overdue_to FROM report_settings WHERE user_id = ?', [$uid]);
+    return [
+        'time' => $row ? (string)$row['report_time'] : '23:00',
+        'enabled' => $row ? flag($row['enabled']) : true,
+        'overdueEnabled' => $row ? flag($row['overdue_enabled']) : true,
+        'overdueFrom' => $row ? (string)$row['overdue_from'] : '00:00',
+        'overdueTo' => $row ? (string)$row['overdue_to'] : '23:59',
+    ];
+}
+
+function save_overdue_settings(PDO $db, int $uid, bool $enabled, string $from, string $to, int $tz): void
+{
+    $cur = report_settings($db, $uid);
+    upsert($db, 'report_settings', ['user_id'], [
+        'user_id' => $uid,
+        'report_time' => $cur['time'],
+        'enabled' => $cur['enabled'] ? 1 : 0,
+        'overdue_enabled' => $enabled ? 1 : 0,
+        'overdue_from' => $from,
+        'overdue_to' => $to,
+        'tz_offset' => $tz,
+        'updated_at' => now_utc(),
+    ]);
+    if (!$enabled) {
+        run($db, 'DELETE FROM overdue_queue WHERE user_id = ?', [$uid]);
+    }
+}
+
+function in_window(string $hhmm, string $from, string $to): bool
+{
+    return $from <= $to ? ($hhmm >= $from && $hhmm <= $to) : ($hhmm >= $from || $hhmm <= $to);
+}
+
+function send_overdue(PDO $db, array $ids, string $text): void
+{
+    $ready = [];
+    foreach (array_unique(array_filter(array_map('intval', $ids))) as $uid) {
+        $cfg = report_settings($db, $uid);
+        if (!$cfg['overdueEnabled']) {
+            continue;
+        }
+        if (in_window(gmdate('H:i', local_time(boss_tz($db, $uid))), $cfg['overdueFrom'], $cfg['overdueTo'])) {
+            $ready[] = $uid;
+        } else {
+            run($db, 'INSERT INTO overdue_queue (user_id, text, created_at) VALUES (?, ?, ?)', [$uid, $text, now_utc()]);
+        }
+    }
+    if ($ready) {
+        send_to_users($db, $ready, $text);
+    }
+}
+
+function flush_overdue_queue(PDO $db, int $limit = 10): int
+{
+    $sent = 0;
+    foreach (all_rows($db, 'SELECT DISTINCT user_id FROM overdue_queue') as $u) {
+        if ($sent >= $limit) {
+            break;
+        }
+        $uid = (int)$u['user_id'];
+        $cfg = report_settings($db, $uid);
+        if (!$cfg['overdueEnabled']) {
+            run($db, 'DELETE FROM overdue_queue WHERE user_id = ?', [$uid]);
+            continue;
+        }
+        if (!in_window(gmdate('H:i', local_time(boss_tz($db, $uid))), $cfg['overdueFrom'], $cfg['overdueTo'])) {
+            continue;
+        }
+        $items = all_rows($db, 'SELECT id, text FROM overdue_queue WHERE user_id = ? ORDER BY id', [$uid]);
+        if (!$items) {
+            continue;
+        }
+        run($db, 'DELETE FROM overdue_queue WHERE user_id = ? AND id <= ?', [$uid, (int)end($items)['id']]);
+        if (count($items) === 1) {
+            $text = (string)$items[0]['text'];
+        } else {
+            $parts = array_map(fn($r) => str_replace("⏰ <b>Задание не выполнено в срок</b>\n", '• ', (string)$r['text']), array_slice($items, 0, 15));
+            $text = '⏰ <b>Пока уведомления были на паузе, накопились просрочки: ' . count($items) . "</b>\n\n" . implode("\n\n", $parts)
+                . (count($items) > 15 ? "\n\n…и ещё " . (count($items) - 15) : '');
+        }
+        send_to_users($db, [$uid], $text);
+        $sent++;
+    }
+    return $sent;
+}
+
+function build_staff_report(PDO $db, int $uid, string $role): string
+{
+    $tz = boss_tz($db, $uid);
+    $local = local_time($tz);
+    $day = gmdate('Y-m-d', $local);
+    $hhmm = gmdate('H:i', $local);
+    $endUtc = gmdate('Y-m-d H:i:s', strtotime($day . ' 00:00:00 UTC') + $tz * 60 + 86400);
+    $title = '👥 Сотрудники · ' . gmdate('d.m.Y', $local) . ' на ' . $hhmm;
+    $points = boss_points($db, $uid, $role);
+    if (!$points) {
+        return "<b>{$title}</b>\n\nЗа вами пока не закреплено ни одной точки.";
+    }
+    $owner = [];
+    foreach ($points as $p) {
+        $owner[$p] = $p;
+    }
+    foreach (all_rows($db, 'SELECT id, manager_id FROM app_users WHERE active = 1 AND manager_id IN (' . in_list($points) . ')') as $r) {
+        $owner[(int)$r['id']] = (int)$r['manager_id'];
+    }
+    $rows = all_rows(
+        $db,
+        'SELECT t.id, t.title, t.kind, t.end_time, t.assignee_id, t.created_at, a.full_name, a.username FROM staff_tasks t '
+        . 'JOIN app_users a ON a.id = t.assignee_id WHERE t.active = 1 AND a.active = 1 AND t.assignee_id IN (' . in_list(array_keys($owner)) . ') '
+        . "AND (t.kind = 'daily' OR t.task_date = ?)",
+        [$day]
+    );
+    $rows = array_values(array_filter($rows, fn($t) => !$t['created_at'] || $t['created_at'] <= $endUtc));
+    if (!$rows) {
+        return "<b>{$title}</b>\n\nНа сегодня у ваших сотрудников нет заданий.";
+    }
+    $doneDay = [];
+    $doneAny = [];
+    foreach (all_rows($db, 'SELECT task_id, day FROM staff_task_done WHERE task_id IN (' . in_list(array_column($rows, 'id')) . ')') as $m) {
+        $doneDay[$m['task_id'] . '|' . $m['day']] = true;
+        $doneAny[(int)$m['task_id']] = true;
+    }
+    $names = [];
+    foreach (all_rows($db, 'SELECT id, full_name, username FROM app_users WHERE id IN (' . in_list($points) . ')') as $r) {
+        $names[(int)$r['id']] = (string)($r['full_name'] ?: $r['username']);
+    }
+    $people = [];
+    foreach ($rows as $t) {
+        $a = (int)$t['assignee_id'];
+        if (!isset($people[$a])) {
+            $people[$a] = ['name' => (string)($t['full_name'] ?: $t['username']), 'point' => $owner[$a] ?? 0, 'done' => [], 'late' => [], 'wait' => []];
+        }
+        $isDone = $t['kind'] === 'once' ? isset($doneAny[(int)$t['id']]) : isset($doneDay[$t['id'] . '|' . $day]);
+        if ($isDone) {
+            $people[$a]['done'][] = $t['title'];
+        } elseif ($t['end_time'] && $t['end_time'] <= $hhmm) {
+            $people[$a]['late'][] = $t['title'] . ' (до ' . $t['end_time'] . ')';
+        } else {
+            $people[$a]['wait'][] = $t['title'] . ($t['end_time'] ? ' (до ' . $t['end_time'] . ')' : '');
+        }
+    }
+    $sum = fn($k) => array_sum(array_map(fn($p) => count($p[$k]), $people));
+    $lines = ["<b>{$title}</b>", 'Сотрудников: ' . count($people) . ' · ✅ ' . $sum('done') . ' · ⏰ ' . $sum('late') . ' · ⏳ ' . $sum('wait')];
+    $list = array_values($people);
+    usort($list, fn($a, $b) => count($b['late']) <=> count($a['late']) ?: strcasecmp($a['name'], $b['name']));
+    foreach ($list as $p) {
+        $mark = $p['late'] ? '🔴' : ($p['wait'] ? '🟡' : '🟢');
+        $block = ["\n{$mark} <b>" . tg_esc($p['name']) . '</b>' . (count($points) > 1 ? ' · ' . tg_esc($names[$p['point']] ?? '') : '')];
+        $block[] = '   ✅ ' . count($p['done']) . ' · ⏰ ' . count($p['late']) . ' · ⏳ ' . count($p['wait']);
+        foreach (array_slice($p['late'], 0, 3) as $i) {
+            $block[] = '   ⏰ ' . tg_esc(mb_substr($i, 0, 100));
+        }
+        foreach (array_slice($p['wait'], 0, 2) as $i) {
+            $block[] = '   ⏳ ' . tg_esc(mb_substr($i, 0, 100));
+        }
+        $lines[] = implode("\n", $block);
+    }
+    $text = implode("\n", $lines);
+    return mb_strlen($text) <= 3900 ? $text : mb_substr($text, 0, 3850) . "\n\n…список сокращён";
 }
 
 function save_report_settings(PDO $db, int $uid, string $time, bool $enabled, int $tz): void
@@ -254,6 +414,7 @@ function maybe_daily_reports(PDO $db): void
     @touch($marker);
     try {
         send_daily_reports($db, 4);
+        flush_overdue_queue($db, 4);
     } catch (Throwable $e) {
         error_log('[asap] daily reports failed: ' . $e->getMessage());
     }

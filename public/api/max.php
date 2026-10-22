@@ -34,7 +34,7 @@ function max_ensure_webhook(string $hookUrl): void
     max_call('POST', '/subscriptions', [], ['url' => $target, 'update_types' => ['bot_started', 'message_created', 'message_callback']], 4);
 }
 
-function max_summary(PDO $db, int $maxUid): void
+function max_summary(PDO $db, int $maxUid, string $kind = 'points'): void
 {
     $row = one_row($db, 'SELECT u.id, u.role FROM max_links l JOIN app_users u ON u.id = l.user_id WHERE l.max_user_id = ? AND u.active = 1', [$maxUid]);
     if (!$row) {
@@ -45,7 +45,9 @@ function max_summary(PDO $db, int $maxUid): void
         max_send($maxUid, 'Сводка по точкам доступна админам, управляющим и супер-админу.');
         return;
     }
-    max_send_button($maxUid, build_report($db, (int)$row['id'], (string)$row['role'], false));
+    max_send_button($maxUid, $kind === 'staff'
+        ? build_staff_report($db, (int)$row['id'], (string)$row['role'])
+        : build_report($db, (int)$row['id'], (string)$row['role'], false));
 }
 
 function max_handle(PDO $db, array $u): void
@@ -58,13 +60,13 @@ function max_handle(PDO $db, array $u): void
         $payload = (string)($cb['payload'] ?? '');
         $cbUid = (int)($cb['user']['user_id'] ?? 0);
         if (!empty($cb['callback_id'])) {
-            max_call('POST', '/answers', ['callback_id' => (string)$cb['callback_id']], ['notification' => $payload === 'summary' ? 'Готовлю сводку…' : 'Принято'], 3);
+            max_call('POST', '/answers', ['callback_id' => (string)$cb['callback_id']], ['notification' => in_array($payload, ['summary', 'staff'], true) ? 'Готовлю сводку…' : 'Принято'], 3);
         }
         if (!$cbUid) {
             return;
         }
-        if ($payload === 'summary') {
-            max_summary($db, $cbUid);
+        if ($payload === 'summary' || $payload === 'staff') {
+            max_summary($db, $cbUid, $payload === 'staff' ? 'staff' : 'points');
         } else {
             mt_callback($db, $cbUid, $payload);
         }
@@ -83,10 +85,12 @@ function max_handle(PDO $db, array $u): void
             max_send($sid, 'Уведомления отключены.');
         } elseif (mt_dialog_text($db, $sid, $text)) {
             return;
+        } elseif (preg_match('#^(/staff|сотрудники|сводка по сотрудникам|персонал)#u', $low)) {
+            max_summary($db, $sid, 'staff');
         } elseif (preg_match('#^(/summary|/svodka|сводка|отч[её]т)#u', $low)) {
             max_summary($db, $sid);
         } else {
-            max_send_button($sid, "Я присылаю уведомления о заявках, ремонтах и передачах оборудования, а в 23:00 — итоги дня.\nЧтобы получить сводку по своим точкам прямо сейчас, нажмите кнопку или напишите «сводка».");
+            max_send_button($sid, "Я присылаю уведомления о заявках, ремонтах и передачах оборудования, а в 23:00 — итоги дня.\nСводку по точкам или по сотрудникам можно получить кнопками ниже или словами «сводка» и «сотрудники».");
         }
     }
 }
@@ -105,7 +109,7 @@ if ($hook !== '') {
 }
 
 if (($_GET['task'] ?? '') === 'daily') {
-    out(['ok' => true, 'sent' => send_daily_reports($db)]);
+    out(['ok' => true, 'sent' => send_daily_reports($db) + flush_overdue_queue($db)]);
 }
 
 function max_status(PDO $db, int $uid, string $role): array
@@ -117,6 +121,9 @@ function max_status(PDO $db, int $uid, string $role): array
         'canReport' => $boss,
         'reportTime' => $cfg ? $cfg['time'] : null,
         'reportEnabled' => $cfg ? $cfg['enabled'] : false,
+        'overdueEnabled' => $cfg ? $cfg['overdueEnabled'] : false,
+        'overdueFrom' => $cfg ? $cfg['overdueFrom'] : null,
+        'overdueTo' => $cfg ? $cfg['overdueTo'] : null,
         'allowed' => in_array($role, NOTIFY_ROLES, true),
         'configured' => max_token() !== '',
         'linked' => (bool)$row,
@@ -231,6 +238,21 @@ if ($action === 'report_settings') {
     }
     $tz = max(-840, min(840, (int)($body['tzOffset'] ?? -180)));
     save_report_settings($db, (int)$me['id'], $time, !array_key_exists('enabled', $body) || (bool)$body['enabled'], $tz);
+    out(max_status($db, (int)$me['id'], $me['role']));
+}
+
+if ($action === 'overdue_settings') {
+    if (!in_array($me['role'], BOSS_ROLES_R, true)) {
+        out(['error' => 'forbidden_role'], 403);
+    }
+    $from = (string)($body['from'] ?? '00:00');
+    $to = (string)($body['to'] ?? '23:59');
+    $re = '/^([01]\d|2[0-3]):[0-5]\d$/';
+    if (!preg_match($re, $from) || !preg_match($re, $to)) {
+        out(['error' => 'bad_time'], 400);
+    }
+    $tz = max(-840, min(840, (int)($body['tzOffset'] ?? -180)));
+    save_overdue_settings($db, (int)$me['id'], !array_key_exists('enabled', $body) || (bool)$body['enabled'], $from, $to, $tz);
     out(max_status($db, (int)$me['id'], $me['role']));
 }
 

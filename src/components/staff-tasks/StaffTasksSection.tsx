@@ -17,6 +17,7 @@ import StaffTaskFormDialog from '@/components/staff-tasks/StaffTaskFormDialog';
 import TelegramConnect from '@/components/TelegramConnect';
 import MaxConnect from '@/components/MaxConnect';
 import ReportTimeSettings from '@/components/ReportTimeSettings';
+import OverdueAlertSettings from '@/components/OverdueAlertSettings';
 import MyTunePicker from '@/components/staff-tasks/MyTunePicker';
 
 interface StaffTasksSectionProps {
@@ -236,6 +237,7 @@ const StaffTasksSection = ({ data, setData, loading, now, onConfirm, viewedId = 
         <>
           <div className="mt-4 grid gap-2">
             <ReportTimeSettings />
+            <OverdueAlertSettings />
             <MaxConnect compact hint="Сообщим в MAX, если сотрудник не выполнит задание к сроку" />
             <TelegramConnect compact hint="Сообщим в Telegram, если сотрудник не выполнит задание к сроку" />
           </div>

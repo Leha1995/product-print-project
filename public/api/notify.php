@@ -224,6 +224,15 @@ function send_max_to_users(PDO $db, array $ids, array $roles, string $text, ?int
                 'format' => 'html',
                 'attachments' => max_task_keyboard($techTaskId),
             ], 4);
+        } elseif (in_array($r['role'], ['admin', 'manager', 'superadmin'], true) && strpos($text, '⏰') === 0) {
+            max_call('POST', '/messages', ['user_id' => (int)$r['max_user_id']], [
+                'text' => mb_substr($text, 0, 3900),
+                'format' => 'html',
+                'attachments' => [['type' => 'inline_keyboard', 'payload' => ['buttons' => [
+                    [['type' => 'callback', 'text' => '👥 Сводка по сотрудникам', 'payload' => 'staff']],
+                    [['type' => 'callback', 'text' => '📊 Сводка по точкам', 'payload' => 'summary']],
+                ]]]],
+            ], 4);
         } else {
             max_send((int)$r['max_user_id'], $text);
         }

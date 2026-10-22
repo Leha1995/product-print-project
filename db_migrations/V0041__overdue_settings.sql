@@ -1,0 +1,10 @@
+ALTER TABLE report_settings ADD COLUMN IF NOT EXISTS overdue_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE report_settings ADD COLUMN IF NOT EXISTS overdue_from TEXT NOT NULL DEFAULT '00:00';
+ALTER TABLE report_settings ADD COLUMN IF NOT EXISTS overdue_to TEXT NOT NULL DEFAULT '23:59';
+CREATE TABLE IF NOT EXISTS overdue_queue (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  text TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_overdue_queue_user ON overdue_queue (user_id);

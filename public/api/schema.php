@@ -200,6 +200,12 @@ function schema_sql(string $driver): array
             user_id INT NOT NULL,
             expires_at DATETIME NOT NULL
         )$tail",
+        "CREATE TABLE IF NOT EXISTS overdue_queue (
+            id $auto,
+            user_id INT NOT NULL,
+            text $text NOT NULL,
+            created_at DATETIME NULL
+        )$tail",
         "CREATE TABLE IF NOT EXISTS max_dialogs (
             max_user_id BIGINT NOT NULL PRIMARY KEY,
             task_id INT NOT NULL,
@@ -283,7 +289,7 @@ function schema_sql(string $driver): array
     ];
 }
 
-const SCHEMA_VERSION = 11;
+const SCHEMA_VERSION = 12;
 
 const SCHEMA_COLUMNS = [
     'app_sessions' => [
@@ -291,6 +297,11 @@ const SCHEMA_COLUMNS = [
     ],
     'equipment_tasks' => [
         'taken_at' => 'DATETIME NULL',
+    ],
+    'report_settings' => [
+        'overdue_enabled' => 'TINYINT NOT NULL DEFAULT 1',
+        'overdue_from' => "VARCHAR(5) NOT NULL DEFAULT '00:00'",
+        'overdue_to' => "VARCHAR(5) NOT NULL DEFAULT '23:59'",
     ],
     'shared_products' => [
         'structure_id' => 'INT NULL',

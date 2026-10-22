@@ -10,7 +10,10 @@ REPORT_HOUR = 23
 DEFAULT_TZ = -180
 SUMMARY_BUTTON = [{
     'type': 'inline_keyboard',
-    'payload': {'buttons': [[{'type': 'callback', 'text': '📊 Сводка по точкам', 'payload': 'summary'}]]},
+    'payload': {'buttons': [
+        [{'type': 'callback', 'text': '📊 Сводка по точкам', 'payload': 'summary'}],
+        [{'type': 'callback', 'text': '👥 Сводка по сотрудникам', 'payload': 'staff'}],
+    ]},
 }]
 
 
@@ -79,9 +82,138 @@ def boss_tz(cur, uid: int) -> int:
 
 
 def report_settings(cur, uid: int) -> dict:
-    cur.execute(f'SELECT report_time, enabled FROM report_settings WHERE user_id = {int(uid)}')
+    cur.execute(
+        'SELECT report_time, enabled, overdue_enabled, overdue_from, overdue_to '
+        f'FROM report_settings WHERE user_id = {int(uid)}'
+    )
     row = cur.fetchone()
-    return {'time': row[0] if row else DEFAULT_TIME, 'enabled': bool(row[1]) if row else True}
+    return {
+        'time': row[0] if row else DEFAULT_TIME,
+        'enabled': bool(row[1]) if row else True,
+        'overdueEnabled': bool(row[2]) if row else True,
+        'overdueFrom': row[3] if row else '00:00',
+        'overdueTo': row[4] if row else '23:59',
+    }
+
+
+def save_overdue_settings(cur, uid: int, enabled: bool, start: str, end: str, tz: int) -> dict:
+    cur.execute(
+        'INSERT INTO report_settings (user_id, overdue_enabled, overdue_from, overdue_to, tz_offset, updated_at) '
+        f'VALUES ({int(uid)}, {"TRUE" if enabled else "FALSE"}, {q(start)}, {q(end)}, {int(tz)}, NOW()) '
+        'ON CONFLICT (user_id) DO UPDATE SET overdue_enabled = EXCLUDED.overdue_enabled, '
+        'overdue_from = EXCLUDED.overdue_from, overdue_to = EXCLUDED.overdue_to, tz_offset = EXCLUDED.tz_offset, updated_at = NOW()'
+    )
+    if not enabled:
+        cur.execute(f'DELETE FROM overdue_queue WHERE user_id = {int(uid)}')
+    return report_settings(cur, uid)
+
+
+def in_window(hhmm: str, start: str, end: str) -> bool:
+    if start <= end:
+        return start <= hhmm <= end
+    return hhmm >= start or hhmm <= end
+
+
+def flush_overdue_queue(cur, limit: int = 10) -> int:
+    """Отправляет отложенные уведомления о просрочках тем, у кого началось разрешённое время."""
+    cur.execute('SELECT DISTINCT user_id FROM overdue_queue ORDER BY user_id LIMIT 50')
+    users = [r[0] for r in cur.fetchall()]
+    sent = 0
+    for uid in users:
+        if sent >= limit:
+            break
+        cfg = report_settings(cur, uid)
+        if not cfg['overdueEnabled']:
+            cur.execute(f'DELETE FROM overdue_queue WHERE user_id = {int(uid)}')
+            continue
+        hhmm = local_now(boss_tz(cur, uid)).strftime('%H:%M')
+        if not in_window(hhmm, cfg['overdueFrom'], cfg['overdueTo']):
+            continue
+        cur.execute(f'DELETE FROM overdue_queue WHERE user_id = {int(uid)} RETURNING text, created_at')
+        items = sorted(cur.fetchall(), key=lambda r: r[1])
+        if not items:
+            continue
+        if len(items) == 1:
+            text = items[0][0]
+        else:
+            text = f'⏰ <b>Пока уведомления были на паузе, накопились просрочки: {len(items)}</b>\n\n' + '\n\n'.join(
+                r[0].replace('⏰ <b>Задание не выполнено в срок</b>\n', '• ') for r in items[:15]
+            )
+            if len(items) > 15:
+                text += f'\n\n…и ещё {len(items) - 15}'
+        cur.execute(
+            'SELECT m.max_user_id, t.chat_id FROM app_users u LEFT JOIN max_links m ON m.user_id = u.id '
+            f'LEFT JOIN telegram_links t ON t.user_id = u.id WHERE u.id = {int(uid)} AND u.active'
+        )
+        row = cur.fetchone()
+        if row and row[0]:
+            send_max(row[0], text, True)
+        if row and row[1]:
+            send_tg(row[1], text)
+        sent += 1
+    return sent
+
+
+def build_staff_report(cur, uid: int, role: str) -> str:
+    """Сводка по каждому сотруднику: что выполнено, что просрочено, что ещё в работе."""
+    tz = boss_tz(cur, uid)
+    now = local_now(tz)
+    day = now.strftime('%Y-%m-%d')
+    hhmm = now.strftime('%H:%M')
+    end_utc = datetime.datetime.strptime(day, '%Y-%m-%d') + datetime.timedelta(minutes=tz) + datetime.timedelta(days=1)
+    points = boss_points(cur, uid, role)
+    title = f"👥 Сотрудники · {now.strftime('%d.%m.%Y')} на {hhmm}"
+    if not points:
+        return f'<b>{title}</b>\n\nЗа вами пока не закреплено ни одной точки.'
+    cur.execute(f"SELECT id, manager_id FROM app_users WHERE active AND manager_id IN ({ids_sql(points)})")
+    owner = {int(p): int(p) for p in points}
+    for pid, mid in cur.fetchall():
+        owner[int(pid)] = int(mid)
+    cur.execute(
+        'SELECT t.id, t.title, t.kind, t.end_time, t.assignee_id, t.created_at, '
+        "COALESCE(NULLIF(a.full_name, ''), a.username) FROM staff_tasks t JOIN app_users a ON a.id = t.assignee_id "
+        f"WHERE t.active AND a.active AND t.assignee_id IN ({ids_sql(owner.keys())}) "
+        f"AND (t.kind = 'daily' OR t.task_date = {q(day)})"
+    )
+    rows = [r for r in cur.fetchall() if not r[5] or r[5] <= end_utc]
+    if not rows:
+        return f'<b>{title}</b>\n\nНа сегодня у ваших сотрудников нет заданий.'
+    cur.execute(
+        f'SELECT task_id, day, done_at FROM staff_task_done WHERE task_id IN ({ids_sql([r[0] for r in rows])})'
+    )
+    marks = cur.fetchall()
+    done_day = {(m[0], m[1]): m[2] for m in marks}
+    done_any = {m[0]: m[2] for m in marks}
+    people = {}
+    for tid, ttitle, kind, end, assignee, _c, person in rows:
+        p = people.setdefault(int(assignee), {'name': person or '', 'point': owner.get(int(assignee)), 'done': [], 'late': [], 'wait': []})
+        done_at = done_any.get(tid) if kind == 'once' else done_day.get((tid, day))
+        if done_at:
+            p['done'].append(ttitle)
+        elif end and end <= hhmm:
+            p['late'].append(f'{ttitle} (до {end})')
+        else:
+            p['wait'].append(ttitle + (f' (до {end})' if end else ''))
+    point_names = names(cur, points)
+    total_done = sum(len(p['done']) for p in people.values())
+    total_late = sum(len(p['late']) for p in people.values())
+    total_wait = sum(len(p['wait']) for p in people.values())
+    lines = [
+        f'<b>{title}</b>',
+        f'Сотрудников: {len(people)} · ✅ {total_done} · ⏰ {total_late} · ⏳ {total_wait}',
+    ]
+    ordered = sorted(people.values(), key=lambda p: (-len(p['late']), point_names.get(p['point'], ''), p['name'].lower()))
+    for p in ordered:
+        mark = '🔴' if p['late'] else ('🟢' if not p['wait'] else '🟡')
+        block = [f"\n{mark} <b>{esc(p['name'])}</b>" + (f" · {esc(point_names.get(p['point'], ''))}" if len(points) > 1 else '')]
+        block.append(f"   ✅ {len(p['done'])} · ⏰ {len(p['late'])} · ⏳ {len(p['wait'])}")
+        for item in p['late'][:3]:
+            block.append(f'   ⏰ {esc(item[:100])}')
+        for item in p['wait'][:2]:
+            block.append(f'   ⏳ {esc(item[:100])}')
+        lines.append('\n'.join(block))
+    text = '\n'.join(lines)
+    return text if len(text) <= 3900 else text[:3850] + '\n\n…список сокращён'
 
 
 def save_report_settings(cur, uid: int, time_str: str, enabled: bool, tz: int) -> dict:

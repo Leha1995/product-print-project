@@ -6,6 +6,9 @@ export interface MaxStatus {
   canReport?: boolean;
   reportTime?: string | null;
   reportEnabled?: boolean;
+  overdueEnabled?: boolean;
+  overdueFrom?: string | null;
+  overdueTo?: string | null;
   allowed?: boolean;
   configured: boolean;
   linked: boolean;
@@ -42,6 +45,17 @@ export const saveReportSettings = async (time: string, enabled: boolean): Promis
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({ action: 'report_settings', time, enabled, tzOffset: new Date().getTimezoneOffset() }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || String(res.status));
+  return data;
+};
+
+export const saveOverdueSettings = async (enabled: boolean, from: string, to: string): Promise<MaxStatus> => {
+  const res = await fetch(API(), {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ action: 'overdue_settings', enabled, from, to, tzOffset: new Date().getTimezoneOffset() }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || String(res.status));

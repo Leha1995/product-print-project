@@ -6,7 +6,7 @@ import urllib.request
 
 import psycopg2
 
-from notify import bosses_of, overdue_text, send_to_bosses
+from notify import bosses_of, overdue_text, send_overdue
 
 CORS = {
     'Access-Control-Allow-Origin': '*',
@@ -237,7 +237,7 @@ def check_overdue(cur, limit: int = 15) -> None:
         sent_count += 1
         y, m, d = c['day'].split('-')
         try:
-            send_to_bosses(cur, bosses_of(cur, c['assigneeId'], c['createdBy']), overdue_text(c, f'{d}.{m}.{y}'))
+            send_overdue(cur, bosses_of(cur, c['assigneeId'], c['createdBy']), overdue_text(c, f'{d}.{m}.{y}'))
         except Exception as err:
             print(f'overdue notify failed {c["id"]}: {err}')
 
@@ -245,8 +245,28 @@ def check_overdue(cur, limit: int = 15) -> None:
 MAX_FN = 'https://functions.poehali.dev/af92396f-6f3f-4ceb-a528-6ffaf66a1e61'
 
 
+def queue_ready(cur) -> bool:
+    """Есть ли отложенные уведомления о просрочках, которые уже можно отправить."""
+    cur.execute(
+        "SELECT COALESCE(r.overdue_from, '00:00'), COALESCE(r.overdue_to, '23:59'), COALESCE(r.tz_offset, -180) "
+        'FROM (SELECT DISTINCT user_id FROM overdue_queue) q LEFT JOIN report_settings r ON r.user_id = q.user_id LIMIT 50'
+    )
+    utc_now = datetime.datetime.utcnow()
+    for start, end, tz in cur.fetchall():
+        hhmm = (utc_now - datetime.timedelta(minutes=int(tz))).strftime('%H:%M')
+        if (start <= hhmm <= end) if start <= end else (hhmm >= start or hhmm <= end):
+            return True
+    return False
+
+
 def kick_daily_reports(cur) -> None:
-    """Если у кого-то из руководителей наступило время сводки, а она ещё не ушла — будит рассылку."""
+    """Если у кого-то наступило время сводки или отложенных уведомлений — будит рассылку."""
+    if queue_ready(cur):
+        try:
+            urllib.request.urlopen(f'{MAX_FN}?task=daily', timeout=1.5).read()
+        except Exception:
+            pass
+        return
     cur.execute(
         "SELECT u.id, COALESCE(r.report_time, '23:00'), COALESCE(r.enabled, TRUE), COALESCE(r.tz_offset, -180) "
         'FROM app_users u LEFT JOIN report_settings r ON r.user_id = u.id '

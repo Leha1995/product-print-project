@@ -1,3 +1,4 @@
+import datetime
 import html
 import json
 import os
@@ -29,11 +30,17 @@ def _send(chat_id: int, text: str) -> None:
         print(f'telegram send failed {chat_id}: {err}')
 
 
+BOSS_BUTTONS = [{'type': 'inline_keyboard', 'payload': {'buttons': [
+    [{'type': 'callback', 'text': '👥 Сводка по сотрудникам', 'payload': 'staff'}],
+    [{'type': 'callback', 'text': '📊 Сводка по точкам', 'payload': 'summary'}],
+]}}]
+
+
 def _send_max(max_user_id: int, text: str) -> None:
     token = os.environ.get('MAX_BOT_TOKEN', '').strip()
     req = urllib.request.Request(
         f'https://platform-api.max.ru/messages?user_id={int(max_user_id)}',
-        data=json.dumps({'text': text[:3900], 'format': 'html'}).encode(),
+        data=json.dumps({'text': text[:3900], 'format': 'html', 'attachments': BOSS_BUTTONS}).encode(),
         headers={'Authorization': token, 'Content-Type': 'application/json'},
         method='POST',
     )
@@ -76,6 +83,45 @@ def bosses_of(cur, assignee_id: int, creator_id: int) -> list:
                 ids.add(int(head[0]))
     ids.discard(int(assignee_id))
     return sorted(ids)
+
+
+def overdue_targets(cur, ids: list) -> list:
+    """Кому слать сейчас: выключившие — пропускаем, у кого не их время — откладываем в очередь."""
+    if not ids:
+        return []
+    cur.execute(
+        'SELECT user_id, overdue_enabled, overdue_from, overdue_to, tz_offset FROM report_settings '
+        f"WHERE user_id IN ({', '.join(str(int(i)) for i in ids)})"
+    )
+    cfg = {r[0]: r for r in cur.fetchall()}
+    now = datetime.datetime.utcnow()
+    ready = []
+    for uid in ids:
+        row = cfg.get(uid)
+        if not row:
+            ready.append(uid)
+            continue
+        _, enabled, start, end, tz = row
+        if not enabled:
+            continue
+        hhmm = (now - datetime.timedelta(minutes=int(tz or -180))).strftime('%H:%M')
+        inside = start <= hhmm <= end if start <= end else (hhmm >= start or hhmm <= end)
+        if inside:
+            ready.append(uid)
+        else:
+            ready.append(-uid)
+    return ready
+
+
+def send_overdue(cur, user_ids, text: str) -> None:
+    ids = sorted({int(i) for i in user_ids if i})
+    ready = []
+    for uid in overdue_targets(cur, ids):
+        if uid < 0:
+            cur.execute(f"INSERT INTO overdue_queue (user_id, text) VALUES ({-uid}, '{text.replace(chr(39), chr(39) * 2)}')")
+        else:
+            ready.append(uid)
+    send_to_bosses(cur, ready, text)
 
 
 def send_to_bosses(cur, user_ids, text: str) -> None:

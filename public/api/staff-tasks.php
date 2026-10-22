@@ -177,7 +177,7 @@ function check_overdue(PDO $db, int $limit = 15): void
             . '📋 ' . tg_esc($r['title']) . "\n"
             . ($note !== '' ? '📝 ' . tg_esc(mb_substr($note, 0, 500)) . "\n" : '')
             . "🕒 Нужно было $when · $d.$m.$y";
-        send_to_users($db, task_bosses($db, (int)$r['assignee_id'], (int)$r['created_by']), $text);
+        send_overdue($db, task_bosses($db, (int)$r['assignee_id'], (int)$r['created_by']), $text);
     }
 }
 

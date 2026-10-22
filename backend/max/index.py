@@ -11,7 +11,8 @@ import psycopg2
 
 from tasks import handle_callback, handle_dialog_text
 from report import (
-    SUMMARY_BUTTON, build_report, report_settings, reports_due, save_report_settings, send_daily_reports,
+    SUMMARY_BUTTON, build_report, build_staff_report, flush_overdue_queue, report_settings, reports_due,
+    save_overdue_settings, save_report_settings, send_daily_reports,
 )
 
 CORS = {
@@ -26,6 +27,8 @@ ALLOWED_ROLES = ('admin', 'manager', 'technician', 'superadmin')
 BOSS_ROLES = ('admin', 'manager', 'superadmin')
 WEBHOOK_PREFIX = 'https://functions.poehali.dev/'
 SUMMARY_WORDS = ('/summary', '/svodka', 'сводка', 'отчет', 'отчёт')
+STAFF_WORDS = ('/staff', 'сотрудники', 'сводка по сотрудникам', 'персонал')
+TIME_RE = re.compile(r'^([01]\d|2[0-3]):[0-5]\d$')
 
 
 def q(value) -> str:
@@ -86,7 +89,7 @@ def ensure_webhook(hook_url: str) -> None:
     print(f'max subscribe {status}: {data}')
 
 
-def send_summary(cur, max_uid) -> None:
+def send_summary(cur, max_uid, kind: str = 'points') -> None:
     cur.execute(
         'SELECT u.id, u.role FROM max_links l JOIN app_users u ON u.id = l.user_id '
         f'WHERE l.max_user_id = {int(max_uid)} AND u.active'
@@ -98,7 +101,8 @@ def send_summary(cur, max_uid) -> None:
     if row[1] not in BOSS_ROLES:
         send_text(max_uid, 'Сводка по точкам доступна админам, управляющим и супер-админу.')
         return
-    send_text(max_uid, build_report(cur, int(row[0]), row[1], False), True)
+    text = build_staff_report(cur, int(row[0]), row[1]) if kind == 'staff' else build_report(cur, int(row[0]), row[1], False)
+    send_text(max_uid, text, True)
 
 
 def handle_update(cur, upd: dict) -> None:
@@ -110,13 +114,13 @@ def handle_update(cur, upd: dict) -> None:
         user = cb.get('user') or {}
         payload = str(cb.get('payload') or '')
         uid = user.get('user_id')
-        notice = 'Готовлю сводку…' if payload == 'summary' else 'Принято'
+        notice = 'Готовлю сводку…' if payload in ('summary', 'staff') else 'Принято'
         if cb.get('callback_id'):
             max_api('POST', '/answers', {'callback_id': cb['callback_id']}, {'notification': notice}, 3)
         if not uid:
             return
-        if payload == 'summary':
-            send_summary(cur, uid)
+        if payload in ('summary', 'staff'):
+            send_summary(cur, uid, 'staff' if payload == 'staff' else 'points')
         else:
             handle_callback(cur, uid, payload, lambda t: send_text(uid, t))
     elif kind == 'message_created':
@@ -133,13 +137,15 @@ def handle_update(cur, upd: dict) -> None:
             send_text(sender['user_id'], 'Уведомления отключены.')
         elif handle_dialog_text(cur, sender['user_id'], text):
             return
+        elif any(low.startswith(w) for w in STAFF_WORDS):
+            send_summary(cur, sender['user_id'], 'staff')
         elif any(low.startswith(w) for w in SUMMARY_WORDS):
             send_summary(cur, sender['user_id'])
         else:
             send_text(
                 sender['user_id'],
                 'Я присылаю уведомления о заявках, ремонтах и передачах оборудования, а в 23:00 — итоги дня.\n'
-                'Чтобы получить сводку по своим точкам прямо сейчас, нажмите кнопку или напишите «сводка».',
+                'Сводку по точкам или по сотрудникам можно получить кнопками ниже или словами «сводка» и «сотрудники».',
                 True,
             )
 
@@ -163,6 +169,9 @@ def link_status(cur, uid: int, role: str) -> dict:
         'canReport': role in BOSS_ROLES,
         'reportTime': cfg['time'] if cfg else None,
         'reportEnabled': cfg['enabled'] if cfg else False,
+        'overdueEnabled': cfg['overdueEnabled'] if cfg else False,
+        'overdueFrom': cfg['overdueFrom'] if cfg else None,
+        'overdueTo': cfg['overdueTo'] if cfg else None,
         'allowed': role in ALLOWED_ROLES,
         'configured': bool(bot_token()),
         'linked': bool(row),
@@ -270,6 +279,10 @@ def handler(event: dict, context) -> dict:
             sent = send_daily_reports(cur)
         except Exception as err:
             print(f'daily reports failed: {err}')
+        try:
+            sent += flush_overdue_queue(cur)
+        except Exception as err:
+            print(f'overdue queue failed: {err}')
         return finish({'ok': True, 'sent': sent})
 
     me = session_user(cur, token)
@@ -280,6 +293,7 @@ def handler(event: dict, context) -> dict:
         try:
             if reports_due(cur):
                 send_daily_reports(cur, 4)
+            flush_overdue_queue(cur, 4)
         except Exception as err:
             print(f'daily reports failed: {err}')
         if bot_token():
@@ -298,13 +312,27 @@ def handler(event: dict, context) -> dict:
         if me['role'] not in BOSS_ROLES:
             return finish({'error': 'forbidden_role'}, 403)
         time_str = str(body.get('time') or '')
-        if not re.match(r'^([01]\d|2[0-3]):[0-5]\d$', time_str):
+        if not TIME_RE.match(time_str):
             return finish({'error': 'bad_time'}, 400)
         try:
             tz = max(-840, min(840, int(body.get('tzOffset'))))
         except (TypeError, ValueError):
             tz = -180
         save_report_settings(cur, me['id'], time_str, bool(body.get('enabled', True)), tz)
+        return finish(link_status(cur, me['id'], me['role']))
+
+    if action == 'overdue_settings':
+        if me['role'] not in BOSS_ROLES:
+            return finish({'error': 'forbidden_role'}, 403)
+        start = str(body.get('from') or '00:00')
+        end = str(body.get('to') or '23:59')
+        if not TIME_RE.match(start) or not TIME_RE.match(end):
+            return finish({'error': 'bad_time'}, 400)
+        try:
+            tz = max(-840, min(840, int(body.get('tzOffset'))))
+        except (TypeError, ValueError):
+            tz = -180
+        save_overdue_settings(cur, me['id'], bool(body.get('enabled', True)), start, end, tz)
         return finish(link_status(cur, me['id'], me['role']))
 
     if action == 'unlink':
