@@ -9,6 +9,7 @@ header('X-Robots-Tag: noindex');
 require __DIR__ . '/lib.php';
 require __DIR__ . '/schema.php';
 require __DIR__ . '/notify.php';
+require_once __DIR__ . '/max_bot.php';
 
 function e($v): string
 {
@@ -76,6 +77,17 @@ function real_login_request(string $login, string $pass): array
     $text = preg_replace('/"token":"[0-9a-f]+"/', '"token":"…"', $text);
     return [$url, $code, mb_substr($text, 0, 800)];
 }
+$hookResult = null;
+if ($cfg && $authorized && isset($_POST['max_hook_connect'])) {
+    if (max_token() === '') {
+        $hookResult = [false, 'Сначала сохраните токен бота MAX в блоке ниже'];
+    } else {
+        [$okSelf, $selfText] = max_hook_selftest(max_hook_base());
+        $hookResult = $okSelf ? max_connect_webhook(max_hook_base()) : [false, 'Сайт не отвечает сам себе: ' . $selfText . '. Проверьте, что сайт открывается по https и папка api загружена целиком'];
+    }
+    $add($hookResult[0], 'Кнопки бота MAX', $hookResult[1]);
+}
+
 if ($cfg && $authorized && isset($_POST['max_save'])) {
     $newMax = trim((string)($_POST['max_token'] ?? ''));
     $next = $cfg;
@@ -158,6 +170,22 @@ if ($cfg && $authorized) {
             [$mc, $mb] = max_call('GET', '/me', [], null, 6);
             if ($mc === 200 && !empty($mb['username'])) {
                 $add(true, 'Бот MAX', '@' . $mb['username'] . ' на связи');
+                [$hookState, $hookText] = max_hook_state(max_hook_base());
+                if ($hookState === 'ok') {
+                    $add(true, 'Кнопки бота MAX', 'Подключены — нажатия приходят на ' . $hookText);
+                } elseif ($hookState === 'other') {
+                    $add(false, 'Кнопки бота MAX', 'Нажатия уходят на другой адрес: ' . $hookText . '. Нажмите «Подключить кнопки бота» ниже');
+                } elseif ($hookState === 'none') {
+                    $add(false, 'Кнопки бота MAX', 'Не подключены — кнопки «Взял в работу», «Выполнено» и «Сводка» не работают. Нажмите «Подключить кнопки бота» ниже');
+                } else {
+                    $add(false, 'Кнопки бота MAX', $hookText);
+                }
+                try {
+                    $techCount = (int)one_value($db, "SELECT COUNT(*) FROM max_links l JOIN app_users u ON u.id = l.user_id WHERE u.role = 'technician' AND u.active = 1");
+                    $add($techCount > 0, 'Техники в MAX', $techCount > 0 ? 'подключено: ' . $techCount : 'ни один техник не подключил MAX — им не придут кнопки в заявках');
+                } catch (Throwable $ex) {
+                    $add(false, 'Техники в MAX', $ex->getMessage());
+                }
             } elseif ($mc === 401) {
                 $add(false, 'Бот MAX', 'MAX не принял токен — проверьте его в business.max.ru → Чат-боты → Интеграция');
             } else {
@@ -428,6 +456,19 @@ $serverJs = @file_get_contents(__DIR__ . '/server.js');
             <div class="d">Тот же файл, что загружали при установке. Недостающие фото скачаются с poehali.dev — это может занять пару минут.</div>
             <button type="submit">Проверить</button>
         </form>
+
+        <?php if ($authorized && (string)($cfg['max_token'] ?? '') !== ''): ?>
+        <form method="post" style="margin-top:24px">
+            <h3>Кнопки бота MAX</h3>
+            <input type="hidden" name="db_pass" value="<?= e((string)($_POST['db_pass'] ?? '')) ?>">
+            <input type="hidden" name="max_hook_connect" value="1">
+            <div class="d">Чтобы нажатия «Взял в работу», «Выполнено», «Сводка» сразу доходили до вашего сервера. Нажатия будут приходить на:<br><b><?= e(max_hook_base()) ?></b></div>
+            <?php if ($hookResult): ?>
+                <div class="d" style="font-weight:600;color:<?= $hookResult[0] ? '#15803d' : '#b91c1c' ?>"><?= $hookResult[0] ? '✅ ' : '❌ ' ?><?= e($hookResult[1]) ?></div>
+            <?php endif; ?>
+            <button type="submit">Подключить кнопки бота</button>
+        </form>
+        <?php endif; ?>
 
         <?php if ($authorized): $maxTok = (string)($cfg['max_token'] ?? ''); ?>
         <form method="post" style="margin-top:24px">

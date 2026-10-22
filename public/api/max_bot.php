@@ -9,23 +9,99 @@ function max_hook_key(): string
     return substr(hash('sha256', 'max-hook:' . max_token()), 0, 40);
 }
 
+const MAX_HOOK_TYPES = ['bot_started', 'message_created', 'message_callback'];
+
+function max_hook_base(): string
+{
+    $host = (string)($_SERVER['HTTP_HOST'] ?? '');
+    $dir = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? '/api/check.php'))), '/');
+    return 'https://' . $host . $dir . '/max.php';
+}
+
+function max_mask_url(string $url): string
+{
+    return (string)preg_replace('/hook=[^&]+/', 'hook=***', $url);
+}
+
+function max_subscriptions(): array
+{
+    [$code, $data] = max_call('GET', '/subscriptions', [], null, 6);
+    return [$code, $code === 200 ? (array)($data['subscriptions'] ?? []) : []];
+}
+
+function max_hook_state(string $base): array
+{
+    $target = $base . '?hook=' . max_hook_key();
+    [$code, $subs] = max_subscriptions();
+    if ($code !== 200) {
+        return ['error', 'MAX не отдал список подписок (код ' . $code . ($GLOBALS['max_last_error'] ? ', ' . $GLOBALS['max_last_error'] : '') . ')', $subs];
+    }
+    foreach ($subs as $s) {
+        if (($s['url'] ?? '') === $target) {
+            return ['ok', max_mask_url($target), $subs];
+        }
+    }
+    return [$subs ? 'other' : 'none', $subs ? implode(', ', array_map(fn($s) => max_mask_url((string)($s['url'] ?? '')), $subs)) : '', $subs];
+}
+
+function max_connect_webhook(string $base): array
+{
+    $target = $base . '?hook=' . max_hook_key();
+    [$code, $subs] = max_subscriptions();
+    if ($code !== 200) {
+        return [false, 'MAX не ответил (код ' . $code . '). Проверьте токен бота'];
+    }
+    foreach ($subs as $s) {
+        $url = (string)($s['url'] ?? '');
+        if ($url !== '' && $url !== $target) {
+            max_call('DELETE', '/subscriptions', ['url' => $url], null, 6);
+        }
+    }
+    [$code, $data] = max_call('POST', '/subscriptions', [], ['url' => $target, 'update_types' => MAX_HOOK_TYPES], 8);
+    if ($code !== 200 || (isset($data['success']) && !$data['success'])) {
+        return [false, 'MAX отказал в подключении: ' . ((string)($data['message'] ?? '') ?: 'код ' . $code)];
+    }
+    [$state] = max_hook_state($base);
+    return $state === 'ok'
+        ? [true, 'Нажатия кнопок теперь приходят на ' . max_mask_url($target)]
+        : [false, 'MAX принял запрос, но подписка не появилась. Попробуйте ещё раз через минуту'];
+}
+
+function max_hook_selftest(string $base): array
+{
+    if (!function_exists('curl_init')) {
+        return [true, 'пропущено: на хостинге нет curl'];
+    }
+    $ch = curl_init($base . '?hook=' . max_hook_key());
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => json_encode(['update_type' => 'ping']),
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 8,
+        CURLOPT_CONNECTTIMEOUT => 4,
+    ]);
+    $raw = curl_exec($ch);
+    $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
+    curl_close($ch);
+    $data = json_decode((string)$raw, true);
+    if ($code === 200 && !empty($data['ok'])) {
+        return [true, 'адрес ' . max_mask_url($base) . ' отвечает'];
+    }
+    return [false, 'адрес ' . max_mask_url($base) . ' не отвечает как надо (код ' . $code . ($err ? ', ' . $err : '') . ')'];
+}
+
 function max_ensure_webhook(string $hookUrl): void
 {
     if (!preg_match('#^https://#', $hookUrl)) {
         return;
     }
-    $target = strtok($hookUrl, '?') . '?hook=' . max_hook_key();
-    [$code, $data] = max_call('GET', '/subscriptions', [], null, 4);
-    $subs = $code === 200 ? (array)($data['subscriptions'] ?? []) : [];
-    foreach ($subs as $s) {
-        if (($s['url'] ?? '') === $target) {
-            return;
-        }
+    $base = (string)strtok($hookUrl, '?');
+    [$state] = max_hook_state($base);
+    if ($state !== 'ok') {
+        max_connect_webhook($base);
     }
-    foreach ($subs as $s) {
-        max_call('DELETE', '/subscriptions', ['url' => (string)$s['url']], null, 4);
-    }
-    max_call('POST', '/subscriptions', [], ['url' => $target, 'update_types' => ['bot_started', 'message_created', 'message_callback']], 4);
 }
 
 function max_summary(PDO $db, int $maxUid, string $kind = 'points'): void
