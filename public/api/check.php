@@ -114,11 +114,12 @@ if ($cfg && $authorized) {
         } else {
             $me = tg_call('getMe', [], 6);
             if (!$me) {
-                $add(false, 'Telegram-бот', 'Хостинг не может связаться с api.telegram.org: ' . ($GLOBALS['tg_last_error'] ?? '') . ' — обратитесь в поддержку REG.RU, чтобы открыли исходящие запросы к api.telegram.org');
+                $add(false, 'Telegram-бот', 'Нет связи ни напрямую, ни через посредника: ' . ($GLOBALS['tg_last_error'] ?? '') . ' — обратитесь в поддержку REG.RU, чтобы разрешили исходящие запросы к api.telegram.org или functions.poehali.dev');
             } elseif (empty($me['ok'])) {
                 $add(false, 'Telegram-бот', 'Telegram отклонил токен: ' . ($me['description'] ?? 'неизвестная ошибка') . ' — проверьте токен в настройках');
             } else {
-                $add(true, 'Telegram-бот', '@' . ($me['result']['username'] ?? '') . ' на связи');
+                $add(true, 'Telegram-бот', '@' . ($me['result']['username'] ?? '') . ' на связи'
+                    . (!empty($GLOBALS['tg_via_relay']) ? ' — через посредника (хостинг не пускает напрямую к api.telegram.org, это нормально)' : ' — напрямую'));
                 $hook = tg_call('getWebhookInfo', [], 6)['result'] ?? [];
                 $hookUrl = (string)($hook['url'] ?? '');
                 $hookErr = (string)($hook['last_error_message'] ?? '');

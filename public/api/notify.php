@@ -14,50 +14,90 @@ function bot_token(): string
     return trim((string)($cfg['telegram_token'] ?? ''));
 }
 
+const TG_RELAY_URL = 'https://functions.poehali.dev/cb4da38c-8f87-4ee3-9304-a91dc812dade';
+
+function tg_relay_marker(): string
+{
+    return __DIR__ . '/.tg_relay';
+}
+
+function tg_use_relay(): bool
+{
+    $file = tg_relay_marker();
+    return is_file($file) && (time() - (int)@filemtime($file)) < 6 * 3600;
+}
+
+function tg_http(string $url, string $json, float $timeout): array
+{
+    if (!function_exists('curl_init')) {
+        $ctx = stream_context_create(['http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json\r\n",
+            'content' => $json,
+            'timeout' => $timeout,
+            'ignore_errors' => true,
+        ]]);
+        $raw = @file_get_contents($url, false, $ctx);
+        return [$raw, $raw === false ? 'нет соединения' : ''];
+    }
+    $attempt = function (bool $verify) use ($url, $json, $timeout) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $json,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => (int)ceil($timeout),
+            CURLOPT_CONNECTTIMEOUT => 4,
+            CURLOPT_SSL_VERIFYPEER => $verify,
+            CURLOPT_SSL_VERIFYHOST => $verify ? 2 : 0,
+        ]);
+        $raw = curl_exec($ch);
+        $errNo = curl_errno($ch);
+        $err = curl_error($ch);
+        curl_close($ch);
+        return [$raw, $errNo, $err];
+    };
+    [$raw, $errNo, $err] = $attempt(true);
+    if ($raw === false && in_array($errNo, [35, 51, 58, 60, 77], true)) {
+        [$raw, $errNo, $err] = $attempt(false);
+    }
+    return [$raw, $raw === false ? 'curl ' . $errNo . ': ' . $err : ''];
+}
+
 function tg_call(string $method, array $payload, float $timeout = 4.0): array
 {
     $token = bot_token();
     if ($token === '') {
         return [];
     }
-    $url = 'https://api.telegram.org/bot' . $token . '/' . $method;
-    $json = json_encode($payload ?: new stdClass(), JSON_UNESCAPED_UNICODE);
     $GLOBALS['tg_last_error'] = '';
-    if (function_exists('curl_init')) {
-        $attempt = function (bool $verify) use ($url, $json, $timeout) {
-            $ch = curl_init($url);
-            curl_setopt_array($ch, [
-                CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => $json,
-                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => (int)ceil($timeout),
-                CURLOPT_CONNECTTIMEOUT => 4,
-                CURLOPT_SSL_VERIFYPEER => $verify,
-                CURLOPT_SSL_VERIFYHOST => $verify ? 2 : 0,
-            ]);
-            $raw = curl_exec($ch);
-            $errNo = curl_errno($ch);
-            $err = curl_error($ch);
-            curl_close($ch);
-            return [$raw, $errNo, $err];
-        };
-        [$raw, $errNo, $err] = $attempt(true);
-        if ($raw === false && in_array($errNo, [35, 51, 58, 60, 77], true)) {
-            [$raw, $errNo, $err] = $attempt(false);
+    $GLOBALS['tg_via_relay'] = false;
+    $body = $payload ?: new stdClass();
+    if (!tg_use_relay()) {
+        [$raw, $err] = tg_http(
+            'https://api.telegram.org/bot' . $token . '/' . $method,
+            json_encode($body, JSON_UNESCAPED_UNICODE),
+            min($timeout, 5.0)
+        );
+        if ($raw !== false) {
+            $data = json_decode((string)$raw, true);
+            return is_array($data) ? $data : [];
         }
-        if ($raw === false) {
-            $GLOBALS['tg_last_error'] = 'curl ' . $errNo . ': ' . $err;
-        }
-    } else {
-        $ctx = stream_context_create(['http' => [
-            'method' => 'POST',
-            'header' => "Content-Type: application/json\r\n",
-            'content' => $json,
-            'timeout' => $timeout,
-        ]]);
-        $raw = @file_get_contents($url, false, $ctx);
+        $GLOBALS['tg_direct_error'] = $err;
+        @touch(tg_relay_marker());
     }
+    [$raw, $err] = tg_http(
+        TG_RELAY_URL,
+        json_encode(['token' => $token, 'method' => $method, 'payload' => $body], JSON_UNESCAPED_UNICODE),
+        max($timeout, 10.0)
+    );
+    if ($raw === false) {
+        $GLOBALS['tg_last_error'] = trim(($GLOBALS['tg_direct_error'] ?? '') . ' / посредник: ' . $err, ' /');
+        @unlink(tg_relay_marker());
+        return [];
+    }
+    $GLOBALS['tg_via_relay'] = true;
     $data = json_decode((string)$raw, true);
     return is_array($data) ? $data : [];
 }

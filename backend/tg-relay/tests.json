@@ -1,0 +1,6 @@
+{
+  "tests": [
+    {"name": "CORS preflight", "method": "OPTIONS", "path": "/", "expectedStatus": 200},
+    {"name": "Неверный токен — 400", "method": "POST", "path": "/", "body": {"token": "x", "method": "getMe"}, "expectedStatus": 400, "expectedBody": {"ok": false, "description": "bad_token"}, "bodyMatcher": "partial"}
+  ]
+}
