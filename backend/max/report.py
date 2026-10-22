@@ -65,10 +65,39 @@ def send_tg(chat_id, text: str) -> None:
         print(f'telegram send failed {chat_id}: {err}')
 
 
+DEFAULT_TIME = '23:00'
+
+
 def boss_tz(cur, uid: int) -> int:
+    cur.execute(f'SELECT tz_offset FROM report_settings WHERE user_id = {int(uid)}')
+    row = cur.fetchone()
+    if row and row[0] is not None:
+        return int(row[0])
     cur.execute(f'SELECT tz_offset FROM staff_tasks WHERE created_by = {int(uid)} ORDER BY id DESC LIMIT 1')
     row = cur.fetchone()
     return int(row[0]) if row and row[0] is not None else DEFAULT_TZ
+
+
+def report_settings(cur, uid: int) -> dict:
+    cur.execute(f'SELECT report_time, enabled FROM report_settings WHERE user_id = {int(uid)}')
+    row = cur.fetchone()
+    return {'time': row[0] if row else DEFAULT_TIME, 'enabled': bool(row[1]) if row else True}
+
+
+def save_report_settings(cur, uid: int, time_str: str, enabled: bool, tz: int) -> dict:
+    cur.execute(
+        'INSERT INTO report_settings (user_id, report_time, enabled, tz_offset, updated_at) '
+        f'VALUES ({int(uid)}, {q(time_str)}, {"TRUE" if enabled else "FALSE"}, {int(tz)}, NOW()) '
+        'ON CONFLICT (user_id) DO UPDATE SET report_time = EXCLUDED.report_time, enabled = EXCLUDED.enabled, '
+        'tz_offset = EXCLUDED.tz_offset, updated_at = NOW()'
+    )
+    now = local_now(tz)
+    if now.strftime('%H:%M') >= time_str:
+        cur.execute(
+            f"INSERT INTO daily_reports (user_id, day) VALUES ({int(uid)}, {q(now.strftime('%Y-%m-%d'))}) "
+            'ON CONFLICT (user_id, day) DO NOTHING'
+        )
+    return report_settings(cur, uid)
 
 
 def local_now(tz: int) -> datetime.datetime:
@@ -162,7 +191,7 @@ def build_report(cur, uid: int, role: str, final: bool) -> str:
     start_utc = datetime.datetime.strptime(day, '%Y-%m-%d') + datetime.timedelta(minutes=tz)
     end_utc = start_utc + datetime.timedelta(days=1)
     points = boss_points(cur, uid, role)
-    title = f"{'🌙 Итоги дня' if final else '📊 Сводка'} · {now.strftime('%d.%m.%Y')}"
+    title = f"{'🌙 Итоги дня' if final else '📊 Сводка за день'} · {now.strftime('%d.%m.%Y')}"
     if not final:
         title += f" на {now.strftime('%H:%M')}"
     if not points:
@@ -219,15 +248,18 @@ def linked_bosses(cur) -> list:
 
 
 def send_daily_reports(cur, limit: int = 8) -> int:
-    """Отправляет итоги дня руководителям после 23:00 по их времени — один раз за день."""
+    """Отправляет сводку руководителям в выбранное ими время (по умолчанию 23:00) — один раз за день."""
     if not os.environ.get('MAX_BOT_TOKEN', '').strip() and not os.environ.get('TELEGRAM_BOT_TOKEN', '').strip():
         return 0
     jobs = []
     for uid, role, max_uid, chat_id in linked_bosses(cur):
         if len(jobs) >= limit:
             break
+        cfg = report_settings(cur, uid)
+        if not cfg['enabled']:
+            continue
         now = local_now(boss_tz(cur, uid))
-        if now.hour < REPORT_HOUR:
+        if now.strftime('%H:%M') < cfg['time']:
             continue
         day = now.strftime('%Y-%m-%d')
         cur.execute(
@@ -237,7 +269,7 @@ def send_daily_reports(cur, limit: int = 8) -> int:
         if not cur.fetchone():
             continue
         try:
-            text = build_report(cur, int(uid), role, True)
+            text = build_report(cur, int(uid), role, cfg['time'] >= '22:00')
         except Exception as err:
             print(f'report build failed {uid}: {err}')
             continue
@@ -252,10 +284,15 @@ def send_daily_reports(cur, limit: int = 8) -> int:
 
 
 def reports_due(cur) -> bool:
-    """Быстрая проверка: наступило ли 23:00 по Москве и есть ли кому слать сегодня."""
-    now = local_now(DEFAULT_TZ)
-    if now.hour < REPORT_HOUR:
-        return False
-    cur.execute(f"SELECT COUNT(*) FROM daily_reports WHERE day = {q(now.strftime('%Y-%m-%d'))}")
-    sent = int(cur.fetchone()[0] or 0)
-    return sent < len(linked_bosses(cur))
+    """Быстрая проверка: есть ли руководитель, чьё время сводки уже наступило, а сводка не ушла."""
+    for uid, _role, _m, _c in linked_bosses(cur):
+        cfg = report_settings(cur, uid)
+        if not cfg['enabled']:
+            continue
+        now = local_now(boss_tz(cur, uid))
+        if now.strftime('%H:%M') < cfg['time']:
+            continue
+        cur.execute(f"SELECT 1 FROM daily_reports WHERE user_id = {int(uid)} AND day = {q(now.strftime('%Y-%m-%d'))}")
+        if not cur.fetchone():
+            return True
+    return False

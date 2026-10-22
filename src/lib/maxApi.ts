@@ -3,6 +3,9 @@ import { apiUrl, isOwnServer } from '@/lib/apiBase';
 import { getToken } from '@/lib/authApi';
 
 export interface MaxStatus {
+  canReport?: boolean;
+  reportTime?: string | null;
+  reportEnabled?: boolean;
   allowed?: boolean;
   configured: boolean;
   linked: boolean;
@@ -28,6 +31,17 @@ export const requestMaxLink = async (): Promise<{ url: string; botName: string }
       webhookUrl: (func2url as Record<string, string>).max,
       ...(isOwnServer() ? { hookUrl: new URL(API(), window.location.href).href } : {}),
     }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || String(res.status));
+  return data;
+};
+
+export const saveReportSettings = async (time: string, enabled: boolean): Promise<MaxStatus> => {
+  const res = await fetch(API(), {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ action: 'report_settings', time, enabled, tzOffset: new Date().getTimezoneOffset() }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || String(res.status));

@@ -229,7 +229,8 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $day)) {
 $isBoss = in_array($me['role'], BOSS_ROLES, true);
 
 $payload = function () use ($db, $me, $day, $isBoss, $token): array {
-    $data = ['mine' => my_tasks($db, $me, $day), 'canManage' => $isBoss];
+    $pref = (string)(one_value($db, 'SELECT tune FROM staff_tune_prefs WHERE user_id = ?', [(int)$me['id']]) ?? '');
+    $data = ['mine' => my_tasks($db, $me, $day), 'canManage' => $isBoss, 'myTune' => in_array($pref, TASK_TUNES, true) ? $pref : ''];
     if ($isBoss) {
         $ids = task_managed_ids($db, $me, task_members($db, $token, $me));
         $data['manage'] = task_rows($db, '(t.assignee_id IN (' . in_list($ids) . ') OR t.created_by = ?)', [(int)$me['id']], $day);
@@ -254,6 +255,15 @@ if (method() === 'GET') {
 }
 
 $action = (string)($b['action'] ?? '');
+
+if ($action === 'my_tune') {
+    $tune = (string)($b['tune'] ?? '');
+    if ($tune !== '' && !in_array($tune, TASK_TUNES, true)) {
+        out(['error' => 'bad_tune'], 400);
+    }
+    upsert($db, 'staff_tune_prefs', ['user_id'], ['user_id' => (int)$me['id'], 'tune' => $tune, 'updated_at' => now_utc()]);
+    out($payload());
+}
 
 if ($action === 'done') {
     $tid = (int)($b['taskId'] ?? 0);

@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 import os
 import secrets
 import urllib.error
@@ -8,7 +9,9 @@ import urllib.request
 
 import psycopg2
 
-from report import SUMMARY_BUTTON, build_report, reports_due, send_daily_reports
+from report import (
+    SUMMARY_BUTTON, build_report, report_settings, reports_due, save_report_settings, send_daily_reports,
+)
 
 CORS = {
     'Access-Control-Allow-Origin': '*',
@@ -145,7 +148,11 @@ def session_user(cur, token: str):
 def link_status(cur, uid: int, role: str) -> dict:
     cur.execute(f'SELECT max_name, linked_at FROM max_links WHERE user_id = {int(uid)}')
     row = cur.fetchone()
+    cfg = report_settings(cur, uid) if role in BOSS_ROLES else None
     return {
+        'canReport': role in BOSS_ROLES,
+        'reportTime': cfg['time'] if cfg else None,
+        'reportEnabled': cfg['enabled'] if cfg else False,
         'allowed': role in ALLOWED_ROLES,
         'configured': bool(bot_token()),
         'linked': bool(row),
@@ -276,6 +283,19 @@ def handler(event: dict, context) -> dict:
 
     body = json.loads(event.get('body') or '{}')
     action = body.get('action')
+
+    if action == 'report_settings':
+        if me['role'] not in BOSS_ROLES:
+            return finish({'error': 'forbidden_role'}, 403)
+        time_str = str(body.get('time') or '')
+        if not re.match(r'^([01]\d|2[0-3]):[0-5]\d$', time_str):
+            return finish({'error': 'bad_time'}, 400)
+        try:
+            tz = max(-840, min(840, int(body.get('tzOffset'))))
+        except (TypeError, ValueError):
+            tz = -180
+        save_report_settings(cur, me['id'], time_str, bool(body.get('enabled', True)), tz)
+        return finish(link_status(cur, me['id'], me['role']))
 
     if action == 'unlink':
         cur.execute(f"SELECT max_user_id FROM max_links WHERE user_id = {int(me['id'])}")

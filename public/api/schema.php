@@ -200,6 +200,18 @@ function schema_sql(string $driver): array
             user_id INT NOT NULL,
             expires_at DATETIME NOT NULL
         )$tail",
+        "CREATE TABLE IF NOT EXISTS staff_tune_prefs (
+            user_id INT NOT NULL PRIMARY KEY,
+            tune VARCHAR(32) NOT NULL DEFAULT '',
+            updated_at DATETIME NULL
+        )$tail",
+        "CREATE TABLE IF NOT EXISTS report_settings (
+            user_id INT NOT NULL PRIMARY KEY,
+            report_time VARCHAR(5) NOT NULL DEFAULT '23:00',
+            enabled TINYINT NOT NULL DEFAULT 1,
+            tz_offset INT NOT NULL DEFAULT -180,
+            updated_at DATETIME NULL
+        )$tail",
         "CREATE TABLE IF NOT EXISTS daily_reports (
             user_id INT NOT NULL,
             day VARCHAR(10) NOT NULL,
@@ -264,7 +276,7 @@ function schema_sql(string $driver): array
     ];
 }
 
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 10;
 
 const SCHEMA_COLUMNS = [
     'app_sessions' => [

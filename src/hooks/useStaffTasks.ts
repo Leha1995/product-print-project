@@ -9,7 +9,7 @@ import {
   todayKey,
 } from '@/lib/staffTasksApi';
 
-const empty: StaffTasksData = { mine: [], manage: [], assignees: [], canManage: false };
+const empty: StaffTasksData = { mine: [], manage: [], assignees: [], canManage: false, myTune: '' };
 
 export const useStaffTasks = (enabled: boolean) => {
   const [data, setData] = useState<StaffTasksData>(empty);
@@ -76,12 +76,12 @@ export const useStaffTasks = (enabled: boolean) => {
     });
     if (!ringing.length) return;
     ringing.forEach((t) => lastRing.current.set(t.id, stamp));
-    playTune(ringing[0].tune, 8, true);
+    playTune(data.myTune || ringing[0].tune, 8, true);
     toast({
       title: ringing.length > 1 ? `Пора выполнить задания: ${ringing.length}` : 'Пора выполнить задание',
       description: ringing.map((t) => t.title).join(', '),
     });
-  }, [due, now]);
+  }, [due, now, data.myTune]);
 
   const confirm = useCallback(async (taskId: number) => {
     const next = await markStaffTaskDone(taskId);

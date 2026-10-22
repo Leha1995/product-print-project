@@ -246,17 +246,29 @@ MAX_FN = 'https://functions.poehali.dev/af92396f-6f3f-4ceb-a528-6ffaf66a1e61'
 
 
 def kick_daily_reports(cur) -> None:
-    """После 23:00 по Москве будит рассылку итогов дня, если сегодня она ещё не прошла."""
-    local = datetime.datetime.utcnow() + datetime.timedelta(hours=3)
-    if local.hour < 23:
+    """Если у кого-то из руководителей наступило время сводки, а она ещё не ушла — будит рассылку."""
+    cur.execute(
+        "SELECT u.id, COALESCE(r.report_time, '23:00'), COALESCE(r.enabled, TRUE), COALESCE(r.tz_offset, -180) "
+        'FROM app_users u LEFT JOIN report_settings r ON r.user_id = u.id '
+        "WHERE u.active AND u.role IN ('admin', 'manager', 'superadmin') AND ("
+        'EXISTS (SELECT 1 FROM max_links m WHERE m.user_id = u.id) OR '
+        'EXISTS (SELECT 1 FROM telegram_links t WHERE t.user_id = u.id))'
+    )
+    utc_now = datetime.datetime.utcnow()
+    for uid, rtime, enabled, tz in cur.fetchall():
+        if not enabled:
+            continue
+        local = utc_now - datetime.timedelta(minutes=int(tz))
+        if local.strftime('%H:%M') < rtime:
+            continue
+        cur.execute(f"SELECT 1 FROM daily_reports WHERE user_id = {int(uid)} AND day = {q(local.strftime('%Y-%m-%d'))}")
+        if cur.fetchone():
+            continue
+        try:
+            urllib.request.urlopen(f'{MAX_FN}?task=daily', timeout=1.5).read()
+        except Exception:
+            pass
         return
-    cur.execute(f"SELECT COUNT(*) FROM daily_reports WHERE day = {q(local.strftime('%Y-%m-%d'))}")
-    if int(cur.fetchone()[0] or 0) > 0 and local.minute % 10:
-        return
-    try:
-        urllib.request.urlopen(f'{MAX_FN}?task=daily', timeout=1.5).read()
-    except Exception:
-        pass
 
 
 def handler(event: dict, context) -> dict:
@@ -299,7 +311,9 @@ def handler(event: dict, context) -> dict:
             print(f'daily kick failed: {err}')
 
     def payload():
-        data = {'mine': mine(cur, me, day), 'canManage': is_boss}
+        cur.execute(f"SELECT tune FROM staff_tune_prefs WHERE user_id = {int(me['id'])}")
+        pref = cur.fetchone()
+        data = {'mine': mine(cur, me, day), 'canManage': is_boss, 'myTune': pref[0] if pref and pref[0] in TUNES else ''}
         if is_boss:
             members = structure_members(cur, token, me)
             ids = managed_ids(cur, me, members)
@@ -315,6 +329,16 @@ def handler(event: dict, context) -> dict:
         return finish(payload())
 
     action = body.get('action')
+
+    if action == 'my_tune':
+        tune = str(body.get('tune') or '')
+        if tune and tune not in TUNES:
+            return finish({'error': 'bad_tune'}, 400)
+        cur.execute(
+            f"INSERT INTO staff_tune_prefs (user_id, tune, updated_at) VALUES ({int(me['id'])}, {q(tune)}, NOW()) "
+            'ON CONFLICT (user_id) DO UPDATE SET tune = EXCLUDED.tune, updated_at = NOW()'
+        )
+        return finish(payload())
 
     if action == 'done':
         tid = int(body.get('taskId') or 0)

@@ -27,8 +27,34 @@ function rub($v): string
     return number_format(round((float)$v), 0, '', ' ') . ' ₽';
 }
 
+function report_settings(PDO $db, int $uid): array
+{
+    $row = one_row($db, 'SELECT report_time, enabled FROM report_settings WHERE user_id = ?', [$uid]);
+    return ['time' => $row ? (string)$row['report_time'] : '23:00', 'enabled' => $row ? flag($row['enabled']) : true];
+}
+
+function save_report_settings(PDO $db, int $uid, string $time, bool $enabled, int $tz): void
+{
+    upsert($db, 'report_settings', ['user_id'], [
+        'user_id' => $uid,
+        'report_time' => $time,
+        'enabled' => $enabled ? 1 : 0,
+        'tz_offset' => $tz,
+        'updated_at' => now_utc(),
+    ]);
+    $local = local_time($tz);
+    $day = gmdate('Y-m-d', $local);
+    if (gmdate('H:i', $local) >= $time && !one_value($db, 'SELECT 1 FROM daily_reports WHERE user_id = ? AND day = ?', [$uid, $day])) {
+        run($db, 'INSERT INTO daily_reports (user_id, day, sent_at) VALUES (?, ?, ?)', [$uid, $day, now_utc()]);
+    }
+}
+
 function boss_tz(PDO $db, int $uid): int
 {
+    $own = one_value($db, 'SELECT tz_offset FROM report_settings WHERE user_id = ?', [$uid]);
+    if ($own !== null) {
+        return (int)$own;
+    }
     $tz = one_value($db, 'SELECT tz_offset FROM staff_tasks WHERE created_by = ? ORDER BY id DESC LIMIT 1', [$uid]);
     return $tz === null ? REPORT_TZ : (int)$tz;
 }
@@ -58,7 +84,7 @@ function build_report(PDO $db, int $uid, string $role, bool $final): string
     $hhmm = gmdate('H:i', $local);
     $startUtc = gmdate('Y-m-d H:i:s', strtotime($day . ' 00:00:00 UTC') + $tz * 60);
     $endUtc = gmdate('Y-m-d H:i:s', strtotime($day . ' 00:00:00 UTC') + $tz * 60 + 86400);
-    $title = ($final ? '🌙 Итоги дня' : '📊 Сводка') . ' · ' . gmdate('d.m.Y', $local) . ($final ? '' : ' на ' . $hhmm);
+    $title = ($final ? '🌙 Итоги дня' : '📊 Сводка за день') . ' · ' . gmdate('d.m.Y', $local) . ($final ? '' : ' на ' . $hhmm);
     $points = boss_points($db, $uid, $role);
     if (!$points) {
         return "<b>{$title}</b>\n\nЗа вами пока не закреплено ни одной точки.";
@@ -185,8 +211,12 @@ function send_daily_reports(PDO $db, int $limit = 8): int
             break;
         }
         $uid = (int)$b['id'];
+        $cfg = report_settings($db, $uid);
+        if (!$cfg['enabled']) {
+            continue;
+        }
         $local = local_time(boss_tz($db, $uid));
-        if ((int)gmdate('G', $local) < REPORT_HOUR) {
+        if (gmdate('H:i', $local) < $cfg['time']) {
             continue;
         }
         $day = gmdate('Y-m-d', $local);
@@ -199,7 +229,7 @@ function send_daily_reports(PDO $db, int $limit = 8): int
             continue;
         }
         try {
-            $text = build_report($db, $uid, (string)$b['role'], true);
+            $text = build_report($db, $uid, (string)$b['role'], $cfg['time'] >= '22:00');
         } catch (Throwable $e) {
             error_log('[asap] report failed: ' . $e->getMessage());
             continue;
@@ -217,12 +247,8 @@ function send_daily_reports(PDO $db, int $limit = 8): int
 
 function maybe_daily_reports(PDO $db): void
 {
-    $local = local_time(REPORT_TZ);
-    if ((int)gmdate('G', $local) < REPORT_HOUR) {
-        return;
-    }
-    $marker = sys_get_temp_dir() . '/asap_daily_' . md5(__DIR__) . '_' . gmdate('Ymd', $local);
-    if (is_file($marker) && time() - (int)@filemtime($marker) < 600) {
+    $marker = sys_get_temp_dir() . '/asap_daily_' . md5(__DIR__);
+    if (is_file($marker) && time() - (int)@filemtime($marker) < 120) {
         return;
     }
     @touch($marker);

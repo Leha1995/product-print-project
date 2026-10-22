@@ -16,6 +16,8 @@ import {
 import StaffTaskFormDialog from '@/components/staff-tasks/StaffTaskFormDialog';
 import TelegramConnect from '@/components/TelegramConnect';
 import MaxConnect from '@/components/MaxConnect';
+import ReportTimeSettings from '@/components/ReportTimeSettings';
+import MyTunePicker from '@/components/staff-tasks/MyTunePicker';
 
 interface StaffTasksSectionProps {
   data: StaffTasksData;
@@ -185,6 +187,7 @@ const StaffTasksSection = ({ data, setData, loading, now, onConfirm, viewedId = 
 
       {(tab === 'mine' || !data.canManage) && (
         <>
+          <MyTunePicker value={data.myTune} onSaved={setData} />
           <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {mine.map((t) => {
               const due = isTaskDue(t, now);
@@ -232,6 +235,7 @@ const StaffTasksSection = ({ data, setData, loading, now, onConfirm, viewedId = 
       {tab === 'manage' && data.canManage && (
         <>
           <div className="mt-4 grid gap-2">
+            <ReportTimeSettings />
             <MaxConnect compact hint="Сообщим в MAX, если сотрудник не выполнит задание к сроку" />
             <TelegramConnect compact hint="Сообщим в Telegram, если сотрудник не выполнит задание к сроку" />
           </div>

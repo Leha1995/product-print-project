@@ -101,7 +101,12 @@ if (($_GET['task'] ?? '') === 'daily') {
 function max_status(PDO $db, int $uid, string $role): array
 {
     $row = one_row($db, 'SELECT max_name, linked_at FROM max_links WHERE user_id = ?', [$uid]);
+    $boss = in_array($role, BOSS_ROLES_R, true);
+    $cfg = $boss ? report_settings($db, $uid) : null;
     return [
+        'canReport' => $boss,
+        'reportTime' => $cfg ? $cfg['time'] : null,
+        'reportEnabled' => $cfg ? $cfg['enabled'] : false,
         'allowed' => in_array($role, NOTIFY_ROLES, true),
         'configured' => max_token() !== '',
         'linked' => (bool)$row,
@@ -205,6 +210,19 @@ if (method() === 'GET') {
 
 $body = body();
 $action = (string)($body['action'] ?? '');
+
+if ($action === 'report_settings') {
+    if (!in_array($me['role'], BOSS_ROLES_R, true)) {
+        out(['error' => 'forbidden_role'], 403);
+    }
+    $time = (string)($body['time'] ?? '');
+    if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time)) {
+        out(['error' => 'bad_time'], 400);
+    }
+    $tz = max(-840, min(840, (int)($body['tzOffset'] ?? -180)));
+    save_report_settings($db, (int)$me['id'], $time, !array_key_exists('enabled', $body) || (bool)$body['enabled'], $tz);
+    out(max_status($db, (int)$me['id'], $me['role']));
+}
 
 if ($action === 'unlink') {
     $maxUid = one_value($db, 'SELECT max_user_id FROM max_links WHERE user_id = ?', [$me['id']]);

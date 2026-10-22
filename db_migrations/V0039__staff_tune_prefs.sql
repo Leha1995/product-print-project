@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS staff_tune_prefs (
+  user_id INTEGER PRIMARY KEY,
+  tune TEXT NOT NULL DEFAULT '',
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);

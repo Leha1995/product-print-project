@@ -33,6 +33,7 @@ export interface StaffTasksData {
   manage: StaffTask[];
   assignees: StaffAssignee[];
   canManage: boolean;
+  myTune: string;
 }
 
 export interface StaffTaskInput {
@@ -58,6 +59,7 @@ const normalize = (data: Partial<StaffTasksData>): StaffTasksData => ({
   manage: Array.isArray(data.manage) ? data.manage : [],
   assignees: Array.isArray(data.assignees) ? data.assignees : [],
   canManage: Boolean(data.canManage),
+  myTune: typeof data.myTune === 'string' ? data.myTune : '',
 });
 
 export const fetchStaffTasks = async (): Promise<StaffTasksData> => {
@@ -87,6 +89,8 @@ export const updateStaffTask = async (taskId: number, task: StaffTaskInput) => {
   const updated = await send({ action: 'update', taskId, ...task, assigneeIds: [first], tzOffset: tzOffset() });
   return rest.length ? createStaffTask({ ...task, assigneeIds: rest }) : updated;
 };
+
+export const saveMyTune = (tune: string) => send({ action: 'my_tune', tune });
 
 export const deleteStaffTask = (taskId: number) => send({ action: 'delete', taskId });
 
