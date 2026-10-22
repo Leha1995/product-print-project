@@ -382,7 +382,7 @@ EXPORT_TABLES = {
     'print_keys': 'owner_id, key, printers, last_seen, created_at',
     'inventory_sessions': 'id, user_id, started_by, started_at, finished_at, scanned, missing, total, '
                           'total_price, missing_price',
-    'staff_tasks': 'id, created_by, assignee_id, title, note, kind, start_time, task_date, interval_min, tune, '
+    'staff_tasks': 'id, created_by, assignee_id, title, note, kind, start_time, end_time, task_date, interval_min, tune, '
                    'active, created_at',
     'staff_task_done': 'task_id, day, done_at, done_by',
 }

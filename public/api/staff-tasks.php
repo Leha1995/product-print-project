@@ -50,7 +50,7 @@ function task_rows(PDO $db, string $where, array $params, string $day): array
 {
     $rows = all_rows(
         $db,
-        "SELECT t.id, t.title, t.note, t.kind, t.start_time, t.task_date, t.interval_min, t.tune, t.assignee_id, "
+        "SELECT t.id, t.title, t.note, t.kind, t.start_time, t.end_time, t.task_date, t.interval_min, t.tune, t.assignee_id, "
         . "a.full_name AS a_full, a.username AS a_user, c.full_name AS c_full, c.username AS c_user "
         . 'FROM staff_tasks t LEFT JOIN app_users a ON a.id = t.assignee_id LEFT JOIN app_users c ON c.id = t.created_by '
         . "WHERE t.active = 1 AND $where ORDER BY t.start_time, t.id",
@@ -82,6 +82,7 @@ function task_rows(PDO $db, string $where, array $params, string $day): array
             'note' => (string)($r['note'] ?? ''),
             'kind' => $r['kind'],
             'startTime' => $r['start_time'],
+            'endTime' => $r['end_time'] ?: null,
             'date' => $r['task_date'],
             'intervalMin' => (int)$r['interval_min'],
             'tune' => $r['tune'],
@@ -110,7 +111,11 @@ function clean_task(array $b): ?array
     $date = (string)($b['date'] ?? '');
     $tune = (string)($b['tune'] ?? 'beep');
     $interval = (int)($b['intervalMin'] ?? 5);
+    $end = (string)($b['endTime'] ?? '');
     if ($title === '' || !preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $start)) {
+        return null;
+    }
+    if ($end !== '' && (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $end) || $end <= $start)) {
         return null;
     }
     if ($kind === 'once' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
@@ -121,6 +126,7 @@ function clean_task(array $b): ?array
         'note' => $note,
         'kind' => $kind,
         'start_time' => $start,
+        'end_time' => $end !== '' ? $end : null,
         'task_date' => $kind === 'once' ? $date : null,
         'interval_min' => max(1, min(120, $interval ?: 5)),
         'tune' => in_array($tune, TASK_TUNES, true) ? $tune : 'beep',
@@ -211,9 +217,9 @@ if ($action === 'create' || $action === 'update') {
         foreach (array_slice($assignees, 0, 100) as $uid) {
             run(
                 $db,
-                'INSERT INTO staff_tasks (created_by, assignee_id, title, note, kind, start_time, task_date, interval_min, tune, active, created_at) '
-                . 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)',
-                [(int)$me['id'], $uid, $task['title'], $task['note'], $task['kind'], $task['start_time'], $task['task_date'], $task['interval_min'], $task['tune'], now_utc()]
+                'INSERT INTO staff_tasks (created_by, assignee_id, title, note, kind, start_time, end_time, task_date, interval_min, tune, active, created_at) '
+                . 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)',
+                [(int)$me['id'], $uid, $task['title'], $task['note'], $task['kind'], $task['start_time'], $task['end_time'], $task['task_date'], $task['interval_min'], $task['tune'], now_utc()]
             );
         }
     } else {
@@ -223,8 +229,8 @@ if ($action === 'create' || $action === 'update') {
         }
         run(
             $db,
-            'UPDATE staff_tasks SET assignee_id = ?, title = ?, note = ?, kind = ?, start_time = ?, task_date = ?, interval_min = ?, tune = ? WHERE id = ?',
-            [$assignee, $task['title'], $task['note'], $task['kind'], $task['start_time'], $task['task_date'], $task['interval_min'], $task['tune'], $tid]
+            'UPDATE staff_tasks SET assignee_id = ?, title = ?, note = ?, kind = ?, start_time = ?, end_time = ?, task_date = ?, interval_min = ?, tune = ? WHERE id = ?',
+            [$assignee, $task['title'], $task['note'], $task['kind'], $task['start_time'], $task['end_time'], $task['task_date'], $task['interval_min'], $task['tune'], $tid]
         );
     }
     out($payload());

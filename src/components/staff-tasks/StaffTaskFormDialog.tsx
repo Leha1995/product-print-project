@@ -32,6 +32,7 @@ const StaffTaskFormDialog = ({
   const [note, setNote] = useState('');
   const [kind, setKind] = useState<StaffTaskKind>('daily');
   const [startTime, setStartTime] = useState('09:00');
+  const [endTime, setEndTime] = useState('');
   const [date, setDate] = useState(todayKey());
   const [intervalMin, setIntervalMin] = useState(5);
   const [tune, setTune] = useState('beep');
@@ -45,6 +46,7 @@ const StaffTaskFormDialog = ({
     setNote(task?.note ?? '');
     setKind(task?.kind ?? 'daily');
     setStartTime(task?.startTime ?? '09:00');
+    setEndTime(task?.endTime ?? '');
     setDate(task?.date ?? todayKey());
     setIntervalMin(task?.intervalMin ?? 5);
     setTune(task?.tune ?? 'beep');
@@ -63,6 +65,7 @@ const StaffTaskFormDialog = ({
     if (!title.trim()) return setError('Напишите, что нужно сделать');
     if (!assigneeIds.length) return setError('Выберите хотя бы одного сотрудника');
     if (!startTime) return setError('Укажите время');
+    if (endTime && endTime <= startTime) return setError('«Выполнить до» должно быть позже времени начала');
     if (kind === 'once' && !date) return setError('Укажите дату');
     setBusy(true);
     setError('');
@@ -72,6 +75,7 @@ const StaffTaskFormDialog = ({
         note: note.trim(),
         kind,
         startTime,
+        endTime: endTime || null,
         date: kind === 'once' ? date : null,
         intervalMin,
         tune,
@@ -188,13 +192,13 @@ const StaffTaskFormDialog = ({
             </div>
           </div>
 
-          <div className={`grid gap-3 ${kind === 'once' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-            {kind === 'once' && (
-              <label>
-                <span className={labelClass}>Дата</span>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
-              </label>
-            )}
+          {kind === 'once' && (
+            <label>
+              <span className={labelClass}>Дата</span>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
+            </label>
+          )}
+          <div className="grid grid-cols-2 gap-3">
             <label>
               <span className={labelClass}>Начать звонить с</span>
               <input
@@ -204,7 +208,33 @@ const StaffTaskFormDialog = ({
                 className={inputClass}
               />
             </label>
+            <label>
+              <span className={labelClass}>Выполнить до</span>
+              <div className="flex gap-1">
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className={inputClass}
+                />
+                {endTime && (
+                  <button
+                    type="button"
+                    onClick={() => setEndTime('')}
+                    aria-label="Убрать срок"
+                    className="flex shrink-0 items-center border-2 border-primary bg-background px-2 text-primary hover:bg-muted"
+                  >
+                    <Icon name="X" size={16} strokeWidth={2.5} />
+                  </button>
+                )}
+              </div>
+            </label>
           </div>
+          <span className="-mt-2 block text-[12px] text-muted-foreground">
+            {endTime
+              ? `Не выполнено к ${endTime} — задание попадёт в «Сводку» как просроченное и продолжит звонить.`
+              : 'Срок «до» необязателен. Без него задание не считается просроченным.'}
+          </span>
 
           <label>
             <span className={labelClass}>Повторять сигнал каждые</span>

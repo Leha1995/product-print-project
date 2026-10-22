@@ -37,6 +37,7 @@ import AccountantTechsPanel from '@/components/accountant/AccountantTechsPanel';
 import AccountantTransfersPanel from '@/components/accountant/AccountantTransfersPanel';
 import StaffTasksSection from '@/components/staff-tasks/StaffTasksSection';
 import useStaffTasks from '@/hooks/useStaffTasks';
+import { isTaskOverdue } from '@/lib/staffTasksApi';
 
 const Index = () => {
   const [selected, setSelected] = useState<Product | null>(null);
@@ -121,6 +122,10 @@ const Index = () => {
     const timer = window.setInterval(load, 120000);
     return () => window.clearInterval(timer);
   }, [isAdmin, overviewOpen]);
+  const reloadTasks = staffTasks.reload;
+  useEffect(() => {
+    if (overviewOpen) reloadTasks();
+  }, [overviewOpen, reloadTasks]);
   const [adminOpen, setAdminOpen] = useState(false);
   const { settings, update, reset } = useLabelSettings();
   const [quickPrint, setQuickPrint] = useState<Product | null>(null);
@@ -295,7 +300,7 @@ const Index = () => {
         userName={user?.fullName || user?.username || ''}
         onUsersClick={() => setUsersOpen(true)}
         onOverviewClick={() => setOverviewOpen(true)}
-        alertCount={alertCount}
+        alertCount={alertCount + staffTasks.data.manage.filter((t) => isTaskOverdue(t, staffTasks.now)).length}
         onAdminClick={() => setAdminOpen(true)}
         accessUntil={user?.accessUntil ?? null}
         section={section}
@@ -480,6 +485,8 @@ const Index = () => {
         open={overviewOpen}
         onOpenChange={setOverviewOpen}
         managed={managed}
+        tasks={staffTasks.data.manage}
+        now={staffTasks.now}
         onOpenStaff={(id) => {
           setTargetId(id);
           scrollTo('menu');

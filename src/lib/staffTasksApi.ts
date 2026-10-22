@@ -11,6 +11,7 @@ export interface StaffTask {
   note: string;
   kind: StaffTaskKind;
   startTime: string;
+  endTime: string | null;
   date: string | null;
   intervalMin: number;
   tune: string;
@@ -39,6 +40,7 @@ export interface StaffTaskInput {
   note: string;
   kind: StaffTaskKind;
   startTime: string;
+  endTime: string | null;
   date: string | null;
   intervalMin: number;
   tune: string;
@@ -99,4 +101,15 @@ export const isTaskDue = (task: StaffTask, now = new Date()) => {
     if (task.date < today) return true;
   }
   return now.getHours() * 60 + now.getMinutes() >= minutesOf(task.startTime);
+};
+
+export const isTaskOverdue = (task: StaffTask, now = new Date()) => {
+  if (task.doneAt) return false;
+  const today = todayKey(now);
+  if (task.kind === 'once') {
+    if (!task.date || task.date > today) return false;
+    if (task.date < today) return true;
+  }
+  if (!task.endTime) return false;
+  return now.getHours() * 60 + now.getMinutes() >= minutesOf(task.endTime);
 };

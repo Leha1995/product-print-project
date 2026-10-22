@@ -9,6 +9,7 @@ import {
   createStaffTask,
   deleteStaffTask,
   isTaskDue,
+  isTaskOverdue,
   todayKey,
   updateStaffTask,
 } from '@/lib/staffTasksApi';
@@ -33,7 +34,7 @@ const dateLabel = (key: string | null) => {
 };
 
 const scheduleText = (t: StaffTask) =>
-  t.kind === 'daily' ? `Каждый день с ${t.startTime}` : `${dateLabel(t.date)} с ${t.startTime}`;
+  `${t.kind === 'daily' ? 'Каждый день' : dateLabel(t.date)} с ${t.startTime}${t.endTime ? ` до ${t.endTime}` : ''}`;
 
 const StaffTasksSection = ({ data, setData, loading, now, onConfirm, viewedId = null }: StaffTasksSectionProps) => {
   const viewed = viewedId ? data.assignees.find((a) => a.id === viewedId) ?? null : null;
@@ -109,11 +110,19 @@ const StaffTasksSection = ({ data, setData, loading, now, onConfirm, viewedId = 
         </span>
       );
     }
+    if (isTaskOverdue(t, now)) {
+      return (
+        <span className="inline-flex items-center gap-1 border-2 border-destructive bg-destructive px-1.5 py-0.5 font-head text-[0.6rem] font-bold uppercase text-destructive-foreground">
+          <Icon name="TriangleAlert" fallback="AlertTriangle" size={12} strokeWidth={2.5} />
+          {t.endTime && !(t.kind === 'once' && t.date && t.date < today) ? `Просрочено · срок был ${t.endTime}` : 'Просрочено'}
+        </span>
+      );
+    }
     if (isTaskDue(t, now)) {
       return (
         <span className="inline-flex items-center gap-1 border-2 border-destructive bg-destructive px-1.5 py-0.5 font-head text-[0.6rem] font-bold uppercase text-destructive-foreground">
           <Icon name="BellRing" size={12} strokeWidth={2.5} />
-          Ждёт выполнения
+          {t.endTime ? `Ждёт выполнения · до ${t.endTime}` : 'Ждёт выполнения'}
         </span>
       );
     }

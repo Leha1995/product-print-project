@@ -237,7 +237,7 @@ function schema_sql(string $driver): array
     ];
 }
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 const SCHEMA_COLUMNS = [
     'app_sessions' => [
@@ -252,6 +252,9 @@ const SCHEMA_COLUMNS = [
         'repair_cost' => 'DECIMAL(14,2) NULL DEFAULT 0',
         'in_repair' => 'TINYINT NULL DEFAULT 0',
         'repair_sent_at' => 'DATETIME NULL',
+    ],
+    'staff_tasks' => [
+        'end_time' => 'VARCHAR(5) NULL',
     ],
     'equipment_transfers' => [
         'equipment_name' => 'VARCHAR(255) NULL',
@@ -330,7 +333,7 @@ const IMPORT_COLUMNS = [
     'telegram_links' => ['user_id', 'chat_id', 'tg_name', 'linked_at'],
     'print_keys' => ['owner_id', 'print_key', 'printers', 'last_seen', 'created_at'],
     'inventory_sessions' => ['id', 'user_id', 'started_by', 'started_at', 'finished_at', 'scanned', 'missing', 'total', 'total_price', 'missing_price'],
-    'staff_tasks' => ['id', 'created_by', 'assignee_id', 'title', 'note', 'kind', 'start_time', 'task_date', 'interval_min', 'tune', 'active', 'created_at'],
+    'staff_tasks' => ['id', 'created_by', 'assignee_id', 'title', 'note', 'kind', 'start_time', 'end_time', 'task_date', 'interval_min', 'tune', 'active', 'created_at'],
     'staff_task_done' => ['task_id', 'day', 'done_at', 'done_by'],
 ];
 

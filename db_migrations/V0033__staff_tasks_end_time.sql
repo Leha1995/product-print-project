@@ -1,0 +1,1 @@
+ALTER TABLE staff_tasks ADD COLUMN IF NOT EXISTS end_time TEXT NULL;

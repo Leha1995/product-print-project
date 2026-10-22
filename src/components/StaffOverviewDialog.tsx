@@ -5,12 +5,15 @@ import { StaffOverview, fetchOverview } from '@/lib/catalogApi';
 import { ManagedTarget } from '@/lib/authApi';
 import { formatLeft } from '@/hooks/usePrintHistory';
 import { toast } from '@/hooks/use-toast';
+import { StaffTask, isTaskOverdue } from '@/lib/staffTasksApi';
 
 interface StaffOverviewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onOpenStaff: (id: number) => void;
   managed?: ManagedTarget[];
+  tasks?: StaffTask[];
+  now?: Date;
 }
 
 interface TreeNode {
@@ -21,6 +24,8 @@ interface TreeNode {
   children: TreeNode[];
   expired: number;
   soon: number;
+  overdueTasks: StaffTask[];
+  tasksLate: number;
 }
 
 const roleShort: Record<string, string> = {
@@ -35,13 +40,17 @@ const roleRank = (role: string) =>
   role === 'superadmin' ? 0 : role === 'manager' ? 1 : role === 'admin' ? 2 : 3;
 
 const order = (a: TreeNode, b: TreeNode) =>
-  b.expired - a.expired || roleRank(a.role) - roleRank(b.role) || a.name.localeCompare(b.name, 'ru');
+  b.expired + b.tasksLate - (a.expired + a.tasksLate) || roleRank(a.role) - roleRank(b.role) || a.name.localeCompare(b.name, 'ru');
 
-const buildTree = (staff: StaffOverview[], managed: ManagedTarget[]): TreeNode[] => {
+const buildTree = (
+  staff: StaffOverview[],
+  managed: ManagedTarget[],
+  late: Map<number, StaffTask[]>,
+): TreeNode[] => {
   const byId = new Map(managed.map((m) => [m.id, m]));
   const people = new Map(staff.map((s) => [s.id, s]));
-  const ids = new Set<number>([...people.keys()]);
-  people.forEach((_, id) => {
+  const ids = new Set<number>([...people.keys(), ...[...late.keys()].filter((id) => byId.has(id))]);
+  ids.forEach((id) => {
     let parent = byId.get(id)?.managerId;
     const guard = new Set<number>([id]);
     while (parent && byId.has(parent) && !guard.has(parent)) {
@@ -60,6 +69,7 @@ const buildTree = (staff: StaffOverview[], managed: ManagedTarget[]): TreeNode[]
     seen.add(id);
     const m = byId.get(id);
     const person = people.get(id) || null;
+    const overdueTasks = late.get(id) || [];
     const children = [...ids]
       .filter((c) => !seen.has(c) && parentOf(c) === id)
       .map((c) => make(c, seen))
@@ -72,6 +82,8 @@ const buildTree = (staff: StaffOverview[], managed: ManagedTarget[]): TreeNode[]
       children,
       expired: (person?.expired.length || 0) + children.reduce((s, c) => s + c.expired, 0),
       soon: (person?.soon.length || 0) + children.reduce((s, c) => s + c.soon, 0),
+      overdueTasks,
+      tasksLate: overdueTasks.length + children.reduce((s, c) => s + c.tasksLate, 0),
     };
   };
 
@@ -85,14 +97,19 @@ const buildTree = (staff: StaffOverview[], managed: ManagedTarget[]): TreeNode[]
 };
 
 const toneBorder = (n: TreeNode) =>
-  n.expired
+  n.expired || n.tasksLate
     ? 'border-destructive bg-destructive/10'
     : n.soon
       ? 'border-warning bg-warning/15'
       : 'border-primary bg-card';
 
-const Badges = ({ expired, soon }: { expired: number; soon: number }) => (
+const Badges = ({ expired, soon, tasksLate }: { expired: number; soon: number; tasksLate: number }) => (
   <>
+    {tasksLate > 0 && (
+      <span className="shrink-0 border-2 border-destructive bg-destructive px-2 py-0.5 font-head text-[0.66rem] font-bold uppercase text-destructive-foreground">
+        Не выполнено заданий: {tasksLate}
+      </span>
+    )}
     {expired > 0 && (
       <span className="shrink-0 border-2 border-destructive bg-destructive px-2 py-0.5 font-head text-[0.66rem] font-bold uppercase text-destructive-foreground">
         Просрочено: {expired}
@@ -103,7 +120,7 @@ const Badges = ({ expired, soon }: { expired: number; soon: number }) => (
         Истекает: {soon}
       </span>
     )}
-    {!expired && !soon && (
+    {!expired && !soon && !tasksLate && (
       <span className="shrink-0 border-2 border-primary bg-background px-2 py-0.5 font-head text-[0.66rem] font-bold uppercase text-primary">
         Всё в сроке
       </span>
@@ -118,7 +135,14 @@ const toggle = (set: Set<number>, id: number) => {
   return next;
 };
 
-const StaffOverviewDialog = ({ open, onOpenChange, onOpenStaff, managed = [] }: StaffOverviewDialogProps) => {
+const StaffOverviewDialog = ({
+  open,
+  onOpenChange,
+  onOpenStaff,
+  managed = [],
+  tasks = [],
+  now = new Date(),
+}: StaffOverviewDialogProps) => {
   const [staff, setStaff] = useState<StaffOverview[]>([]);
   const [loading, setLoading] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
@@ -140,7 +164,17 @@ const StaffOverviewDialog = ({ open, onOpenChange, onOpenStaff, managed = [] }: 
     if (open) load();
   }, [open, load]);
 
-  const tree = useMemo(() => buildTree(staff, managed), [staff, managed]);
+  const late = useMemo(() => {
+    const map = new Map<number, StaffTask[]>();
+    tasks.forEach((t) => {
+      if (!isTaskOverdue(t, now)) return;
+      map.set(t.assigneeId, [...(map.get(t.assigneeId) || []), t]);
+    });
+    return map;
+  }, [tasks, now]);
+
+  const tree = useMemo(() => buildTree(staff, managed, late), [staff, managed, late]);
+  const totalLate = [...late.values()].reduce((sum, list) => sum + list.length, 0);
 
   const totalExpired = staff.reduce((sum, s) => sum + s.expired.length, 0);
   const totalSoon = staff.reduce((sum, s) => sum + s.soon.length, 0);
@@ -158,11 +192,11 @@ const StaffOverviewDialog = ({ open, onOpenChange, onOpenStaff, managed = [] }: 
   const allCollapsed = groupIds.length > 0 && groupIds.every((id) => collapsed.has(id));
 
   const renderNode = (node: TreeNode, depth: number): JSX.Element | null => {
-    if (onlyProblems && !node.expired && !node.soon) return null;
+    if (onlyProblems && !node.expired && !node.soon && !node.tasksLate) return null;
     const isGroup = node.children.length > 0;
     const isCollapsed = collapsed.has(node.id);
     const own = node.person;
-    const ownCount = own ? own.expired.length + own.soon.length : 0;
+    const ownCount = (own ? own.expired.length + own.soon.length : 0) + node.overdueTasks.length;
     const itemsShown = itemsOpen.has(node.id);
 
     const chevron = isGroup
@@ -205,7 +239,7 @@ const StaffOverviewDialog = ({ open, onOpenChange, onOpenStaff, managed = [] }: 
               </span>
             </button>
 
-            <Badges expired={node.expired} soon={node.soon} />
+            <Badges expired={node.expired} soon={node.soon} tasksLate={node.tasksLate} />
 
             {own && (
               <button
@@ -231,9 +265,23 @@ const StaffOverviewDialog = ({ open, onOpenChange, onOpenStaff, managed = [] }: 
             </button>
           )}
 
-          {own && itemsShown && ownCount > 0 && (
+          {itemsShown && ownCount > 0 && (
             <div className="space-y-1 border-t-2 border-primary bg-background/60 p-2.5">
-              {own.expired.map((item) => (
+              {node.overdueTasks.map((t) => (
+                <div
+                  key={`t-${t.id}`}
+                  className="flex items-center justify-between gap-3 border-2 border-destructive bg-background px-2.5 py-1.5"
+                >
+                  <span className="flex min-w-0 items-center gap-1.5 truncate font-head text-[0.78rem] font-bold uppercase text-destructive">
+                    <Icon name="ListChecks" size={14} strokeWidth={2.5} className="shrink-0" />
+                    <span className="truncate">{t.title}</span>
+                  </span>
+                  <span className="shrink-0 text-[12px] font-bold uppercase text-destructive">
+                    {t.endTime ? `Срок был ${t.endTime}` : 'Не выполнено'}
+                  </span>
+                </div>
+              ))}
+              {own?.expired.map((item) => (
                 <div
                   key={`e-${item.id}`}
                   className="flex items-center justify-between gap-3 border-2 border-destructive bg-background px-2.5 py-1.5"
@@ -244,7 +292,7 @@ const StaffOverviewDialog = ({ open, onOpenChange, onOpenStaff, managed = [] }: 
                   <span className="shrink-0 text-[12px] font-bold uppercase text-destructive">Срок вышел</span>
                 </div>
               ))}
-              {own.soon.map((item) => (
+              {own?.soon.map((item) => (
                 <div
                   key={`s-${item.id}`}
                   className="flex items-center justify-between gap-3 border-2 border-warning bg-background px-2.5 py-1.5"
@@ -278,6 +326,7 @@ const StaffOverviewDialog = ({ open, onOpenChange, onOpenStaff, managed = [] }: 
           </div>
           <p className="mt-1 text-[12px] text-primary-foreground/70">
             Просрочено: {totalExpired} · Скоро истекает: {totalSoon}
+            {totalLate > 0 ? ` · Не выполнено заданий: ${totalLate}` : ''}
           </p>
         </div>
 
@@ -320,7 +369,7 @@ const StaffOverviewDialog = ({ open, onOpenChange, onOpenStaff, managed = [] }: 
             <p className="py-6 text-center text-muted-foreground">За вами пока не закреплены сотрудники</p>
           )}
 
-          {!loading && onlyProblems && staff.length > 0 && !totalExpired && !totalSoon && (
+          {!loading && onlyProblems && staff.length > 0 && !totalExpired && !totalSoon && !totalLate && (
             <p className="py-6 text-center text-muted-foreground">У всех всё в сроке</p>
           )}
 

@@ -91,7 +91,7 @@ def task_rows(cur, where: str, day: str):
     cur.execute(
         'SELECT t.id, t.title, t.note, t.kind, t.start_time, t.task_date, t.interval_min, t.tune, '
         't.assignee_id, COALESCE(NULLIF(a.full_name, \'\'), a.username), '
-        'COALESCE(NULLIF(c.full_name, \'\'), c.username), t.created_at '
+        'COALESCE(NULLIF(c.full_name, \'\'), c.username), t.created_at, t.end_time '
         'FROM staff_tasks t LEFT JOIN app_users a ON a.id = t.assignee_id '
         'LEFT JOIN app_users c ON c.id = t.created_by '
         f'WHERE t.active AND {where} ORDER BY t.start_time, t.id'
@@ -120,6 +120,7 @@ def task_rows(cur, where: str, day: str):
             'note': r[2],
             'kind': r[3],
             'startTime': r[4],
+            'endTime': r[12] or None,
             'date': r[5],
             'intervalMin': r[6],
             'tune': r[7],
@@ -148,7 +149,10 @@ def clean_task(body: dict):
         interval = int(body.get('intervalMin') or 5)
     except (TypeError, ValueError):
         interval = 5
+    end = str(body.get('endTime') or '')
     if not title or not TIME_RE.match(start):
+        return None
+    if end and (not TIME_RE.match(end) or end <= start):
         return None
     if kind == 'once' and not DAY_RE.match(date):
         return None
@@ -157,6 +161,7 @@ def clean_task(body: dict):
         'note': note,
         'kind': kind,
         'start_time': start,
+        'end_time': end or None,
         'task_date': date if kind == 'once' else None,
         'interval_min': max(1, min(120, interval)),
         'tune': tune if tune in TUNES else 'beep',
@@ -250,14 +255,15 @@ def handler(event: dict, context) -> dict:
             return finish({'error': 'forbidden'}, 403)
         assignee = assignees[0]
         date_sql = q(task['task_date']) if task['task_date'] else 'NULL'
+        end_sql = q(task['end_time']) if task['end_time'] else 'NULL'
         if action == 'create':
             values = ', '.join(
                 f"({int(me['id'])}, {uid}, {q(task['title'])}, {q(task['note'])}, {q(task['kind'])}, "
-                f"{q(task['start_time'])}, {date_sql}, {task['interval_min']}, {q(task['tune'])})"
+                f"{q(task['start_time'])}, {end_sql}, {date_sql}, {task['interval_min']}, {q(task['tune'])})"
                 for uid in assignees[:100]
             )
             cur.execute(
-                'INSERT INTO staff_tasks (created_by, assignee_id, title, note, kind, start_time, task_date, interval_min, tune) '
+                'INSERT INTO staff_tasks (created_by, assignee_id, title, note, kind, start_time, end_time, task_date, interval_min, tune) '
                 f'VALUES {values}'
             )
         else:
@@ -268,7 +274,7 @@ def handler(event: dict, context) -> dict:
                 return finish({'error': 'not_found'}, 404)
             cur.execute(
                 f"UPDATE staff_tasks SET assignee_id = {assignee}, title = {q(task['title'])}, note = {q(task['note'])}, "
-                f"kind = {q(task['kind'])}, start_time = {q(task['start_time'])}, task_date = {date_sql}, "
+                f"kind = {q(task['kind'])}, start_time = {q(task['start_time'])}, end_time = {end_sql}, task_date = {date_sql}, "
                 f"interval_min = {task['interval_min']}, tune = {q(task['tune'])} WHERE id = {tid}"
             )
         return finish(payload())
