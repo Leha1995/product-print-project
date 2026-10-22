@@ -383,8 +383,9 @@ EXPORT_TABLES = {
     'inventory_sessions': 'id, user_id, started_by, started_at, finished_at, scanned, missing, total, '
                           'total_price, missing_price',
     'staff_tasks': 'id, created_by, assignee_id, title, note, kind, start_time, end_time, task_date, interval_min, tune, '
-                   'active, created_at',
+                   'active, created_at, tz_offset',
     'staff_task_done': 'task_id, day, done_at, done_by',
+    'staff_task_alerts': 'task_id, day, sent_at',
 }
 
 

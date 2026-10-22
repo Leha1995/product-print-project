@@ -1,8 +1,11 @@
+import datetime
 import json
 import os
 import re
 
 import psycopg2
+
+from notify import bosses_of, overdue_text, send_to_bosses
 
 CORS = {
     'Access-Control-Allow-Origin': '*',
@@ -149,6 +152,10 @@ def clean_task(body: dict):
         interval = int(body.get('intervalMin') or 5)
     except (TypeError, ValueError):
         interval = 5
+    try:
+        tz = max(-840, min(840, int(body.get('tzOffset'))))
+    except (TypeError, ValueError):
+        tz = -180
     end = str(body.get('endTime') or '')
     if not title or not TIME_RE.match(start):
         return None
@@ -165,7 +172,73 @@ def clean_task(body: dict):
         'task_date': date if kind == 'once' else None,
         'interval_min': max(1, min(120, interval)),
         'tune': tune if tune in TUNES else 'beep',
+        'tz_offset': tz,
     }
+
+
+def check_overdue(cur, limit: int = 15) -> None:
+    """Находит просроченные невыполненные задания и один раз сообщает руководителям в Telegram."""
+    if not os.environ.get('TELEGRAM_BOT_TOKEN', '').strip():
+        return
+    utc_now = datetime.datetime.utcnow()
+    cur.execute(
+        'SELECT t.id, t.title, t.note, t.kind, t.start_time, t.end_time, t.task_date, t.tz_offset, '
+        't.assignee_id, t.created_by, t.created_at, COALESCE(NULLIF(a.full_name, \'\'), a.username) '
+        'FROM staff_tasks t JOIN app_users a ON a.id = t.assignee_id '
+        "WHERE t.active AND a.active AND (t.end_time IS NOT NULL OR t.kind = 'once')"
+    )
+    candidates = []
+    for row in cur.fetchall():
+        tid, title, note, kind, _start, end, tdate, tz, assignee, creator, created_at, name = row
+        local = utc_now - datetime.timedelta(minutes=int(tz or 0))
+        today = local.strftime('%Y-%m-%d')
+        hhmm = local.strftime('%H:%M')
+        if kind == 'once':
+            if not tdate or tdate > today:
+                continue
+            day = tdate
+            if tdate == today and (not end or hhmm < end):
+                continue
+        else:
+            if not end or hhmm < end:
+                continue
+            day = today
+        deadline_local = datetime.datetime.strptime(f"{day} {end or '23:59'}", '%Y-%m-%d %H:%M')
+        if created_at and created_at > deadline_local + datetime.timedelta(minutes=int(tz or 0)):
+            continue
+        candidates.append({
+            'id': tid, 'kind': kind, 'title': title, 'note': note or '', 'endTime': end, 'day': day,
+            'assigneeId': assignee, 'createdBy': creator, 'assigneeName': name or '',
+        })
+    if not candidates:
+        return
+    ids = ids_sql([c['id'] for c in candidates])
+    cur.execute(f'SELECT task_id, day FROM staff_task_done WHERE task_id IN ({ids})')
+    done = {(r[0], r[1]) for r in cur.fetchall()}
+    done_once = {r[0] for r in done}
+    cur.execute(f'SELECT task_id, day FROM staff_task_alerts WHERE task_id IN ({ids})')
+    sent = {(r[0], r[1]) for r in cur.fetchall()}
+    sent_count = 0
+    for c in candidates:
+        if sent_count >= limit:
+            break
+        key = (c['id'], c['day'])
+        if key in sent or key in done:
+            continue
+        if c['kind'] == 'once' and c['id'] in done_once:
+            continue
+        cur.execute(
+            f"INSERT INTO staff_task_alerts (task_id, day) VALUES ({int(c['id'])}, {q(c['day'])}) "
+            'ON CONFLICT (task_id, day) DO NOTHING RETURNING task_id'
+        )
+        if not cur.fetchone():
+            continue
+        sent_count += 1
+        y, m, d = c['day'].split('-')
+        try:
+            send_to_bosses(cur, bosses_of(cur, c['assigneeId'], c['createdBy']), overdue_text(c, f'{d}.{m}.{y}'))
+        except Exception as err:
+            print(f'overdue notify failed {c["id"]}: {err}')
 
 
 def handler(event: dict, context) -> dict:
@@ -197,6 +270,11 @@ def handler(event: dict, context) -> dict:
         return finish({'error': 'invalid_day'}, 400)
 
     is_boss = me['role'] in BOSS_ROLES
+    if method == 'GET':
+        try:
+            check_overdue(cur)
+        except Exception as err:
+            print(f'check_overdue failed: {err}')
 
     def payload():
         data = {'mine': mine(cur, me, day), 'canManage': is_boss}
@@ -259,11 +337,11 @@ def handler(event: dict, context) -> dict:
         if action == 'create':
             values = ', '.join(
                 f"({int(me['id'])}, {uid}, {q(task['title'])}, {q(task['note'])}, {q(task['kind'])}, "
-                f"{q(task['start_time'])}, {end_sql}, {date_sql}, {task['interval_min']}, {q(task['tune'])})"
+                f"{q(task['start_time'])}, {end_sql}, {date_sql}, {task['interval_min']}, {q(task['tune'])}, {task['tz_offset']})"
                 for uid in assignees[:100]
             )
             cur.execute(
-                'INSERT INTO staff_tasks (created_by, assignee_id, title, note, kind, start_time, end_time, task_date, interval_min, tune) '
+                'INSERT INTO staff_tasks (created_by, assignee_id, title, note, kind, start_time, end_time, task_date, interval_min, tune, tz_offset) '
                 f'VALUES {values}'
             )
         else:
@@ -275,7 +353,7 @@ def handler(event: dict, context) -> dict:
             cur.execute(
                 f"UPDATE staff_tasks SET assignee_id = {assignee}, title = {q(task['title'])}, note = {q(task['note'])}, "
                 f"kind = {q(task['kind'])}, start_time = {q(task['start_time'])}, end_time = {end_sql}, task_date = {date_sql}, "
-                f"interval_min = {task['interval_min']}, tune = {q(task['tune'])} WHERE id = {tid}"
+                f"interval_min = {task['interval_min']}, tune = {q(task['tune'])}, tz_offset = {task['tz_offset']} WHERE id = {tid}"
             )
         return finish(payload())
 

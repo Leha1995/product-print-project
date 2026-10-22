@@ -78,11 +78,13 @@ const send = async (body: Record<string, unknown>): Promise<StaffTasksData> => {
 
 export const markStaffTaskDone = (taskId: number) => send({ action: 'done', taskId });
 
-export const createStaffTask = (task: StaffTaskInput) => send({ action: 'create', ...task });
+const tzOffset = () => new Date().getTimezoneOffset();
+
+export const createStaffTask = (task: StaffTaskInput) => send({ action: 'create', ...task, tzOffset: tzOffset() });
 
 export const updateStaffTask = async (taskId: number, task: StaffTaskInput) => {
   const [first, ...rest] = task.assigneeIds;
-  const updated = await send({ action: 'update', taskId, ...task, assigneeIds: [first] });
+  const updated = await send({ action: 'update', taskId, ...task, assigneeIds: [first], tzOffset: tzOffset() });
   return rest.length ? createStaffTask({ ...task, assigneeIds: rest }) : updated;
 };
 

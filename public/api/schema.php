@@ -215,6 +215,12 @@ function schema_sql(string $driver): array
             active TINYINT NOT NULL DEFAULT 1,
             created_at DATETIME NULL
         )$tail",
+        "CREATE TABLE IF NOT EXISTS staff_task_alerts (
+            task_id INT NOT NULL,
+            day VARCHAR(10) NOT NULL,
+            sent_at DATETIME NULL,
+            PRIMARY KEY (task_id, day)
+        )$tail",
         "CREATE TABLE IF NOT EXISTS staff_task_done (
             task_id INT NOT NULL,
             day VARCHAR(10) NOT NULL,
@@ -237,7 +243,7 @@ function schema_sql(string $driver): array
     ];
 }
 
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 const SCHEMA_COLUMNS = [
     'app_sessions' => [
@@ -255,6 +261,7 @@ const SCHEMA_COLUMNS = [
     ],
     'staff_tasks' => [
         'end_time' => 'VARCHAR(5) NULL',
+        'tz_offset' => 'INT NOT NULL DEFAULT -180',
     ],
     'equipment_transfers' => [
         'equipment_name' => 'VARCHAR(255) NULL',
@@ -333,8 +340,9 @@ const IMPORT_COLUMNS = [
     'telegram_links' => ['user_id', 'chat_id', 'tg_name', 'linked_at'],
     'print_keys' => ['owner_id', 'print_key', 'printers', 'last_seen', 'created_at'],
     'inventory_sessions' => ['id', 'user_id', 'started_by', 'started_at', 'finished_at', 'scanned', 'missing', 'total', 'total_price', 'missing_price'],
-    'staff_tasks' => ['id', 'created_by', 'assignee_id', 'title', 'note', 'kind', 'start_time', 'end_time', 'task_date', 'interval_min', 'tune', 'active', 'created_at'],
+    'staff_tasks' => ['id', 'created_by', 'assignee_id', 'title', 'note', 'kind', 'start_time', 'end_time', 'task_date', 'interval_min', 'tune', 'active', 'created_at', 'tz_offset'],
     'staff_task_done' => ['task_id', 'day', 'done_at', 'done_by'],
+    'staff_task_alerts' => ['task_id', 'day', 'sent_at'],
 ];
 
 const IMPORT_DEFAULTS = [

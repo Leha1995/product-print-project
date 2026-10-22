@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/lib.php';
 require __DIR__ . '/schema.php';
+require __DIR__ . '/notify.php';
 
 $db = boot();
 upgrade_schema($db);
@@ -102,6 +103,83 @@ function my_tasks(PDO $db, array $me, string $day): array
     return array_values(array_filter($list, fn($t) => $t['kind'] === 'daily' || !$t['doneAt'] || $t['date'] === $day));
 }
 
+function task_bosses(PDO $db, int $assignee, int $creator): array
+{
+    $ids = [$creator];
+    $row = one_row($db, 'SELECT role, manager_id FROM app_users WHERE id = ?', [$assignee]);
+    if ($row && $row['manager_id']) {
+        $ids[] = (int)$row['manager_id'];
+        if ($row['role'] === 'user') {
+            $head = one_value($db, "SELECT manager_id FROM app_users WHERE id = ? AND role = 'admin'", [(int)$row['manager_id']]);
+            if ($head) {
+                $ids[] = (int)$head;
+            }
+        }
+    }
+    return array_values(array_diff(array_unique($ids), [$assignee]));
+}
+
+function check_overdue(PDO $db, int $limit = 15): void
+{
+    if (bot_token() === '') {
+        return;
+    }
+    $rows = all_rows(
+        $db,
+        'SELECT t.id, t.title, t.note, t.kind, t.end_time, t.task_date, t.tz_offset, t.assignee_id, t.created_by, t.created_at, '
+        . 'a.full_name, a.username FROM staff_tasks t JOIN app_users a ON a.id = t.assignee_id '
+        . "WHERE t.active = 1 AND a.active = 1 AND (t.end_time IS NOT NULL OR t.kind = 'once')"
+    );
+    $sent = 0;
+    foreach ($rows as $r) {
+        if ($sent >= $limit) {
+            break;
+        }
+        $tz = (int)$r['tz_offset'];
+        $local = gmdate('Y-m-d H:i', time() - $tz * 60);
+        [$today, $hhmm] = explode(' ', $local);
+        $end = $r['end_time'] ? (string)$r['end_time'] : null;
+        if ($r['kind'] === 'once') {
+            $day = (string)$r['task_date'];
+            if ($day === '' || $day > $today || ($day === $today && (!$end || $hhmm < $end))) {
+                continue;
+            }
+        } else {
+            if (!$end || $hhmm < $end) {
+                continue;
+            }
+            $day = $today;
+        }
+        $deadlineUtc = gmdate('Y-m-d H:i:s', strtotime($day . ' ' . ($end ?: '23:59') . ':00 UTC') + $tz * 60);
+        if ($r['created_at'] && (string)$r['created_at'] > $deadlineUtc) {
+            continue;
+        }
+        $tid = (int)$r['id'];
+        $doneSql = $r['kind'] === 'once' ? 'SELECT 1 FROM staff_task_done WHERE task_id = ?' : 'SELECT 1 FROM staff_task_done WHERE task_id = ? AND day = ?';
+        if (one_value($db, $doneSql, $r['kind'] === 'once' ? [$tid] : [$tid, $day])) {
+            continue;
+        }
+        if (one_value($db, 'SELECT 1 FROM staff_task_alerts WHERE task_id = ? AND day = ?', [$tid, $day])) {
+            continue;
+        }
+        try {
+            run($db, 'INSERT INTO staff_task_alerts (task_id, day, sent_at) VALUES (?, ?, ?)', [$tid, $day, now_utc()]);
+        } catch (Throwable $e) {
+            continue;
+        }
+        $sent++;
+        [$y, $m, $d] = explode('-', $day);
+        $when = $end ? "до $end" : 'в свой день';
+        $note = trim((string)($r['note'] ?? ''));
+        $text = "⏰ <b>Задание не выполнено в срок</b>\n"
+            . '👤 Сотрудник: ' . tg_esc($r['full_name'] ?: $r['username']) . "\n"
+            . '📋 ' . tg_esc($r['title']) . "\n"
+            . ($note !== '' ? '📝 ' . tg_esc(mb_substr($note, 0, 500)) . "\n" : '')
+            . "🕒 Нужно было $when · $d.$m.$y";
+        send_to_users($db, task_bosses($db, (int)$r['assignee_id'], (int)$r['created_by']), $text);
+    }
+}
+
 function clean_task(array $b): ?array
 {
     $title = mb_substr(trim((string)($b['title'] ?? '')), 0, 200);
@@ -111,6 +189,7 @@ function clean_task(array $b): ?array
     $date = (string)($b['date'] ?? '');
     $tune = (string)($b['tune'] ?? 'beep');
     $interval = (int)($b['intervalMin'] ?? 5);
+    $tz = isset($b['tzOffset']) && is_numeric($b['tzOffset']) ? max(-840, min(840, (int)$b['tzOffset'])) : -180;
     $end = (string)($b['endTime'] ?? '');
     if ($title === '' || !preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $start)) {
         return null;
@@ -126,6 +205,7 @@ function clean_task(array $b): ?array
         'note' => $note,
         'kind' => $kind,
         'start_time' => $start,
+        'tz_offset' => $tz,
         'end_time' => $end !== '' ? $end : null,
         'task_date' => $kind === 'once' ? $date : null,
         'interval_min' => max(1, min(120, $interval ?: 5)),
@@ -163,6 +243,11 @@ $payload = function () use ($db, $me, $day, $isBoss, $token): array {
 };
 
 if (method() === 'GET') {
+    try {
+        check_overdue($db);
+    } catch (Throwable $e) {
+        error_log('[asap] check_overdue: ' . $e->getMessage());
+    }
     out($payload());
 }
 
@@ -217,9 +302,9 @@ if ($action === 'create' || $action === 'update') {
         foreach (array_slice($assignees, 0, 100) as $uid) {
             run(
                 $db,
-                'INSERT INTO staff_tasks (created_by, assignee_id, title, note, kind, start_time, end_time, task_date, interval_min, tune, active, created_at) '
-                . 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)',
-                [(int)$me['id'], $uid, $task['title'], $task['note'], $task['kind'], $task['start_time'], $task['end_time'], $task['task_date'], $task['interval_min'], $task['tune'], now_utc()]
+                'INSERT INTO staff_tasks (created_by, assignee_id, title, note, kind, start_time, end_time, task_date, interval_min, tune, tz_offset, active, created_at) '
+                . 'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)',
+                [(int)$me['id'], $uid, $task['title'], $task['note'], $task['kind'], $task['start_time'], $task['end_time'], $task['task_date'], $task['interval_min'], $task['tune'], $task['tz_offset'], now_utc()]
             );
         }
     } else {
@@ -229,8 +314,8 @@ if ($action === 'create' || $action === 'update') {
         }
         run(
             $db,
-            'UPDATE staff_tasks SET assignee_id = ?, title = ?, note = ?, kind = ?, start_time = ?, end_time = ?, task_date = ?, interval_min = ?, tune = ? WHERE id = ?',
-            [$assignee, $task['title'], $task['note'], $task['kind'], $task['start_time'], $task['end_time'], $task['task_date'], $task['interval_min'], $task['tune'], $tid]
+            'UPDATE staff_tasks SET assignee_id = ?, title = ?, note = ?, kind = ?, start_time = ?, end_time = ?, task_date = ?, interval_min = ?, tune = ?, tz_offset = ? WHERE id = ?',
+            [$assignee, $task['title'], $task['note'], $task['kind'], $task['start_time'], $task['end_time'], $task['task_date'], $task['interval_min'], $task['tune'], $task['tz_offset'], $tid]
         );
     }
     out($payload());
