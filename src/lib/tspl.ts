@@ -88,7 +88,7 @@ const layoutCanvas = (src: HTMLCanvasElement, opts: TsplOptions) => {
   return page;
 };
 
-const toBitmap = (canvas: HTMLCanvasElement) => {
+const toBitmap = (canvas: HTMLCanvasElement, threshold = 170) => {
   const { width, height } = canvas;
   const rowBytes = Math.ceil(width / 8);
   const pixels = canvas.getContext('2d')!.getImageData(0, 0, width, height).data;
@@ -98,7 +98,7 @@ const toBitmap = (canvas: HTMLCanvasElement) => {
       const i = (y * width + x) * 4;
       const lum = 0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2];
       const alpha = pixels[i + 3];
-      if (alpha > 100 && lum < 170) {
+      if (alpha > 100 && lum < threshold) {
         out[y * rowBytes + (x >> 3)] &= ~(0x80 >> (x & 7));
       }
     }
@@ -117,8 +117,8 @@ const concat = (parts: Uint8Array[]) => {
   return result;
 };
 
-export const canvasToTspl = (canvas: HTMLCanvasElement, opts: TsplOptions) => {
-  const { rowBytes, height, data } = toBitmap(canvas);
+export const canvasToTspl = (canvas: HTMLCanvasElement, opts: TsplOptions, threshold = 170) => {
+  const { rowBytes, height, data } = toBitmap(canvas, threshold);
   const heightMm = opts.heightMm ?? Math.ceil(height / DOTS_PER_MM);
   const gap = opts.heightMm ? (opts.gapMm ?? 2) : 0;
   const head =
